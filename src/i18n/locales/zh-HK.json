@@ -1,0 +1,298 @@
+{
+  "nav": {
+    "myCollections": "我的收藏",
+    "marketplace": "市集",
+    "familyTodo": "家庭待辦"
+  },
+  "collections": {
+    "title": "我的收藏",
+    "create": "新增收藏",
+    "empty": "尚未有收藏，立即建立一個！",
+    "delete_confirm": "確定要刪除「{{title}}」？",
+    "count": "{{count}} 個收藏",
+    "shared": "共享",
+    "linksCount": "{{count}} 個連結",
+    "addLink": "新增連結",
+    "linksTitle": "連結",
+    "linksEmpty": "尚未有連結，立即新增一個！",
+    "link_delete_confirm": "確定要刪除此連結？",
+    "marketplace": {
+      "title": "市集",
+      "subtitle": "將此收藏公開給其他人探索",
+      "anonymous": "隱藏發布者資料",
+      "publish": "發布",
+      "publishing": "發布中...",
+      "unpublish": "取消發布",
+      "unpublishing": "取消發布中...",
+      "confirmUnpublish": "確定要取消發布？",
+      "publishSuccess": "已發布至市集",
+      "unpublishSuccess": "已取消發布",
+      "publishError": "發布失敗",
+      "unpublishError": "取消發布失敗"
+    },
+    "notFound": "找不到收藏",
+    "errors": {
+      "load": "載入收藏失敗",
+      "delete": "刪除收藏失敗",
+      "save": "儲存收藏失敗，請重試",
+      "requiredTitle": "標題為必填"
+    },
+    "form": {
+      "createTitle": "新增收藏",
+      "editTitle": "編輯收藏",
+      "iconHint": "可以使用 emoji (例如：📚, 🎨, 🛠)",
+      "fields": {
+        "title": "標題",
+        "description": "描述",
+        "icon": "圖示"
+      }
+    }
+  },
+  "marketplace": {
+    "title": "市集",
+    "links": "連結",
+    "anonymous": "匿名",
+    "search": "搜尋收藏...",
+    "subscribe": "訂閱",
+    "unsubscribe": "取消訂閱",
+    "fork": "複製到我的收藏",
+    "fork_confirm": "確定要複製這個收藏嗎？",
+    "description": "探索公開收藏，訂閱更新或 Fork 你的版本。",
+    "empty": "目前沒有符合的收藏",
+    "notFound": "找不到該收藏",
+    "errors": {
+      "load": "載入市集失敗",
+      "loadDetail": "載入收藏詳情失敗",
+      "loadSubscriptions": "載入訂閱資訊失敗",
+      "toggleSubscribe": "更新訂閱狀態失敗",
+      "fork": "複製收藏失敗"
+    }
+  },
+  "familyTodo": {
+    "spacesCount": "{{count}} 個 spaces",
+    "createSpace": "新增 Space",
+    "editSpace": "編輯 Space",
+    "newSpace": "新增 Space",
+    "spaceName": "名稱",
+    "empty": "尚未有 space，立即建立一個！",
+    "role": "角色：{{role}}",
+    "enterBoard": "進入看板 →",
+    "backSpaces": "← 返回 spaces",
+    "invalidSpaceId": "無效的 space id",
+    "deleteSpaceConfirm": "確定要刪除此 space？",
+    "errors": {
+      "saveSpace": "儲存 space 失敗",
+      "deleteSpace": "刪除失敗",
+      "loadSpaces": "載入 space 失敗"
+    }
+  },
+  "todo": {
+    "board": "看板",
+    "assignee": "指派給",
+    "addTodo": "新增待辦",
+    "addList": "新增列表",
+    "dragOrAdd": "拖曳或新增待辦",
+    "editListTitle": "列表標題",
+    "priority": {
+      "low": "低",
+      "medium": "中",
+      "high": "高",
+      "urgent": "緊急"
+    },
+    "editTodo": "編輯待辦",
+    "createTodo": "新增待辦",
+    "delete_confirm": "確定要刪除此待辦？",
+    "labels": {
+      "title": "標題",
+      "description": "描述",
+      "priority": "優先度",
+      "dueDate": "到期日",
+      "assignTo": "指派給（User ID）",
+      "save": "儲存",
+      "cancel": "取消",
+      "delete": "刪除"
+    },
+    "deleteListConfirm": "確定要刪除此列表？",
+    "errors": {
+      "loadBoard": "載入看板失敗",
+      "addList": "新增列表失敗",
+      "updateList": "更新列表失敗",
+      "deleteList": "刪除列表失敗",
+      "saveTodo": "儲存待辦失敗",
+      "deleteTodo": "刪除待辦失敗",
+      "toggleTodo": "更新待辦狀態失敗",
+      "reorderLists": "列表重排失敗",
+      "reorderTodos": "待辦重排失敗",
+      "moveTodo": "移動待辦失敗"
+    }
+  },
+  "common": {
+    "save": "儲存",
+    "cancel": "取消",
+    "delete": "刪除",
+    "edit": "編輯",
+    "search": "搜尋",
+    "loading": "載入中...",
+    "saving": "儲存中...",
+    "update": "更新",
+    "create": "新增",
+    "back": "← 返回",
+    "backTo": "← 返回 {{target}}",
+    "previous": "上一頁",
+    "next": "下一頁",
+    "page": "第 {{current}} / {{total}} 頁",
+    "loadFailed": "載入失敗",
+    "anonymous": "匿名",
+    "login": "登入",
+    "logout": "登出",
+    "signingIn": "正在登入...",
+    "signInFailed": "登入失敗，請再試一次。",
+    "language": "語言",
+    "languageZh": "繁體中文",
+    "languageEn": "English"
+  },
+  "theme": {
+    "label": "主題",
+    "dark": "黑",
+    "light": "白",
+    "eye": "淡綠"
+  },
+  "home": {
+    "brand": "HKER",
+    "title": "系統主題切換器",
+    "tagline": "你的個人生產力中心 — 收集、整理、分享。",
+    "greeting": "歡迎回來，{{name}} 👋",
+    "getStarted": "立即開始",
+    "madeWith": "用心製作於香港",
+    "loadingHealth": "載入健康檢查中...",
+    "healthFailed": "健康檢查失敗：{{error}}",
+    "features": {
+      "collections": {
+        "title": "收藏",
+        "description": "將你喜歡的連結整理成精美的收藏集，輕鬆分享。",
+        "cta": "瀏覽收藏"
+      },
+      "marketplace": {
+        "title": "市集",
+        "description": "探索公開收藏，訂閱更新或 Fork 你的版本。",
+        "cta": "探索市集"
+      },
+      "familyTodo": {
+        "title": "家庭待辦",
+        "description": "與家人或團隊協作的任務看板 — 支援優先級、到期日等功能。",
+        "cta": "開啟看板"
+      }
+    },
+    "errors": {
+      "loadHealth": "載入健康檢查失敗"
+    }
+  },
+  "links": {
+    "create": "新增連結",
+    "edit": "編輯連結",
+    "fields": {
+      "title": "標題",
+      "url": "URL",
+      "description": "描述"
+    },
+    "errors": {
+      "required": "標題和 URL 為必填",
+      "save": "儲存連結失敗，請重試",
+      "delete": "刪除連結失敗"
+    }
+  },
+  "invites": {
+    "title": "Invite Links",
+    "subtitle": "建立分享連結給協作者",
+    "roleLabel": "角色",
+    "role": {
+      "viewer": "Viewer",
+      "editor": "Editor"
+    },
+    "maxUsesLabel": "最大使用次數",
+    "maxUsesPlaceholder": "不限",
+    "expiresLabel": "有效時數",
+    "expiresPlaceholder": "永不過期",
+    "create": "建立 Invite Link",
+    "loading": "載入中...",
+    "empty": "目前沒有 invite links",
+    "unlimited": "∞",
+    "usage": "{{role}} · 使用 {{useCount}}/{{maxUses}}",
+    "copy": "複製",
+    "delete": "刪除",
+    "confirmDelete": "確定要刪除此 invite link？",
+    "copySuccess": "Invite link 已複製。",
+    "errors": {
+      "load": "載入 invite links 失敗",
+      "create": "建立 invite link 失敗",
+      "delete": "刪除 invite link 失敗",
+      "copy": "複製 invite link 失敗",
+      "maxUses": "最大使用次數需在 1 至 10000 之間",
+      "expires": "有效時數需在 1 至 8760 之間"
+    }
+  },
+  "members": {
+    "title": "Members",
+    "subtitle": "管理協作者",
+    "loading": "載入中...",
+    "empty": "目前沒有成員",
+    "remove": "移除",
+    "confirmRemove": "確定要移除此成員？",
+    "userFallback": "User {{id}}",
+    "errors": {
+      "load": "載入成員失敗",
+      "remove": "移除成員失敗"
+    }
+  },
+  "inviteJoin": {
+    "title": "Join Collection Invite",
+    "subtitle": "你被邀請加入：{{title}}",
+    "invalid": "此邀請連結無效或已超過使用次數上限。",
+    "joinNow": "立即加入",
+    "loginToJoin": "登入以加入",
+    "loading": "載入中...",
+    "notFound": "找不到邀請連結",
+    "errors": {
+      "load": "載入邀請失敗",
+      "join": "加入邀請失敗",
+      "forbidden": "你沒有權限加入此邀請"
+    }
+  },
+  "familyTodoInviteJoin": {
+    "title": "Join Space Invite",
+    "subtitle": "你被邀請加入 space：{{title}}",
+    "invalid": "此 space 邀請連結無效或已超過使用次數上限。",
+    "joinNow": "立即加入 space",
+    "loginToJoin": "登入以加入",
+    "loading": "載入中...",
+    "notFound": "找不到邀請連結",
+    "errors": {
+      "load": "載入 space 邀請失敗",
+      "join": "加入 space 失敗",
+      "forbidden": "你沒有權限加入此 space 邀請"
+    }
+  },
+  "auth": {
+    "loginTitle": "登入 HKER",
+    "registerTitle": "建立 HKER 帳號",
+    "email": "Email",
+    "password": "密碼",
+    "displayName": "顯示名稱",
+    "submitLogin": "登入",
+    "submitRegister": "建立帳號",
+    "noAccount": "還沒有帳號？",
+    "haveAccount": "已有帳號？",
+    "passwordHint": "8–128 個字元",
+    "loginSuccess": "登入成功",
+    "registerSuccess": "帳號建立成功",
+    "errors": {
+      "emailRequired": "Email 為必填",
+      "passwordRequired": "密碼為必填",
+      "passwordLength": "密碼長度需介於 8 到 128 字元",
+      "invalidCredentials": "Email 或密碼錯誤",
+      "emailTaken": "此 Email 已被使用",
+      "register": "建立帳號失敗",
+      "login": "登入失敗"
+    }
+  }
+}

@@ -1,0 +1,136 @@
+@import "tailwindcss";
+
+/* ─── Mochi Starry Night: Unified Theme System ─── */
+
+/* Light — Mochi Light */
+html[data-theme='light'] {
+  --bg:             #FFFBF7;
+  --bg-elevated:    #FFFFFF;
+  --text:           #334155;
+  --muted:          #94A3B8;
+  --accent:         #F472B6;
+  --accent-hover:   #EC4899;
+  --accent-strong:  #DB2777;
+  --accent-soft:    rgba(244, 114, 182, 0.1);
+  --cta:            #F472B6;
+  --cta-hover:      #EC4899;
+  --surface:        rgba(255, 255, 255, 0.8);
+  --surface-strong: #FFFFFF;
+  --border:         rgba(244, 114, 182, 0.1);
+  --border-strong:  rgba(244, 114, 182, 0.25);
+}
+
+/* Dark — Starry Night */
+html[data-theme='dark'] {
+  --bg:             #0F172A;
+  --bg-elevated:    #1E293B;
+  --text:           #F8FAFC;
+  --muted:          #94A3B8;
+  --accent:         #A78BFA;
+  --accent-hover:   #8B5CF6;
+  --accent-strong:  #C4B5FD;
+  --accent-soft:    rgba(167, 139, 250, 0.14);
+  --cta:            #A78BFA;
+  --cta-hover:      #8B5CF6;
+  --surface:        rgba(30, 41, 59, 0.6);
+  --surface-strong: #334155;
+  --border:         rgba(255, 255, 255, 0.1);
+  --border-strong:  rgba(167, 139, 250, 0.4);
+}
+
+/* Eye — Focus Mode */
+html[data-theme='eye'] {
+  --bg:             #F0FDF4;
+  --bg-elevated:    #F7FEF9;
+  --text:           #334155;
+  --muted:          #6B7280;
+  --accent:         #7c9a86;
+  --accent-hover:   #6b8875;
+  --accent-strong:  #516558;
+  --accent-soft:    #edf3ee;
+  --cta:            #7c9a86;
+  --cta-hover:      #6b8875;
+  --surface:        rgba(248, 253, 250, 0.88);
+  --surface-strong: #fcfffd;
+  --border:         rgba(153, 176, 162, 0.28);
+  --border-strong:  rgba(114, 156, 126, 0.5);
+}
+
+/* Universal Tokens */
+:root {
+  --radius-card:    32px;
+  --spring-ease:    cubic-bezier(0.34, 1.56, 0.64, 1);
+  --font-sans:      'Zen Kaku Gothic New', 'Segoe UI', 'Noto Sans TC', sans-serif;
+  --font-heading:   'M PLUS Rounded 1c', 'Zen Kaku Gothic New', sans-serif;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-soft: var(--accent-soft);
+  --color-cta: var(--cta);
+  --color-cta-hover: var(--cta-hover);
+  --color-surface: var(--surface);
+  --color-surface-strong: var(--surface-strong);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --radius-card: 32px;
+  --font-sans: var(--font-sans);
+  --font-heading: var(--font-heading);
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  background-image:
+    radial-gradient(circle at top left, var(--accent-soft), transparent 26%),
+    radial-gradient(circle at top right, var(--accent-soft), transparent 22%),
+    linear-gradient(180deg, var(--bg-elevated), var(--bg));
+  min-height: 100vh;
+}
+
+/* Mochi component utilities */
+.mochi-spring {
+  transition: all 500ms var(--spring-ease);
+}
+
+.mochi-card {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+}
+
+.mochi-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px -12px var(--accent-soft);
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .mochi-spring,
+  .mochi-card {
+    transition: none !important;
+  }
+  .mochi-card:hover {
+    transform: none !important;
+  }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 3px;
+}
