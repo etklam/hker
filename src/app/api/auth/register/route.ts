@@ -7,7 +7,7 @@ import { setSessionCookie } from '@/server/auth'
 import type { SessionResponse } from '@/lib/types'
 
 export async function POST(req: NextRequest) {
-  const rateLimitResponse = applyRateLimit(req)
+  const rateLimitResponse = await applyRateLimit(req)
   if (rateLimitResponse) return rateLimitResponse
 
   let body: { email?: string; password?: string; displayName?: string }
@@ -21,6 +21,11 @@ export async function POST(req: NextRequest) {
 
   if (!email || typeof email !== 'string') {
     return apiError('INVALID_REQUEST', 'Email is required')
+  }
+
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!EMAIL_RE.test(email) || email.length > 255) {
+    return apiError('INVALID_REQUEST', 'Invalid email format')
   }
 
   if (!password || typeof password !== 'string') {
@@ -47,6 +52,7 @@ export async function POST(req: NextRequest) {
         email: user.email,
         displayName: user.displayName,
         avatarUrl: user.avatarUrl,
+        role: user.role,
       },
     }
 

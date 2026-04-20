@@ -22,6 +22,7 @@ export async function resolveSession(req: NextRequest): Promise<AuthUser | null>
     email: result.user.email,
     displayName: result.user.displayName,
     avatarUrl: result.user.avatarUrl,
+    role: result.user.role,
   }
 }
 

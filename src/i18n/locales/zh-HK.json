@@ -166,6 +166,11 @@
     "madeWith": "用心製作於香港",
     "loadingHealth": "載入健康檢查中...",
     "healthFailed": "健康檢查失敗：{{error}}",
+    "featured": {
+      "title": "精選收藏",
+      "subtitle": "由管理員精心策展 — 為你挑選的最佳資源。",
+      "more": "更多連結"
+    },
     "features": {
       "collections": {
         "title": "收藏",
@@ -294,5 +299,19 @@
       "register": "建立帳號失敗",
       "login": "登入失敗"
     }
+  },
+  "admin": {
+    "nav": "管理",
+    "title": "管理後台",
+    "noAccess": "你沒有管理員權限。",
+    "dashboard": "儀表板",
+    "users": "用戶管理",
+    "overview": "總覽",
+    "statsUsers": "用戶總數",
+    "statsCollections": "收藏總數",
+    "statsLinks": "連結總數",
+    "totalUsers": "共 {{count}} 個用戶",
+    "role": "角色",
+    "joined": "加入日期"
   }
 }

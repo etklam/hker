@@ -19,6 +19,7 @@ import {
   LogIn,
   Menu,
   X,
+  Shield,
 } from 'lucide-react'
 import { ToastHost } from '@/components/ToastHost'
 
@@ -87,6 +88,19 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                 {href === '/' ? 'HKER' : t(labelKey)}
               </Link>
             ))}
+            {user?.role === 'admin' && (
+              <Link
+                href="/admin"
+                className={`mochi-spring flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                  isActive('/admin')
+                    ? 'bg-accent-soft text-accent'
+                    : 'text-muted hover:text-text hover:bg-accent-soft/50'
+                }`}
+              >
+                <Shield size={16} strokeWidth={2.5} />
+                {t('admin.nav')}
+              </Link>
+            )}
           </nav>
 
           {/* Right controls */}
@@ -159,6 +173,20 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                   {href === '/' ? 'HKER' : t(labelKey)}
                 </Link>
               ))}
+              {user?.role === 'admin' && (
+                <Link
+                  href="/admin"
+                  onClick={() => setMobileOpen(false)}
+                  className={`mochi-spring flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium ${
+                    isActive('/admin')
+                      ? 'bg-accent-soft text-accent'
+                      : 'text-muted hover:text-text hover:bg-accent-soft/50'
+                  }`}
+                >
+                  <Shield size={18} strokeWidth={2.5} />
+                  {t('admin.nav')}
+                </Link>
+              )}
             </nav>
 
             <div className="flex items-center gap-2 border-t border-border px-4 py-3">

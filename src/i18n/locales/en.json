@@ -166,6 +166,11 @@
     "madeWith": "Made with care in HK",
     "loadingHealth": "Loading health check...",
     "healthFailed": "Health check failed: {{error}}",
+    "featured": {
+      "title": "Featured Collections",
+      "subtitle": "Curated by our team — the best resources, handpicked for you.",
+      "more": "more links"
+    },
     "features": {
       "collections": {
         "title": "Collections",
@@ -294,5 +299,19 @@
       "register": "Failed to create account",
       "login": "Failed to log in"
     }
+  },
+  "admin": {
+    "nav": "Admin",
+    "title": "Admin Panel",
+    "noAccess": "You do not have admin access.",
+    "dashboard": "Dashboard",
+    "users": "Users",
+    "overview": "Overview",
+    "statsUsers": "Total Users",
+    "statsCollections": "Total Collections",
+    "statsLinks": "Total Links",
+    "totalUsers": "{{count}} users total",
+    "role": "Role",
+    "joined": "Joined"
   }
 }

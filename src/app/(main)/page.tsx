@@ -6,11 +6,33 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
 import { useTheme } from '@/lib/theme'
 import { api } from '@/lib/api-client'
-import { Bookmark, Store, CheckSquare, Heart, ArrowRight } from 'lucide-react'
+import { Bookmark, Store, CheckSquare, Heart, ArrowRight, ExternalLink } from 'lucide-react'
 
 interface HealthResponse {
   status: string
   timestamp: string
+}
+
+interface FeaturedLink {
+  id: number
+  title: string
+  url: string
+  description: string | null
+  faviconUrl: string | null
+  sortOrder: number
+}
+
+interface FeaturedCollection {
+  id: number
+  title: string
+  description: string | null
+  icon: string | null
+  linkCount: number
+  links: FeaturedLink[]
+}
+
+interface FeaturedResponse {
+  collections: FeaturedCollection[]
 }
 
 const FEATURES = [
@@ -36,11 +58,18 @@ export default function HomePage() {
   const { user } = useAuth()
   const [theme] = useTheme()
   const [health, setHealth] = useState<string | null>(null)
+  const [featured, setFeatured] = useState<FeaturedCollection[]>([])
 
   useEffect(() => {
     api<HealthResponse>('/api/health')
       .then((data) => setHealth(data.status))
       .catch(() => setHealth('error'))
+  }, [])
+
+  useEffect(() => {
+    api<FeaturedResponse>('/api/featured')
+      .then((data) => setFeatured(data.collections))
+      .catch(() => {})
   }, [])
 
   return (
@@ -81,6 +110,61 @@ export default function HomePage() {
           </div>
         )}
       </section>
+
+      {/* ─── Featured Collections (Admin curated) ─── */}
+      {featured.length > 0 && (
+        <section className="mb-16">
+          <h2 className="mb-6 text-center text-2xl font-bold text-text sm:text-3xl">
+            {t('home.featured.title')}
+          </h2>
+          <p className="mb-8 text-center text-sm text-muted">
+            {t('home.featured.subtitle')}
+          </p>
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {featured.map((col) => (
+              <div key={col.id} className="mochi-card flex flex-col p-6">
+                <div className="mb-3 flex items-center gap-2">
+                  {col.icon && <span className="text-2xl">{col.icon}</span>}
+                  <h3 className="text-lg font-bold text-text">{col.title}</h3>
+                </div>
+                {col.description && (
+                  <p className="mb-4 text-sm text-muted line-clamp-2">{col.description}</p>
+                )}
+                <div className="flex-1 space-y-2">
+                  {col.links.slice(0, 5).map((link) => (
+                    <a
+                      key={link.id}
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mochi-spring flex items-center gap-2 rounded-xl border border-border/50 px-3 py-2 text-sm text-text hover:bg-accent-soft/50 hover:border-border-strong"
+                    >
+                      {link.faviconUrl && (
+                        <img
+                          src={link.faviconUrl}
+                          alt=""
+                          className="h-4 w-4 rounded"
+                          loading="lazy"
+                        />
+                      )}
+                      <span className="flex-1 truncate">{link.title}</span>
+                      <ExternalLink size={12} className="shrink-0 text-muted" />
+                    </a>
+                  ))}
+                  {col.linkCount > 5 && (
+                    <p className="text-xs text-muted text-center pt-1">
+                      +{col.linkCount - 5} {t('home.featured.more')}
+                    </p>
+                  )}
+                </div>
+                <span className="mt-3 text-xs text-muted">
+                  {col.linkCount} {t('marketplace.links')}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* ─── Feature Cards ─── */}
       <section className="mb-16 grid gap-6 sm:grid-cols-3">

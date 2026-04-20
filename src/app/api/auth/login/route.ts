@@ -12,7 +12,7 @@ import { setSessionCookie } from '@/server/auth'
 import type { SessionResponse } from '@/lib/types'
 
 export async function POST(req: NextRequest) {
-  const rateLimitResponse = applyRateLimit(req)
+  const rateLimitResponse = await applyRateLimit(req)
   if (rateLimitResponse) return rateLimitResponse
 
   let body: { email?: string; password?: string }
@@ -32,14 +32,14 @@ export async function POST(req: NextRequest) {
     return apiError('INVALID_REQUEST', 'Password is required')
   }
 
-  if (isAccountLocked(email)) {
+  if (await isAccountLocked(email)) {
     return apiError('FORBIDDEN', 'Account temporarily locked due to too many failed attempts')
   }
 
   try {
     const user = await authService.login(email, password)
 
-    clearLoginFailures(email)
+    await clearLoginFailures(email)
 
     const token = await sessionService.createSession(user.id)
 
@@ -55,6 +55,7 @@ export async function POST(req: NextRequest) {
         email: user.email,
         displayName: user.displayName,
         avatarUrl: user.avatarUrl,
+        role: user.role,
       },
     }
 
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest) {
     return response
   } catch (err) {
     if (err instanceof AppError && err.code === 'INVALID_CREDENTIALS') {
-      trackLoginFailure(email)
+      await trackLoginFailure(email)
       return apiError('INVALID_CREDENTIALS', 'Invalid email or password')
     }
     throw err
