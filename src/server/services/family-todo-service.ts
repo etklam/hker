@@ -43,12 +43,20 @@ export async function removeList(spaceId: number, listId: number) {
 }
 
 export async function reorderLists(spaceId: number, ids: number[]) {
-  for (let i = 0; i < ids.length; i++) {
-    await db
+  if (ids.length === 0) return
+
+  await db.transaction(async (tx) => {
+    const cases = ids.map((id, i) => sql`WHEN ${id} THEN ${i}`).reduce((a, b) => sql`${a} ${b}`)
+    await tx
       .update(familyTodoLists)
-      .set({ sortOrder: i })
-      .where(and(eq(familyTodoLists.id, ids[i]), eq(familyTodoLists.spaceId, spaceId)))
-  }
+      .set({
+        sortOrder: sql`CASE ${familyTodoLists.id} ${cases} END`,
+      })
+      .where(and(
+        eq(familyTodoLists.spaceId, spaceId),
+        sql`${familyTodoLists.id} IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})`,
+      ))
+  })
 }
 
 export async function createTodo(
@@ -173,12 +181,20 @@ export async function moveTodo(todoId: number, targetListId: number) {
 }
 
 export async function reorderTodos(listId: number, ids: number[]) {
-  for (let i = 0; i < ids.length; i++) {
-    await db
+  if (ids.length === 0) return
+
+  await db.transaction(async (tx) => {
+    const cases = ids.map((id, i) => sql`WHEN ${id} THEN ${i}`).reduce((a, b) => sql`${a} ${b}`)
+    await tx
       .update(familyTodos)
-      .set({ sortOrder: i })
-      .where(and(eq(familyTodos.id, ids[i]), eq(familyTodos.listId, listId)))
-  }
+      .set({
+        sortOrder: sql`CASE ${familyTodos.id} ${cases} END`,
+      })
+      .where(and(
+        eq(familyTodos.listId, listId),
+        sql`${familyTodos.id} IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})`,
+      ))
+  })
 }
 
 export async function getTodoById(todoId: number) {

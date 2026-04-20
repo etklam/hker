@@ -112,10 +112,19 @@ export async function remove(collectionId: number, linkId: number) {
 }
 
 export async function reorder(collectionId: number, ids: number[]) {
-  for (let i = 0; i < ids.length; i++) {
-    await db
+  if (ids.length === 0) return
+
+  await db.transaction(async (tx) => {
+    const cases = ids.map((id, i) => sql`WHEN ${id} THEN ${i}`).reduce((a, b) => sql`${a} ${b}`)
+    await tx
       .update(links)
-      .set({ sortOrder: i, updatedAt: new Date() })
-      .where(and(eq(links.id, ids[i]), eq(links.collectionId, collectionId)))
-  }
+      .set({
+        sortOrder: sql`CASE ${links.id} ${cases} END`,
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(links.collectionId, collectionId),
+        sql`${links.id} IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})`,
+      ))
+  })
 }

@@ -3,6 +3,7 @@ import * as spaceService from '@/server/services/family-todo-space-service'
 import { fetchUsersById } from '@/server/services/user-service'
 import type { UserBrief, TodoResponse, TodoListWithItems, BoardResponse } from '@/lib/types'
 import { getSpaceAccess } from '@/server/services/permission-service'
+import { AppError } from '@/lib/errors'
 
 type TodoRecord = NonNullable<Awaited<ReturnType<typeof todoService.getTodoById>>>
 type UserRecord = {
@@ -58,7 +59,7 @@ export async function buildTodoResponse(todo: TodoRecord): Promise<TodoResponse>
 
 export async function getBoardData(spaceId: number, userId: number): Promise<BoardResponse> {
   const space = await spaceService.getById(spaceId)
-  if (!space) throw new Error('Space not found')
+  if (!space) throw new AppError('NOT_FOUND', 'Space not found')
 
   const lists = await todoService.getListsForSpace(spaceId)
   const todos = await todoService.getTodosForSpace(spaceId)

@@ -90,6 +90,13 @@ function baseQuery() {
     .innerJoin(users, eq(marketplaceListings.publisherId, users.id))
 }
 
+function baseCountQuery() {
+  return db
+    .select({ total: count() })
+    .from(marketplaceListings)
+    .innerJoin(collections, eq(marketplaceListings.collectionId, collections.id))
+}
+
 export async function listListings(
   page: number,
   size: number,
@@ -105,7 +112,7 @@ export async function listListings(
       .orderBy(...orderBy)
       .limit(size)
       .offset(page * size),
-    db.select({ total: count() }).from(marketplaceListings),
+    baseCountQuery(),
   ])
 
   return {
@@ -135,10 +142,7 @@ export async function searchListings(
       .orderBy(desc(marketplaceListings.publishedAt))
       .limit(size)
       .offset(page * size),
-    db
-      .select({ total: count() })
-      .from(marketplaceListings)
-      .innerJoin(collections, eq(marketplaceListings.collectionId, collections.id))
+    baseCountQuery()
       .where(whereClause),
   ])
 
