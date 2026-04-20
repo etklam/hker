@@ -1,41 +1,56 @@
-# HKER 部署到 CapRover（可重複流程）
+# HKER Deployment To CapRover
 
-本文記錄本次在 `https://captain.rnsj.913555.xyz` 的實際部署流程與下次直接可用的步驟。
+This document is a reusable CapRover runbook for HKER. It is intentionally sanitized. Do not store live passwords, hostnames, or session secrets in this file.
 
-## 本次建立的資源
+## What You Need
 
-- App: `hker`（主程式）
-- App: `hker-db`（PostgreSQL）
-- DB 連線:
-  - Host: `srv-captain--hker-db`
-  - Port: `5432`
-  - DB: `hker`
-  - User: `postgres`
-  - Password: `Ihave2jj`
+- a CapRover server
+- `caprover` CLI installed locally
+- a Git branch or image you want to deploy
+- a PostgreSQL database app on the same CapRover cluster
 
-## 下次部署前提
+## App Topology
 
-- 本機已安裝 `caprover` CLI
-- 已可登入目標機器：
-  - `caprover login -n ntd -u https://captain.rnsj.913555.xyz -p <CAPROVER_PASSWORD>`
-- 專案 branch 已包含要部署的 commit（本專案是 `main`）
+- App: `hker` for the Next.js application
+- App: `hker-db` for PostgreSQL
+- Internal DB host: `srv-captain--hker-db`
+- App container port: `3000`
 
-## 一次性初始化（只做一次）
+## Required Environment Variables
 
-### 1) 建立 DB App（必須一開始就用 persistent）
+Match these to `.env.example`:
 
-`hker-db` 需要 persistent data，不能先建 non-persistent 再補 volume。
+| Variable | Purpose |
+| --- | --- |
+| `DATABASE_URL` | PostgreSQL connection string |
+| `APP_BASE_URL` | Public base URL for the app |
+| `AUTH_SESSION_SECRET` | Session HMAC secret, use a long random value |
+| `AUTH_SESSION_COOKIE_NAME` | Cookie name, defaults to `hker_session` |
+| `AUTH_SESSION_TTL_DAYS` | Session lifetime in days |
+| `TRUSTED_PROXIES` | Optional comma-separated trusted proxy IPs |
+
+For the database app:
+
+| Variable | Purpose |
+| --- | --- |
+| `POSTGRES_DB` | Database name |
+| `POSTGRES_USER` | Database user |
+| `POSTGRES_PASSWORD` | Database password |
+
+## One-Time Setup
+
+### 1. Create the PostgreSQL app with persistent storage
 
 ```bash
-caprover api -n ntd -t /user/apps/appDefinitions/register -m POST
+caprover api -n <machine-name> -t /user/apps/appDefinitions/register -m POST
 # data:
 # {"appName":"hker-db","hasPersistentData":true}
 ```
 
-### 2) 設定 DB app
+### 2. Configure the PostgreSQL app
 
 ```bash
-caprover api -n ntd -t /user/apps/appDefinitions/update -m POST
+caprover api -n <machine-name> -t /user/apps/appDefinitions/update -m POST
 # data:
 # {
 #   "appName":"hker-db",
@@ -43,35 +58,35 @@ caprover api -n ntd -t /user/apps/appDefinitions/update -m POST
 #   "notExposeAsWebApp":true,
 #   "forceSsl":false,
 #   "envVars":[
-#     {"key":"POSTGRES_DB","value":"hker"},
-#     {"key":"POSTGRES_USER","value":"postgres"},
-#     {"key":"POSTGRES_PASSWORD","value":"Ihave2jj"}
+#     {"key":"POSTGRES_DB","value":"<db-name>"},
+#     {"key":"POSTGRES_USER","value":"<db-user>"},
+#     {"key":"POSTGRES_PASSWORD","value":"<db-password>"}
 #   ],
 #   "volumes":[{"containerPath":"/var/lib/postgresql/data","volumeName":"hker-db-data"}],
 #   "ports":[{"hostPort":54322,"containerPort":5432}]
 # }
 ```
 
-### 3) 部署 DB image
+### 3. Deploy PostgreSQL
 
 ```bash
-caprover deploy -n ntd -a hker-db -i postgres:16-alpine
+caprover deploy -n <machine-name> -a hker-db -i postgres:16-alpine
 ```
 
-### 4) 建立主 App
+### 4. Create the HKER app
 
 ```bash
-caprover api -n ntd -t /user/apps/appDefinitions/register -m POST
+caprover api -n <machine-name> -t /user/apps/appDefinitions/register -m POST
 # data:
 # {"appName":"hker"}
 ```
 
-### 5) 設定主 App 環境變數 + container port
+### 5. Configure the HKER app
 
-重點：`containerHttpPort` 必須是 `3000`，不然會 502。
+`containerHttpPort` must be `3000`. If you leave the CapRover default at `80`, the app will deploy and still serve 502s.
 
 ```bash
-caprover api -n ntd -t /user/apps/appDefinitions/update -m POST
+caprover api -n <machine-name> -t /user/apps/appDefinitions/update -m POST
 # data:
 # {
 #   "appName":"hker",
@@ -80,52 +95,101 @@ caprover api -n ntd -t /user/apps/appDefinitions/update -m POST
 #   "forceSsl":false,
 #   "containerHttpPort":3000,
 #   "envVars":[
-#     {"key":"DATABASE_URL","value":"postgresql://postgres:Ihave2jj@srv-captain--hker-db:5432/hker"},
-#     {"key":"APP_BASE_URL","value":"https://hker.rnsj.913555.xyz"},
-#     {"key":"AUTH_SESSION_SECRET","value":"<請換成隨機 32+ bytes secret>"},
+#     {
+#       "key":"DATABASE_URL",
+#       "value":"postgresql://<db-user>:<db-password>@srv-captain--hker-db:5432/<db-name>"
+#     },
+#     {"key":"APP_BASE_URL","value":"https://<your-domain>"},
+#     {"key":"AUTH_SESSION_SECRET","value":"<32+ byte random secret>"},
 #     {"key":"AUTH_SESSION_COOKIE_NAME","value":"hker_session"},
-#     {"key":"AUTH_SESSION_TTL_DAYS","value":"30"}
+#     {"key":"AUTH_SESSION_TTL_DAYS","value":"30"},
+#     {"key":"TRUSTED_PROXIES","value":""}
 #   ]
 # }
 ```
 
-### 6) 部署主程式
+### 6. Deploy the app
+
+From a Git branch:
 
 ```bash
-caprover deploy -n ntd -a hker -b main
+caprover deploy -n <machine-name> -a hker -b <branch>
 ```
 
-## 日常更新（之後每次）
-
-只要 DB 設定不變，下次只要：
+Or from a built image:
 
 ```bash
-git push origin main
-caprover deploy -n ntd -a hker -b main
+caprover deploy -n <machine-name> -a hker -i <image:tag>
 ```
 
-## 已踩過的坑
+## Database Bootstrap Note
 
-### 坑 1：`public/` 空資料夾導致 Docker COPY 失敗
+At the moment this repo contains Drizzle schema definitions and `drizzle.config.ts`, but it does not check in generated `drizzle/` migration SQL yet.
 
-錯誤：
-`COPY failed: stat app/public: file does not exist`
+That means you currently have two sane production bootstrap options:
 
-解法：確保 repo 有 `public/.gitkeep`（或任何檔案）。
+1. generate and commit migrations before release, then run `npm run db:migrate`
+2. for first-time environment setup only, run `npm run db:push` against the target database from a trusted operator machine
 
-### 坑 2：部署成功但 502
+Do not treat `db:push` as a long-term release process for a multi-person production workflow.
 
-原因：CapRover 預設 `containerHttpPort=80`，但 Next app 在 `3000`。
+## Routine Deploys
 
-解法：更新 app definition 把 `containerHttpPort` 設成 `3000`。
-
-### 坑 3：SSL 申請失敗（No such authorization）
-
-這通常是 DNS / ACME 驗證暫時問題。先確保 HTTP 可通，再過一段時間重試：
+If the app and database definitions are already set up:
 
 ```bash
-caprover api -n ntd -t /user/apps/appDefinitions/enablebasedomainssl -m POST
-# data:
-# {"appName":"hker"}
+git push origin <branch>
+caprover deploy -n <machine-name> -a hker -b <branch>
 ```
 
+## Post-Deploy Checks
+
+Run these after each deploy:
+
+```bash
+curl -sf https://<your-domain>/api/health
+curl -I https://<your-domain>
+```
+
+Then manually verify:
+
+- register and login
+- collections page loads
+- marketplace page loads
+- family todo page loads
+- admin page is reachable only for admin users
+
+## Known CapRover Pitfalls
+
+### `public/` missing during Docker build
+
+Symptom:
+
+```text
+COPY failed: stat app/public: file does not exist
+```
+
+Fix:
+
+- keep `public/` in the repo with at least one tracked file such as `public/.gitkeep`
+
+### App deploys but returns 502
+
+Cause:
+
+- CapRover is still routing to port `80`
+
+Fix:
+
+- set `containerHttpPort` to `3000`
+
+### SSL issuance fails temporarily
+
+Cause:
+
+- usually DNS propagation or ACME timing
+
+Fix:
+
+- confirm plain HTTP works first
+- retry SSL issuance later
