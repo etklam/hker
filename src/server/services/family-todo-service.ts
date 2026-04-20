@@ -19,7 +19,7 @@ export async function createList(spaceId: number, title: string) {
   return list
 }
 
-export async function updateList(listId: number, data: { title?: string }) {
+export async function updateList(spaceId: number, listId: number, data: { title?: string }) {
   const values: Record<string, unknown> = {}
   if (data.title !== undefined) values.title = data.title
 
@@ -28,14 +28,18 @@ export async function updateList(listId: number, data: { title?: string }) {
   const [updated] = await db
     .update(familyTodoLists)
     .set(values)
-    .where(eq(familyTodoLists.id, listId))
+    .where(and(eq(familyTodoLists.id, listId), eq(familyTodoLists.spaceId, spaceId)))
     .returning()
 
   return updated ?? null
 }
 
-export async function removeList(listId: number) {
-  await db.delete(familyTodoLists).where(eq(familyTodoLists.id, listId))
+export async function removeList(spaceId: number, listId: number) {
+  const [row] = await db
+    .delete(familyTodoLists)
+    .where(and(eq(familyTodoLists.id, listId), eq(familyTodoLists.spaceId, spaceId)))
+    .returning()
+  return row ?? null
 }
 
 export async function reorderLists(spaceId: number, ids: number[]) {

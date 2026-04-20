@@ -4,6 +4,14 @@ import { fetchUsersById } from '@/server/services/user-service'
 import type { UserBrief, TodoResponse, TodoListWithItems, BoardResponse } from '@/lib/types'
 import { getSpaceAccess } from '@/server/services/permission-service'
 
+type TodoRecord = NonNullable<Awaited<ReturnType<typeof todoService.getTodoById>>>
+type UserRecord = {
+  id: number
+  displayName: string | null
+  avatarUrl: string | null
+  email: string | null
+}
+
 function toUserBrief(user: { id: number; displayName: string | null; avatarUrl: string | null; email: string | null }): UserBrief {
   return {
     id: user.id,
@@ -11,6 +19,41 @@ function toUserBrief(user: { id: number; displayName: string | null; avatarUrl: 
     avatarUrl: user.avatarUrl,
     email: user.email,
   }
+}
+
+function toTodoResponse(todo: TodoRecord, usersMap: Map<number, UserRecord>): TodoResponse {
+  const createdByUser = usersMap.get(todo.createdBy)
+  const assignedToUser = todo.assignedTo ? usersMap.get(todo.assignedTo) : null
+  const completedByUser = todo.completedBy ? usersMap.get(todo.completedBy) : null
+
+  return {
+    id: todo.id,
+    listId: todo.listId,
+    title: todo.title,
+    description: todo.description,
+    assignedTo: assignedToUser ? toUserBrief(assignedToUser) : null,
+    priority: todo.priority,
+    dueDate: todo.dueDate?.toISOString() ?? null,
+    completed: todo.completed,
+    completedAt: todo.completedAt?.toISOString() ?? null,
+    completedBy: completedByUser ? toUserBrief(completedByUser) : null,
+    sortOrder: todo.sortOrder,
+    createdBy: createdByUser
+      ? toUserBrief(createdByUser)
+      : { id: todo.createdBy, displayName: null, avatarUrl: null, email: null },
+    createdAt: todo.createdAt.toISOString(),
+    updatedAt: todo.updatedAt.toISOString(),
+  }
+}
+
+export async function buildTodoResponse(todo: TodoRecord): Promise<TodoResponse> {
+  const userIds = new Set<number>()
+  if (todo.assignedTo) userIds.add(todo.assignedTo)
+  if (todo.completedBy) userIds.add(todo.completedBy)
+  userIds.add(todo.createdBy)
+
+  const usersMap = await fetchUsersById([...userIds])
+  return toTodoResponse(todo, usersMap)
 }
 
 export async function getBoardData(spaceId: number, userId: number): Promise<BoardResponse> {
@@ -33,27 +76,7 @@ export async function getBoardData(spaceId: number, userId: number): Promise<Boa
 
   const todosByList = new Map<number, TodoResponse[]>()
   for (const t of todos) {
-    const createdByUser = usersMap.get(t.createdBy)
-    const assignedToUser = t.assignedTo ? usersMap.get(t.assignedTo) : null
-    const completedByUser = t.completedBy ? usersMap.get(t.completedBy) : null
-
-    const todoResponse: TodoResponse = {
-      id: t.id,
-      listId: t.listId,
-      title: t.title,
-      description: t.description,
-      assignedTo: assignedToUser ? toUserBrief(assignedToUser) : null,
-      priority: t.priority,
-      dueDate: t.dueDate?.toISOString() ?? null,
-      completed: t.completed,
-      completedAt: t.completedAt?.toISOString() ?? null,
-      completedBy: completedByUser ? toUserBrief(completedByUser) : null,
-      sortOrder: t.sortOrder,
-      createdBy: createdByUser ? toUserBrief(createdByUser) : { id: t.createdBy, displayName: null, avatarUrl: null, email: null },
-      createdAt: t.createdAt.toISOString(),
-      updatedAt: t.updatedAt.toISOString(),
-    }
-
+    const todoResponse = toTodoResponse(t, usersMap)
     const arr = todosByList.get(t.listId) ?? []
     arr.push(todoResponse)
     todosByList.set(t.listId, arr)

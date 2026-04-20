@@ -25,7 +25,7 @@ export const PATCH = withAuth(async (req: NextRequest, { user }) => {
   }
 
   try {
-    const updated = await todoService.updateList(lid, { title: body.title?.trim() })
+    const updated = await todoService.updateList(sid, lid, { title: body.title?.trim() })
     if (!updated) return apiError('NOT_FOUND', 'List not found')
     return Response.json({
       id: updated.id,
@@ -48,6 +48,6 @@ export const DELETE = withAuth(async (req: NextRequest, { user }) => {
   const access = await getSpaceAccess(user.id, sid)
   requireSpaceAtLeast(access, 'admin')
 
-  await todoService.removeList(lid)
+  await todoService.removeList(sid, lid)
   return new Response(null, { status: 204 })
 })

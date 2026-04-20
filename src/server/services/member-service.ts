@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { eq, and } from 'drizzle-orm'
 import { db } from '@/server/db'
 import { collectionMembers } from '@/db/schema/collaboration'
 import { users } from '@/db/schema/users'
@@ -29,15 +29,19 @@ export async function listForCollection(collectionId: number) {
   }))
 }
 
-export async function updateRole(memberId: number, role: 'viewer' | 'editor') {
+export async function updateRole(collectionId: number, memberId: number, role: 'viewer' | 'editor') {
   const [row] = await db
     .update(collectionMembers)
     .set({ role })
-    .where(eq(collectionMembers.id, memberId))
+    .where(and(eq(collectionMembers.id, memberId), eq(collectionMembers.collectionId, collectionId)))
     .returning()
   return row ?? null
 }
 
-export async function remove(memberId: number) {
-  await db.delete(collectionMembers).where(eq(collectionMembers.id, memberId))
+export async function remove(collectionId: number, memberId: number) {
+  const [row] = await db
+    .delete(collectionMembers)
+    .where(and(eq(collectionMembers.id, memberId), eq(collectionMembers.collectionId, collectionId)))
+    .returning()
+  return row ?? null
 }

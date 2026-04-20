@@ -17,7 +17,14 @@ export const GET = withAuth(async (req: NextRequest, { user }) => {
   requireSpaceAtLeast(access, 'admin')
 
   const invites = await spaceService.listInvites(sid)
-  return Response.json(invites)
+  const baseUrl = process.env.APP_BASE_URL || 'http://localhost:3000'
+  const enriched = invites.map((inv) => ({
+    ...inv,
+    expiresAt: inv.expiresAt ? inv.expiresAt.toISOString() : null,
+    createdAt: inv.createdAt.toISOString(),
+    url: `${baseUrl}/family-todo/invite/${inv.token}`,
+  }))
+  return Response.json(enriched)
 })
 
 export const POST = withAuth(async (req: NextRequest, { user }) => {
@@ -47,7 +54,13 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
       maxUses: body.maxUses,
       expiresInHours: body.expiresInHours,
     })
-    return Response.json(invite, { status: 201 })
+    const baseUrl = process.env.APP_BASE_URL || 'http://localhost:3000'
+    return Response.json({
+      ...invite,
+      expiresAt: invite.expiresAt ? invite.expiresAt.toISOString() : null,
+      createdAt: invite.createdAt.toISOString(),
+      url: `${baseUrl}/family-todo/invite/${invite.token}`,
+    }, { status: 201 })
   } catch (e) {
     if (e instanceof AppError) return apiError(e.code, e.message)
     throw e

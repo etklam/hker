@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { withAuth } from '@/server/api-helpers'
 import { apiError, AppError } from '@/lib/errors'
 import { getSpaceAccess, requireSpaceAtLeast } from '@/server/services/permission-service'
+import * as boardService from '@/server/services/family-todo-board-service'
 import * as todoService from '@/server/services/family-todo-service'
 
 function extractListId(req: NextRequest): number {
@@ -51,22 +52,7 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
       assignedTo: body.assignedTo,
     })
 
-    return Response.json({
-      id: todo.id,
-      listId: todo.listId,
-      title: todo.title,
-      description: todo.description,
-      assignedTo: todo.assignedTo,
-      priority: todo.priority,
-      dueDate: todo.dueDate?.toISOString() ?? null,
-      completed: todo.completed,
-      completedAt: todo.completedAt?.toISOString() ?? null,
-      completedBy: todo.completedBy,
-      sortOrder: todo.sortOrder,
-      createdBy: todo.createdBy,
-      createdAt: todo.createdAt.toISOString(),
-      updatedAt: todo.updatedAt.toISOString(),
-    }, { status: 201 })
+    return Response.json(await boardService.buildTodoResponse(todo), { status: 201 })
   } catch (e) {
     if (e instanceof AppError) return apiError(e.code, e.message)
     throw e

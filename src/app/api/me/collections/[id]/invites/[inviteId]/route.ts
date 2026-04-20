@@ -21,6 +21,6 @@ export const DELETE = withAuth(async (req: NextRequest, { user }) => {
   const access = await getCollectionAccess(user.id, collectionId)
   requireAtLeast(access, 'owner')
 
-  await inviteService.remove(inviteId)
+  await inviteService.remove(collectionId, inviteId)
   return new Response(null, { status: 204 })
 })

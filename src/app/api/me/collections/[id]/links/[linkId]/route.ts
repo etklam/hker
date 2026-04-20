@@ -29,7 +29,7 @@ export const PATCH = withAuth(async (req: NextRequest, { user }) => {
   }
 
   try {
-    const updated = await linkService.update(linkId, {
+    const updated = await linkService.update(collectionId, linkId, {
       title: body.title?.trim(),
       url: body.url?.trim(),
       description: body.description?.trim(),
@@ -50,6 +50,6 @@ export const DELETE = withAuth(async (req: NextRequest, { user }) => {
   const access = await getCollectionAccess(user.id, collectionId)
   requireAtLeast(access, 'edit')
 
-  await linkService.remove(linkId)
+  await linkService.remove(collectionId, linkId)
   return new Response(null, { status: 204 })
 })

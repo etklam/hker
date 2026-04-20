@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm'
+import { eq, sql, and } from 'drizzle-orm'
 import { randomBytes } from 'crypto'
 import { db } from '@/server/db'
 import { collectionInviteLinks, collectionMembers } from '@/db/schema/collaboration'
@@ -50,10 +50,10 @@ export async function create(
   throw new AppError('INTERNAL_ERROR', 'Failed to generate unique invite token')
 }
 
-export async function remove(inviteId: number) {
+export async function remove(collectionId: number, inviteId: number) {
   await db
     .delete(collectionInviteLinks)
-    .where(eq(collectionInviteLinks.id, inviteId))
+    .where(and(eq(collectionInviteLinks.id, inviteId), eq(collectionInviteLinks.collectionId, collectionId)))
 }
 
 export async function getByToken(token: string) {

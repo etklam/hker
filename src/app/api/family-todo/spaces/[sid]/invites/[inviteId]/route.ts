@@ -4,19 +4,23 @@ import { apiError } from '@/lib/errors'
 import { getSpaceAccess, requireSpaceAtLeast } from '@/server/services/permission-service'
 import * as spaceService from '@/server/services/family-todo-space-service'
 
-function extractIds(req: NextRequest): { sid: number; mid: number } {
+function extractIds(req: NextRequest): { sid: number; inviteId: number } {
   const segments = req.nextUrl.pathname.split('/')
-  return { sid: Number(segments[4]), mid: Number(segments[6]) }
+  // /api/family-todo/spaces/[sid]/invites/[inviteId]
+  return {
+    sid: Number(segments[4]),
+    inviteId: Number(segments[6]),
+  }
 }
 
 export const DELETE = withAuth(async (req: NextRequest, { user }) => {
-  const { sid, mid } = extractIds(req)
+  const { sid, inviteId } = extractIds(req)
   if (!sid || isNaN(sid)) return apiError('INVALID_REQUEST', 'Invalid space ID')
-  if (!mid || isNaN(mid)) return apiError('INVALID_REQUEST', 'Invalid member ID')
+  if (!inviteId || isNaN(inviteId)) return apiError('INVALID_REQUEST', 'Invalid invite ID')
 
   const access = await getSpaceAccess(user.id, sid)
   requireSpaceAtLeast(access, 'admin')
 
-  await spaceService.removeMember(sid, mid)
+  await spaceService.deleteInvite(sid, inviteId)
   return new Response(null, { status: 204 })
 })

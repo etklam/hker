@@ -34,7 +34,7 @@ export const PATCH = withAuth(async (req: NextRequest, { user }) => {
   }
 
   try {
-    const updated = await memberService.updateRole(memberId, body.role as 'viewer' | 'editor')
+    const updated = await memberService.updateRole(collectionId, memberId, body.role as 'viewer' | 'editor')
     if (!updated) return apiError('NOT_FOUND', 'Member not found')
     return Response.json(updated)
   } catch (e) {
@@ -51,6 +51,6 @@ export const DELETE = withAuth(async (req: NextRequest, { user }) => {
   const access = await getCollectionAccess(user.id, collectionId)
   requireAtLeast(access, 'owner')
 
-  await memberService.remove(memberId)
+  await memberService.remove(collectionId, memberId)
   return new Response(null, { status: 204 })
 })

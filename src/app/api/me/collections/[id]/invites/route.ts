@@ -17,7 +17,14 @@ export const GET = withAuth(async (req: NextRequest, { user }) => {
   requireAtLeast(access, 'owner')
 
   const invites = await inviteService.listForCollection(collectionId)
-  return Response.json(invites)
+  const baseUrl = process.env.APP_BASE_URL || 'http://localhost:3000'
+  const enriched = invites.map((inv) => ({
+    ...inv,
+    expiresAt: inv.expiresAt ? inv.expiresAt.toISOString() : null,
+    createdAt: inv.createdAt.toISOString(),
+    url: `${baseUrl}/invite/${inv.token}`,
+  }))
+  return Response.json(enriched)
 })
 
 export const POST = withAuth(async (req: NextRequest, { user }) => {
@@ -53,7 +60,13 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
       maxUses: body.maxUses,
       expiresInHours: body.expiresInHours,
     })
-    return Response.json(invite, { status: 201 })
+    const baseUrl = process.env.APP_BASE_URL || 'http://localhost:3000'
+    return Response.json({
+      ...invite,
+      expiresAt: invite.expiresAt ? invite.expiresAt.toISOString() : null,
+      createdAt: invite.createdAt.toISOString(),
+      url: `${baseUrl}/invite/${invite.token}`,
+    }, { status: 201 })
   } catch (e) {
     if (e instanceof AppError) return apiError(e.code, e.message)
     throw e

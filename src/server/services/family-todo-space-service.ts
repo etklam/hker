@@ -129,10 +129,12 @@ export async function listMembers(spaceId: number) {
   }))
 }
 
-export async function removeMember(memberId: number) {
-  await db
+export async function removeMember(spaceId: number, memberId: number) {
+  const [row] = await db
     .delete(familyTodoSpaceMembers)
-    .where(eq(familyTodoSpaceMembers.id, memberId))
+    .where(and(eq(familyTodoSpaceMembers.id, memberId), eq(familyTodoSpaceMembers.spaceId, spaceId)))
+    .returning()
+  return row ?? null
 }
 
 export async function createInvite(
@@ -175,10 +177,12 @@ export async function listInvites(spaceId: number) {
     .where(eq(familyTodoInviteLinks.spaceId, spaceId))
 }
 
-export async function deleteInvite(inviteId: number) {
-  await db
+export async function deleteInvite(spaceId: number, inviteId: number) {
+  const [row] = await db
     .delete(familyTodoInviteLinks)
-    .where(eq(familyTodoInviteLinks.id, inviteId))
+    .where(and(eq(familyTodoInviteLinks.id, inviteId), eq(familyTodoInviteLinks.spaceId, spaceId)))
+    .returning()
+  return row ?? null
 }
 
 export async function getInviteByToken(token: string) {

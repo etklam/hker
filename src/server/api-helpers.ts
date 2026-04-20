@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { resolveSession } from '@/server/auth'
-import { apiError } from '@/lib/errors'
+import { apiError, AppError } from '@/lib/errors'
 import type { AuthUser } from '@/lib/types'
 
 // --- Rate limiting (in-memory sliding window) ---
@@ -217,7 +217,12 @@ export function withAuth(handler: AuthenticatedHandler) {
       return apiError('UNAUTHORIZED', 'Authentication required')
     }
 
-    return handler(req, { user })
+    try {
+      return await handler(req, { user })
+    } catch (e) {
+      if (e instanceof AppError) return apiError(e.code, e.message)
+      throw e
+    }
   }
 }
 
@@ -232,6 +237,11 @@ export function withOptionalAuth(handler: OptionalAuthHandler) {
 
     const user = await resolveSession(req)
 
-    return handler(req, { user })
+    try {
+      return await handler(req, { user })
+    } catch (e) {
+      if (e instanceof AppError) return apiError(e.code, e.message)
+      throw e
+    }
   }
 }

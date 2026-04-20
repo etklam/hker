@@ -1,4 +1,4 @@
-import { eq, asc, sql } from 'drizzle-orm'
+import { eq, asc, sql, and } from 'drizzle-orm'
 import { db } from '@/server/db'
 import { links } from '@/db/schema/collections'
 import { AppError } from '@/lib/errors'
@@ -84,6 +84,7 @@ export async function create(
 }
 
 export async function update(
+  collectionId: number,
   linkId: number,
   data: { title?: string; url?: string; description?: string },
 ) {
@@ -97,13 +98,17 @@ export async function update(
       ...data,
       updatedAt: new Date(),
     })
-    .where(eq(links.id, linkId))
+    .where(and(eq(links.id, linkId), eq(links.collectionId, collectionId)))
     .returning()
   return row ?? null
 }
 
-export async function remove(linkId: number) {
-  await db.delete(links).where(eq(links.id, linkId))
+export async function remove(collectionId: number, linkId: number) {
+  const [row] = await db
+    .delete(links)
+    .where(and(eq(links.id, linkId), eq(links.collectionId, collectionId)))
+    .returning()
+  return row ?? null
 }
 
 export async function reorder(collectionId: number, ids: number[]) {
@@ -111,6 +116,6 @@ export async function reorder(collectionId: number, ids: number[]) {
     await db
       .update(links)
       .set({ sortOrder: i, updatedAt: new Date() })
-      .where(eq(links.id, ids[i]))
+      .where(and(eq(links.id, ids[i]), eq(links.collectionId, collectionId)))
   }
 }
