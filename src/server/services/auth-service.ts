@@ -5,10 +5,18 @@ import { authIdentities } from '@/db/schema/auth'
 import { AppError } from '@/lib/errors'
 import * as userService from '@/server/services/user-service'
 
+const SCRYPT_PARAMS = {
+  N: 65536,
+  r: 8,
+  p: 1,
+  // Node default maxmem is too low for these params in some runtimes.
+  maxmem: parseInt(process.env.AUTH_SCRYPT_MAXMEM ?? String(128 * 1024 * 1024), 10),
+} as const
+
 function hashPassword(password: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const salt = randomBytes(16)
-    scrypt(password, salt, 64, { N: 65536, r: 8, p: 1 }, (err, derivedKey) => {
+    scrypt(password, salt, 64, SCRYPT_PARAMS, (err, derivedKey) => {
       if (err) return reject(err)
       resolve(`${salt.toString('hex')}:${derivedKey.toString('hex')}`)
     })
@@ -20,7 +28,7 @@ function verifyPassword(password: string, stored: string): Promise<boolean> {
     const [saltHex, hashHex] = stored.split(':')
     const salt = Buffer.from(saltHex, 'hex')
     const storedHash = Buffer.from(hashHex, 'hex')
-    scrypt(password, salt, 64, { N: 65536, r: 8, p: 1 }, (err, derivedKey) => {
+    scrypt(password, salt, 64, SCRYPT_PARAMS, (err, derivedKey) => {
       if (err) return reject(err)
       resolve(timingSafeEqual(storedHash, derivedKey))
     })
