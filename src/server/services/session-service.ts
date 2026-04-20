@@ -5,10 +5,17 @@ import { authSessions } from '@/db/schema/auth'
 import * as userService from '@/server/services/user-service'
 
 const SESSION_TTL_DAYS = parseInt(process.env.AUTH_SESSION_TTL_DAYS ?? '30', 10)
-const SESSION_SECRET = process.env.AUTH_SESSION_SECRET ?? 'default-secret-change-me'
+const SESSION_SECRET = process.env.AUTH_SESSION_SECRET
+if (!SESSION_SECRET) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('AUTH_SESSION_SECRET environment variable is required in production')
+  }
+  console.warn('⚠ AUTH_SESSION_SECRET not set — using insecure default for development')
+}
+const SESSION_HMAC_KEY = SESSION_SECRET ?? 'dev-only-insecure-secret'
 
 export function hashSessionToken(token: string): string {
-  return createHmac('sha256', SESSION_SECRET).update(token).digest('hex')
+  return createHmac('sha256', SESSION_HMAC_KEY).update(token).digest('hex')
 }
 
 export async function createSession(userId: number): Promise<string> {
@@ -43,10 +50,14 @@ export async function validateSession(token: string) {
     return null
   }
 
-  await db
-    .update(authSessions)
-    .set({ lastSeenAt: new Date() })
-    .where(eq(authSessions.id, session.id))
+  // Throttle lastSeenAt writes to reduce DB load
+  const SEEN_THROTTLE_MS = 5 * 60 * 1000
+  if (!session.lastSeenAt || session.lastSeenAt.getTime() < Date.now() - SEEN_THROTTLE_MS) {
+    await db
+      .update(authSessions)
+      .set({ lastSeenAt: new Date() })
+      .where(eq(authSessions.id, session.id))
+  }
 
   const user = await userService.findById(session.userId)
   if (!user) return null

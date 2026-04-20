@@ -2,50 +2,52 @@ import { NextRequest } from 'next/server'
 import { resolveSession } from '@/server/auth'
 import { apiError, AppError } from '@/lib/errors'
 import type { AuthUser } from '@/lib/types'
+import { db } from '@/server/db'
+import { rateLimitEntries, loginFailures } from '@/db/schema/rateLimit'
+import { eq, sql, and, lt } from 'drizzle-orm'
 
-// --- Rate limiting (in-memory sliding window) ---
+// --- Rate limiting (DB-backed sliding window) ---
 
-interface RateLimitEntry {
-  timestamps: number[]
+export function rateLimit(key: string, limit: number, windowMs: number): Promise<{ allowed: boolean; retryAfterMs: number }> {
+  return rateLimitCheck(key, limit, windowMs)
 }
 
-const rateLimitStore = new Map<string, RateLimitEntry>()
+async function rateLimitCheck(key: string, limit: number, windowMs: number): Promise<{ allowed: boolean; retryAfterMs: number }> {
+  const windowStart = new Date(Date.now() - windowMs)
 
-const CLEANUP_INTERVAL_MS = 60_000
-let lastCleanup = Date.now()
-
-function cleanupExpiredEntries(windowMs: number) {
-  const now = Date.now()
-  if (now - lastCleanup < CLEANUP_INTERVAL_MS) return
-  lastCleanup = now
-
-  for (const [key, entry] of rateLimitStore) {
-    entry.timestamps = entry.timestamps.filter((t) => now - t < windowMs)
-    if (entry.timestamps.length === 0) {
-      rateLimitStore.delete(key)
-    }
-  }
-}
-
-export function rateLimit(key: string, limit: number, windowMs: number): { allowed: boolean; retryAfterMs: number } {
-  const now = Date.now()
-  cleanupExpiredEntries(windowMs)
-
-  let entry = rateLimitStore.get(key)
-  if (!entry) {
-    entry = { timestamps: [] }
-    rateLimitStore.set(key, entry)
+  // Cleanup old entries periodically (1% of requests)
+  if (Math.random() < 0.01) {
+    await db.delete(rateLimitEntries).where(lt(rateLimitEntries.hitAt, windowStart)).catch(() => {})
   }
 
-  entry.timestamps = entry.timestamps.filter((t) => now - t < windowMs)
+  const [{ hitCount }] = await db
+    .select({ hitCount: sql<number>`count(*)::int` })
+    .from(rateLimitEntries)
+    .where(and(
+      eq(rateLimitEntries.key, key),
+      sql`${rateLimitEntries.hitAt} >= ${windowStart}`,
+    ))
 
-  if (entry.timestamps.length >= limit) {
-    const oldest = entry.timestamps[0]
-    const retryAfterMs = windowMs - (now - oldest)
-    return { allowed: false, retryAfterMs }
+  if (hitCount >= limit) {
+    // Find oldest hit in window to compute retry-after
+    const [oldest] = await db
+      .select({ hitAt: rateLimitEntries.hitAt })
+      .from(rateLimitEntries)
+      .where(and(
+        eq(rateLimitEntries.key, key),
+        sql`${rateLimitEntries.hitAt} >= ${windowStart}`,
+      ))
+      .orderBy(rateLimitEntries.hitAt)
+      .limit(1)
+
+    const retryAfterMs = oldest
+      ? windowMs - (Date.now() - oldest.hitAt.getTime())
+      : windowMs
+
+    return { allowed: false, retryAfterMs: Math.max(retryAfterMs, 0) }
   }
 
-  entry.timestamps.push(now)
+  await db.insert(rateLimitEntries).values({ key })
   return { allowed: true, retryAfterMs: 0 }
 }
 
@@ -69,13 +71,13 @@ export function getRateLimitConfig(method: string, pathname: string): RateLimitC
   return RATE_LIMIT_CONFIGS[`${method}:${pathname}`] ?? DEFAULT_RATE_LIMIT
 }
 
-export function applyRateLimit(req: NextRequest): Response | null {
+export async function applyRateLimit(req: NextRequest): Promise<Response | null> {
   const ip = getClientIp(req)
   const pathname = new URL(req.url).pathname
   const config = getRateLimitConfig(req.method, pathname)
   const key = `rl:${ip}:${req.method}:${pathname}`
 
-  const { allowed, retryAfterMs } = rateLimit(key, config.limit, config.windowMs)
+  const { allowed, retryAfterMs } = await rateLimit(key, config.limit, config.windowMs)
   if (!allowed) {
     const retryAfterSeconds = Math.ceil(retryAfterMs / 1000)
     return new Response(
@@ -92,48 +94,62 @@ export function applyRateLimit(req: NextRequest): Response | null {
   return null
 }
 
-// --- Login failure tracking ---
-
-interface LoginFailureEntry {
-  count: number
-  firstFailure: number
-  lockedUntil: number | null
-}
-
-const loginFailureStore = new Map<string, LoginFailureEntry>()
+// --- Login failure tracking (DB-backed) ---
 
 const MAX_LOGIN_FAILURES = 5
 const LOCKOUT_DURATION_MS = 15 * 60_000
 
-export function isAccountLocked(email: string): boolean {
-  const entry = loginFailureStore.get(email.toLowerCase())
+export async function isAccountLocked(email: string): Promise<boolean> {
+  const key = email.toLowerCase()
+  const [entry] = await db
+    .select()
+    .from(loginFailures)
+    .where(eq(loginFailures.email, key))
+    .limit(1)
+
   if (!entry || !entry.lockedUntil) return false
-  if (Date.now() >= entry.lockedUntil) {
-    loginFailureStore.delete(email.toLowerCase())
+
+  if (new Date() >= entry.lockedUntil) {
+    await db.delete(loginFailures).where(eq(loginFailures.email, key))
     return false
   }
   return true
 }
 
-export function trackLoginFailure(email: string): void {
+export async function trackLoginFailure(email: string): Promise<void> {
   const key = email.toLowerCase()
-  const now = Date.now()
-  let entry = loginFailureStore.get(key)
+  const now = new Date()
 
-  if (!entry) {
-    entry = { count: 0, firstFailure: now, lockedUntil: null }
-    loginFailureStore.set(key, entry)
+  const [existing] = await db
+    .select()
+    .from(loginFailures)
+    .where(eq(loginFailures.email, key))
+    .limit(1)
+
+  if (!existing) {
+    const lockedUntil = 1 >= MAX_LOGIN_FAILURES ? new Date(now.getTime() + LOCKOUT_DURATION_MS) : null
+    await db.insert(loginFailures).values({
+      email: key,
+      failCount: 1,
+      firstFailure: now,
+      lockedUntil,
+    })
+    return
   }
 
-  entry.count++
+  const newCount = existing.failCount + 1
+  const lockedUntil = newCount >= MAX_LOGIN_FAILURES
+    ? new Date(now.getTime() + LOCKOUT_DURATION_MS)
+    : null
 
-  if (entry.count >= MAX_LOGIN_FAILURES) {
-    entry.lockedUntil = now + LOCKOUT_DURATION_MS
-  }
+  await db
+    .update(loginFailures)
+    .set({ failCount: newCount, lockedUntil })
+    .where(eq(loginFailures.email, key))
 }
 
-export function clearLoginFailures(email: string): void {
-  loginFailureStore.delete(email.toLowerCase())
+export async function clearLoginFailures(email: string): Promise<void> {
+  await db.delete(loginFailures).where(eq(loginFailures.email, email.toLowerCase()))
 }
 
 // --- Trusted proxy / IP parsing ---
@@ -168,7 +184,10 @@ function validateOrigin(req: NextRequest): boolean {
   const referer = req.headers.get('referer')
   const baseUrl = process.env.APP_BASE_URL
 
-  if (!baseUrl) return true
+  if (!baseUrl) {
+    if (process.env.NODE_ENV === 'production') return false
+    return true
+  }
 
   const allowedHost = new URL(baseUrl).host
 
@@ -209,7 +228,7 @@ export function withAuth(handler: AuthenticatedHandler) {
       return apiError('FORBIDDEN', 'Invalid origin')
     }
 
-    const rateLimitResponse = applyRateLimit(req)
+    const rateLimitResponse = await applyRateLimit(req)
     if (rateLimitResponse) return rateLimitResponse
 
     const user = await resolveSession(req)
@@ -232,7 +251,7 @@ export function withOptionalAuth(handler: OptionalAuthHandler) {
       return apiError('FORBIDDEN', 'Invalid origin')
     }
 
-    const rateLimitResponse = applyRateLimit(req)
+    const rateLimitResponse = await applyRateLimit(req)
     if (rateLimitResponse) return rateLimitResponse
 
     const user = await resolveSession(req)
@@ -244,4 +263,13 @@ export function withOptionalAuth(handler: OptionalAuthHandler) {
       throw e
     }
   }
+}
+
+export function withAdmin(handler: AuthenticatedHandler) {
+  return withAuth(async (req, ctx) => {
+    if (ctx.user.role !== 'admin') {
+      return apiError('FORBIDDEN', 'Admin access required')
+    }
+    return handler(req, ctx)
+  })
 }

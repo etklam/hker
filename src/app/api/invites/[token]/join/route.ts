@@ -11,7 +11,7 @@ function extractToken(req: NextRequest): string {
 
 export const POST = withAuth(async (req: NextRequest, { user }) => {
   const ip = getClientIp(req)
-  const { allowed, retryAfterMs } = rateLimit(`invite-join:${ip}`, 30, 60_000)
+  const { allowed, retryAfterMs } = await rateLimit(`invite-join:${ip}`, 30, 60_000)
   if (!allowed) {
     const retryAfterSeconds = Math.ceil(retryAfterMs / 1000)
     return new Response(

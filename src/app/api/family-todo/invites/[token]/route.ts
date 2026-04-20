@@ -11,7 +11,7 @@ function extractToken(req: NextRequest): string {
 
 export const GET = withOptionalAuth(async (req: NextRequest) => {
   const ip = getClientIp(req)
-  const { allowed, retryAfterMs } = rateLimit(`family-todo-invite-info:${ip}`, 60, 60_000)
+  const { allowed, retryAfterMs } = await rateLimit(`family-todo-invite-info:${ip}`, 60, 60_000)
   if (!allowed) {
     const retryAfterSeconds = Math.ceil(retryAfterMs / 1000)
     return new Response(
