@@ -8,17 +8,17 @@ import { GripVertical, Calendar, Check } from 'lucide-react'
 import type { TodoResponse, TodoPriority } from '@/lib/types'
 
 const priorityBg: Record<TodoPriority, string> = {
-  low: 'bg-yellow-100',
-  medium: 'bg-green-100',
-  high: 'bg-pink-100',
-  urgent: 'bg-red-100',
+  low: 'bg-accent-soft',
+  medium: 'bg-emerald-500/10',
+  high: 'bg-pink-500/10',
+  urgent: 'bg-red-500/10',
 }
 
 const priorityBadge: Record<TodoPriority, string> = {
-  low: 'bg-yellow-200 text-yellow-800',
-  medium: 'bg-green-200 text-green-800',
-  high: 'bg-pink-200 text-pink-800',
-  urgent: 'bg-red-200 text-red-800',
+  low: 'bg-accent-soft text-accent',
+  medium: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
+  high: 'bg-pink-500/15 text-pink-600 dark:text-pink-400',
+  urgent: 'bg-red-500/15 text-red-600 dark:text-red-400',
 }
 
 interface Props {
@@ -80,14 +80,14 @@ export function TodoCard({ todo, onToggle, onEdit }: Props) {
           className="min-w-0 flex-1 text-left"
         >
           <p
-            className={`text-sm font-medium leading-snug text-slate-700 ${
+            className={`text-sm font-medium leading-snug text-text ${
               todo.completed ? 'line-through decoration-pink-300 decoration-2' : ''
             }`}
           >
             {todo.title}
           </p>
           {todo.description && (
-            <p className="mt-0.5 text-xs text-slate-500 line-clamp-2">
+            <p className="mt-0.5 text-xs text-muted line-clamp-2">
               {todo.description}
             </p>
           )}

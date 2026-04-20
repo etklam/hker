@@ -72,6 +72,9 @@ export function CollectionFormModal({ collection, onClose, onSuccess }: Props) {
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="collection-modal-title"
     >
       <div
         className="mochi-card mx-4 w-full max-w-md p-6"
@@ -79,7 +82,7 @@ export function CollectionFormModal({ collection, onClose, onSuccess }: Props) {
       >
         {/* Header */}
         <div className="mb-5 flex items-center justify-between">
-          <h2 className="font-[family-name:var(--font-heading)] text-xl font-bold text-text">
+          <h2 id="collection-modal-title" className="font-[family-name:var(--font-heading)] text-xl font-bold text-text">
             {isEdit ? t('collections.form.editTitle') : t('collections.form.createTitle')}
           </h2>
           <button

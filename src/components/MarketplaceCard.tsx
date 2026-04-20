@@ -2,7 +2,7 @@
 
 import React from 'react'
 import Link from 'next/link'
-import { Star, Users, GitFork } from 'lucide-react'
+import { Star, GitFork } from 'lucide-react'
 import { CollectionAvatar } from '@/components/ui/CollectionAvatar'
 import type { MarketplaceListing } from '@/lib/types'
 
@@ -46,10 +46,6 @@ export function MarketplaceCard({ listing }: Props) {
       <div className="mt-auto flex items-center gap-4">
         <span className="flex items-center gap-1.5 rounded-full bg-yellow-300/15 px-3 py-1 text-xs font-semibold text-yellow-300">
           <Star size={14} />
-          {subscriberCount}
-        </span>
-        <span className="flex items-center gap-1.5 rounded-full bg-yellow-300/15 px-3 py-1 text-xs font-semibold text-yellow-300">
-          <Users size={14} />
           {subscriberCount}
         </span>
         <span className="flex items-center gap-1.5 rounded-full bg-yellow-300/15 px-3 py-1 text-xs font-semibold text-yellow-300">
