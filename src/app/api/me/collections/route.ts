@@ -27,7 +27,20 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
       icon: body.icon?.trim(),
     })
 
-    return Response.json(collection, { status: 201 })
+    const dto = {
+      id: collection.id,
+      title: collection.title,
+      description: collection.description,
+      icon: collection.icon,
+      visibility: collection.visibility,
+      sortOrder: collection.sortOrder,
+      linkCount: 0,
+      access: 'owner' as const,
+      createdAt: collection.createdAt.toISOString(),
+      updatedAt: collection.updatedAt.toISOString(),
+    }
+
+    return Response.json(dto, { status: 201 })
   } catch (e) {
     if (e instanceof AppError) return apiError(e.code, e.message)
     throw e

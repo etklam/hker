@@ -59,6 +59,11 @@ export default function SpaceBoardPage() {
 
   async function handleReorderLists(ids: number[]) {
     const snapshot = structuredClone(lists)
+    // Optimistic update so the parent `lists` ref stays in sync with localLists
+    setLists((prev) => {
+      const listMap = new Map(prev.map((l) => [l.id, l]))
+      return ids.map((id) => listMap.get(id)!).filter(Boolean)
+    })
     try {
       await api(`/api/family-todo/spaces/${sid}/lists/reorder`, {
         method: 'PATCH',
@@ -72,6 +77,14 @@ export default function SpaceBoardPage() {
 
   async function handleReorderTodos(listId: number, ids: number[]) {
     const snapshot = structuredClone(lists)
+    // Optimistic update so the parent `lists` ref stays in sync with localLists
+    setLists((prev) =>
+      prev.map((l) => {
+        if (l.id !== listId) return l
+        const todoMap = new Map(l.todos.map((t) => [t.id, t]))
+        return { ...l, todos: ids.map((id) => todoMap.get(id)!).filter(Boolean) }
+      }),
+    )
     try {
       await api(`/api/family-todo/lists/${listId}/todos/reorder`, {
         method: 'PATCH',
@@ -191,6 +204,26 @@ export default function SpaceBoardPage() {
           })),
         )
         setEditingTodo(null)
+      } catch {
+        pushToast(t('todo.errors.saveTodo'), 'error')
+      }
+    } else if (showCreateTodo) {
+      // Create new todo with full form data (including priority)
+      try {
+        const todo = await api<TodoResponse>(`/api/family-todo/lists/${showCreateTodo.listId}/todos`, {
+          method: 'POST',
+          body: {
+            title: data.title,
+            description: data.description ?? undefined,
+            priority: data.priority,
+            dueDate: data.dueDate ?? undefined,
+            assignedTo: data.assignedTo ?? undefined,
+          },
+        })
+        setLists((prev) =>
+          prev.map((l) => (l.id === showCreateTodo.listId ? { ...l, todos: [...l.todos, todo] } : l)),
+        )
+        setShowCreateTodo(null)
       } catch {
         pushToast(t('todo.errors.saveTodo'), 'error')
       }
@@ -403,6 +436,7 @@ export default function SpaceBoardPage() {
         onReorderTodos={handleReorderTodos}
         onMoveTodo={handleMoveTodo}
         onAddTodo={handleAddTodo}
+        onOpenCreate={(listId) => setShowCreateTodo({ listId })}
         onAddList={handleAddList}
         onEditTodo={setEditingTodo}
         onToggleTodo={handleToggleTodo}
@@ -417,6 +451,14 @@ export default function SpaceBoardPage() {
           onClose={() => setEditingTodo(null)}
           onSave={handleSaveTodo}
           onDelete={handleDeleteTodo}
+        />
+      )}
+
+      {/* Create todo modal (with priority / full details) */}
+      {showCreateTodo && (
+        <TodoFormModal
+          onClose={() => setShowCreateTodo(null)}
+          onSave={handleSaveTodo}
         />
       )}
     </div>

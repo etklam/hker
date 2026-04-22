@@ -30,6 +30,7 @@ interface Props {
   onReorderTodos: (listId: number, ids: number[]) => void
   onMoveTodo: (todoId: number, targetListId: number) => void
   onAddTodo: (listId: number, data: { title: string; description?: string; priority?: TodoPriority; dueDate?: string; assignedTo?: number }) => void
+  onOpenCreate: (listId: number) => void
   onAddList: (title: string) => void
   onEditTodo: (todo: TodoResponse) => void
   onToggleTodo: (todoId: number, completed: boolean) => void
@@ -54,6 +55,7 @@ export function TodoBoard({
   onReorderTodos,
   onMoveTodo,
   onAddTodo,
+  onOpenCreate,
   onAddList,
   onEditTodo,
   onToggleTodo,
@@ -196,6 +198,7 @@ export function TodoBoard({
               list={list}
               canManageLists={canManageLists}
               onAddTodo={(data) => onAddTodo(list.id, data)}
+              onOpenCreate={() => onOpenCreate(list.id)}
               onEditTodo={onEditTodo}
               onToggleTodo={onToggleTodo}
               onDeleteList={() => onDeleteList(list.id)}
