@@ -23,7 +23,7 @@ Match these to `.env.example`:
 | Variable | Purpose |
 | --- | --- |
 | `DATABASE_URL` | PostgreSQL connection string |
-| `APP_BASE_URL` | Public base URL for the app |
+| `APP_BASE_URL` | Public base URL for the app. Use the final `https://` origin in production so auth cookies are issued as `Secure`. |
 | `AUTH_SESSION_SECRET` | Session HMAC secret, use a long random value |
 | `AUTH_SESSION_COOKIE_NAME` | Cookie name, defaults to `hker_session` |
 | `AUTH_SESSION_TTL_DAYS` | Session lifetime in days |
@@ -142,6 +142,19 @@ git push origin <branch>
 caprover deploy -n <machine-name> -a hker -b <branch>
 ```
 
+If you need to deploy the current local workspace from macOS instead of a Git branch, create the tarball with AppleDouble metadata disabled. Otherwise `._*` files can end up in the build context and break `next build` / ESLint.
+
+```bash
+env COPYFILE_DISABLE=1 tar \
+  --exclude='./node_modules' \
+  --exclude='./.git' \
+  --exclude='./.next' \
+  --exclude='./.claude' \
+  -czf /tmp/hker-caprover.tgz .
+
+caprover deploy -n <machine-name> -a hker -t /tmp/hker-caprover.tgz
+```
+
 ## Post-Deploy Checks
 
 Run these after each deploy:
@@ -154,6 +167,7 @@ curl -I https://<your-domain>
 Then manually verify:
 
 - register and login
+- session cookie is returned with the `Secure` attribute on HTTPS
 - collections page loads
 - marketplace page loads
 - family todo page loads
@@ -173,6 +187,23 @@ Fix:
 
 - keep `public/` in the repo with at least one tracked file such as `public/.gitkeep`
 
+### App config update silently resets `containerHttpPort`
+
+Symptom:
+
+```text
+NGINX 502 Error :/
+```
+
+Cause:
+
+- a manual CapRover app-definition update dropped the app back to the default HTTP port `80`
+
+Fix:
+
+- set `containerHttpPort` back to `3000`
+- re-check `/api/health` after the config save
+
 ### App deploys but returns 502
 
 Cause:
@@ -182,6 +213,39 @@ Cause:
 Fix:
 
 - set `containerHttpPort` to `3000`
+
+### Auth routes fail after a DB rebuild but `/api/health` is still 200
+
+Cause:
+
+- `/api/health` does not touch the database
+- the PostgreSQL app was recreated without the expected schema
+- or the attached DB volume was initialized with credentials that no longer match `DATABASE_URL`
+
+Fix:
+
+- verify the PostgreSQL app still has a persistent volume attached
+- if the volume state is unknown, attach a fresh volume and initialize Postgres with known credentials
+- run `npm run db:push` or the committed migration flow against the target DB before testing auth
+- only treat the deploy as healthy after `register` and `login` both succeed
+
+### macOS tar deploy includes `._*` files
+
+Symptom:
+
+```text
+Parsing error: Invalid character.
+./src/app/.../._page.tsx
+```
+
+Cause:
+
+- the deployment tarball included AppleDouble metadata files from macOS
+
+Fix:
+
+- create the tarball with `COPYFILE_DISABLE=1`
+- verify `tar -tzf <tarball> | rg '/\._|^\._'` returns no matches before deploy
 
 ### SSL issuance fails temporarily
 

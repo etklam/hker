@@ -1,21 +1,6 @@
 import type { Metadata } from 'next'
-import { M_PLUS_Rounded_1c, Zen_Kaku_Gothic_New } from 'next/font/google'
 import Providers from '@/components/providers'
 import './globals.css'
-
-const mPlusRounded = M_PLUS_Rounded_1c({
-  weight: ['400', '500', '700', '800'],
-  subsets: ['latin'],
-  variable: '--font-heading',
-  display: 'swap',
-})
-
-const zenKaku = Zen_Kaku_Gothic_New({
-  weight: ['400', '500', '700'],
-  subsets: ['latin'],
-  variable: '--font-sans',
-  display: 'swap',
-})
 
 export const metadata: Metadata = {
   title: 'HKER',
@@ -24,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="zh-HK" suppressHydrationWarning className={`${mPlusRounded.variable} ${zenKaku.variable}`}>
+    <html lang="zh-HK" suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{

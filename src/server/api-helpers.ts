@@ -4,7 +4,7 @@ import { apiError, AppError } from '@/lib/errors'
 import type { AuthUser } from '@/lib/types'
 import { db } from '@/server/db'
 import { rateLimitEntries, loginFailures } from '@/db/schema/rateLimit'
-import { eq, sql, and, lt } from 'drizzle-orm'
+import { eq, sql, and, lt, gte } from 'drizzle-orm'
 
 // --- Rate limiting (DB-backed sliding window) ---
 
@@ -25,7 +25,7 @@ async function rateLimitCheck(key: string, limit: number, windowMs: number): Pro
     .from(rateLimitEntries)
     .where(and(
       eq(rateLimitEntries.key, key),
-      sql`${rateLimitEntries.hitAt} >= ${windowStart}`,
+      gte(rateLimitEntries.hitAt, windowStart),
     ))
 
   if (hitCount >= limit) {
@@ -35,7 +35,7 @@ async function rateLimitCheck(key: string, limit: number, windowMs: number): Pro
       .from(rateLimitEntries)
       .where(and(
         eq(rateLimitEntries.key, key),
-        sql`${rateLimitEntries.hitAt} >= ${windowStart}`,
+        gte(rateLimitEntries.hitAt, windowStart),
       ))
       .orderBy(rateLimitEntries.hitAt)
       .limit(1)

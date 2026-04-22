@@ -5,9 +5,9 @@ import { validateSession } from '@/server/services/session-service'
 const COOKIE_NAME = process.env.AUTH_SESSION_COOKIE_NAME ?? 'hker_session'
 
 function isSecure(): boolean {
-  if (process.env.NODE_ENV === 'production') return true
   const baseUrl = process.env.APP_BASE_URL ?? ''
-  return baseUrl.startsWith('https')
+  if (baseUrl) return baseUrl.startsWith('https')
+  return process.env.NODE_ENV === 'production'
 }
 
 export async function resolveSession(req: NextRequest): Promise<AuthUser | null> {
