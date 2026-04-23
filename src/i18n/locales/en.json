@@ -190,6 +190,11 @@
     },
     "errors": {
       "loadHealth": "Failed to load health check"
+    },
+    "tools": {
+      "title": "Everyday Tools",
+      "subtitle": "Quick calculations and conversions for everyday life in Hong Kong.",
+      "useNow": "Use Now"
     }
   },
   "links": {
@@ -313,5 +318,89 @@
     "totalUsers": "{{count}} users total",
     "role": "Role",
     "joined": "Joined"
+  },
+  "tools": {
+    "title": "Everyday Tools",
+    "subtitle": "Quick calculations and conversions for everyday life in Hong Kong.",
+    "useNow": "Use Now",
+    "backToTools": "← Back to Tools",
+    "moreComingSoon": "More tools coming soon",
+    "mortgage": {
+      "title": "Mortgage Calculator",
+      "description": "Calculate monthly payment, down payment, and total interest. Supports two modes.",
+      "modeA": "From Down Payment",
+      "modeB": "From Monthly Payment",
+      "propertyPrice": "Property Price (HK$)",
+      "downPayment": "Down Payment (HK$)",
+      "targetMonthly": "Target Monthly Payment (HK$)",
+      "annualRate": "Annual Interest Rate (%)",
+      "tenureYears": "Repayment Period (Years)",
+      "maxLtv": "Max LTV (%)",
+      "optional": "Optional",
+      "calculate": "Calculate",
+      "results": {
+        "title": "Results",
+        "placeholder": "Enter values above to see results.",
+        "loanAmount": "Loan Amount",
+        "monthlyPayment": "Monthly Payment",
+        "totalInterest": "Total Interest",
+        "totalPayment": "Total Repayment",
+        "requiredDownPayment": "Required Down Payment",
+        "downPaymentPercent": "Down Payment %",
+        "exceedsLtv": "⚠ Exceeds LTV limit",
+        "fullCoverage": "This monthly payment covers the full loan amount"
+      },
+      "disclaimer": "Results are estimates based on equal instalment amortization. Actual approval depends on bank assessment, income, stress test, mortgage insurance, and other factors. Not financial advice.",
+      "errors": {
+        "propertyPriceRequired": "Please enter property price",
+        "downPaymentExceeds": "Down payment cannot exceed property price",
+        "tenureRequired": "Please enter repayment period",
+        "targetMonthlyRequired": "Please enter target monthly payment"
+      }
+    },
+    "resignation": {
+      "title": "Last Day Calculator",
+      "description": "Enter your resignation date and notice period to calculate your last working day.",
+      "emptyState": "Enter your resignation date and notice period to see the result.",
+      "resignationDate": "Resignation Date",
+      "noticeMode": "Notice Period Type",
+      "modeDays": "Fixed Days",
+      "modeMonths": "Fixed Months",
+      "noticePeriod": "Notice Period",
+      "noticeDaysUnit": "days",
+      "noticeMonthsUnit": "month(s)",
+      "monthNote": "Calculated by calendar month on same date, e.g. 23 Apr + 1 month = 23 May",
+      "results": {
+        "title": "Result",
+        "lastWorkingDay": "Last Working Day",
+        "noticeEndDate": "Notice Period End Date"
+      },
+      "resultSentence": "Your estimated last working day is {{date}}",
+      "disclaimer": "This result is an estimate based on the notice period you entered. It is not legal advice. Please refer to your employment contract and actual HR arrangements. Public holidays and payment in lieu of notice are not included.",
+      "errors": {
+        "dateRequired": "Please select a resignation date",
+        "valueRequired": "Please enter notice period"
+      }
+    },
+    "chequeAmount": {
+      "title": "Cheque Amount Converter",
+      "description": "Convert a numeric amount to Chinese and English cheque writing format.",
+      "amountLabel": "Amount (HKD)",
+      "amountPlaceholder": "e.g. 1234.56",
+      "chinese": "Chinese (大寫)",
+      "english": "English (Cheque)",
+      "copyAll": "Copy All",
+      "copyChinese": "Copy Chinese",
+      "copyEnglish": "Copy English",
+      "copied": "Copied!",
+      "results": {
+        "title": "Converted Amount"
+      },
+      "errors": {
+        "invalidAmount": "Please enter a valid amount",
+        "tooManyDecimals": "Maximum 2 decimal places",
+        "amountTooLarge": "Amount exceeds maximum (HK$99,999,999.99)"
+      }
+    }
   }
 }

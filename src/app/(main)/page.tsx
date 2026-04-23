@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
 import { useTheme } from '@/lib/theme'
 import { api } from '@/lib/api-client'
-import { Bookmark, Store, CheckSquare, Heart, ArrowRight, ExternalLink } from 'lucide-react'
+import { Bookmark, Store, CheckSquare, Heart, ArrowRight, ExternalLink, Calculator, Calendar, FileText } from 'lucide-react'
 
 interface HealthResponse {
   status: string
@@ -34,6 +34,12 @@ interface FeaturedCollection {
 interface FeaturedResponse {
   collections: FeaturedCollection[]
 }
+
+const HOME_TOOLS = [
+  { key: 'mortgage', href: '/tools/mortgage', icon: Calculator },
+  { key: 'resignation', href: '/tools/resignation-last-day', icon: Calendar },
+  { key: 'chequeAmount', href: '/tools/cheque-amount', icon: FileText },
+] as const
 
 const FEATURES = [
   {
@@ -187,6 +193,39 @@ export default function HomePage() {
             </div>
           </Link>
         ))}
+      </section>
+
+      {/* ─── Everyday Tools Section ─── */}
+      <section className="mb-16">
+        <div className="mb-8 text-center">
+          <h2 className="text-2xl font-bold text-text sm:text-3xl">
+            {t('home.tools.title')}
+          </h2>
+          <p className="mt-2 text-sm text-muted">
+            {t('home.tools.subtitle')}
+          </p>
+        </div>
+        <div className="grid gap-6 sm:grid-cols-3">
+          {HOME_TOOLS.map(({ key, href, icon: Icon }) => (
+            <Link key={key} href={href} className="group">
+              <div className="mochi-card mochi-spring flex h-full flex-col p-6 hover:-translate-y-2">
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-accent-soft text-accent">
+                  <Icon size={20} strokeWidth={2} />
+                </div>
+                <h3 className="mb-1 font-bold text-text">
+                  {t(`tools.${key}.title`)}
+                </h3>
+                <p className="flex-1 text-xs text-muted">
+                  {t(`tools.${key}.description`)}
+                </p>
+                <span className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-accent group-hover:gap-2 mochi-spring">
+                  {t('home.tools.useNow')}
+                  <ArrowRight size={12} />
+                </span>
+              </div>
+            </Link>
+          ))}
+        </div>
       </section>
 
       {/* ─── Status Footer ─── */}

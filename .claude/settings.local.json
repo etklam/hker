@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc:*)",
+      "Bash(npm install:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(npx vitest:*)",
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(git status:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ]
+  }
+}

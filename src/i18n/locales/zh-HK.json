@@ -190,6 +190,11 @@
     },
     "errors": {
       "loadHealth": "載入健康檢查失敗"
+    },
+    "tools": {
+      "title": "常用工具",
+      "subtitle": "幫你快速處理生活上常見的小計算與轉換。",
+      "useNow": "立即使用"
     }
   },
   "links": {
@@ -313,5 +318,89 @@
     "totalUsers": "共 {{count}} 個用戶",
     "role": "角色",
     "joined": "加入日期"
+  },
+  "tools": {
+    "title": "常用工具",
+    "subtitle": "幫你快速處理生活上常見的小計算與轉換。",
+    "useNow": "立即使用",
+    "backToTools": "← 返回工具",
+    "moreComingSoon": "更多工具陸續加入",
+    "mortgage": {
+      "title": "按揭計算機",
+      "description": "計算月供、首期及總利息，支援由首期或月供反推。",
+      "modeA": "由首期推月供",
+      "modeB": "由月供倒推首期",
+      "propertyPrice": "樓價 (HK$)",
+      "downPayment": "首期金額 (HK$)",
+      "targetMonthly": "目標月供 (HK$)",
+      "annualRate": "年利率 (%)",
+      "tenureYears": "還款年期 (年)",
+      "maxLtv": "按揭成數上限 (%)",
+      "optional": "可選",
+      "calculate": "計算",
+      "results": {
+        "title": "計算結果",
+        "placeholder": "請輸入數值以顯示結果。",
+        "loanAmount": "貸款額",
+        "monthlyPayment": "每月供款",
+        "totalInterest": "總利息",
+        "totalPayment": "總還款額",
+        "requiredDownPayment": "所需首期",
+        "downPaymentPercent": "首期佔樓價",
+        "exceedsLtv": "⚠ 超出按揭成數上限",
+        "fullCoverage": "以此月供足以覆蓋全額貸款"
+      },
+      "disclaimer": "此結果僅為等額還款估算。實際批核取決於銀行、收入、壓測、按揭保險等因素，並非理財建議。",
+      "errors": {
+        "propertyPriceRequired": "請輸入樓價",
+        "downPaymentExceeds": "首期不可大於樓價",
+        "tenureRequired": "請輸入還款年期",
+        "targetMonthlyRequired": "請輸入目標月供"
+      }
+    },
+    "resignation": {
+      "title": "辭職 Last Day 計算機",
+      "description": "輸入遞信日及通知期，即時計算最後工作日。",
+      "emptyState": "請輸入遞信日期及通知期",
+      "resignationDate": "遞信日期",
+      "noticeMode": "通知期模式",
+      "modeDays": "固定日數",
+      "modeMonths": "固定月數",
+      "noticePeriod": "通知期",
+      "noticeDaysUnit": "日",
+      "noticeMonthsUnit": "個月",
+      "monthNote": "以曆月同日計算，例如 4 月 23 日加 1 個月為 5 月 23 日",
+      "results": {
+        "title": "計算結果",
+        "lastWorkingDay": "預計最後工作日",
+        "noticeEndDate": "通知期完結日"
+      },
+      "resultSentence": "你的預計最後工作日是 {{date}}",
+      "disclaimer": "此結果只按你輸入的通知期規則估算，並非法律意見。請以僱傭合約條款及實際人事安排為準。公眾假期及代通知金不在計算範圍內。",
+      "errors": {
+        "dateRequired": "請選擇遞信日期",
+        "valueRequired": "請輸入通知期"
+      }
+    },
+    "chequeAmount": {
+      "title": "支票金額轉換器",
+      "description": "把數字金額轉成支票中文及英文大寫格式。",
+      "amountLabel": "金額 (HKD)",
+      "amountPlaceholder": "例如：1234.56",
+      "chinese": "中文大寫",
+      "english": "英文大寫",
+      "copyAll": "複製全部",
+      "copyChinese": "複製中文",
+      "copyEnglish": "複製英文",
+      "copied": "已複製！",
+      "results": {
+        "title": "轉換結果"
+      },
+      "errors": {
+        "invalidAmount": "請輸入有效金額",
+        "tooManyDecimals": "小數最多兩位",
+        "amountTooLarge": "金額超過上限（最高 HK$99,999,999.99）"
+      }
+    }
   }
 }
