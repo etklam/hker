@@ -123,6 +123,11 @@ body {
   }
 }
 
+/* Fix React hydration mismatch from browser UA stylesheet caret-color on inputs */
+input, textarea, select {
+  caret-color: currentColor;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
