@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
 import { useTheme } from '@/lib/theme'
 import { api } from '@/lib/api-client'
-import { Bookmark, Store, CheckSquare, Heart, ArrowRight, ExternalLink, Calculator, Calendar, FileText } from 'lucide-react'
+import { Bookmark, Store, CheckSquare, Heart, ArrowRight, ExternalLink, Calculator, Calendar, FileText, ReceiptText } from 'lucide-react'
 
 interface HealthResponse {
   status: string
@@ -39,6 +39,7 @@ const HOME_TOOLS = [
   { key: 'mortgage', href: '/tools/mortgage', icon: Calculator },
   { key: 'resignation', href: '/tools/resignation-last-day', icon: Calendar },
   { key: 'chequeAmount', href: '/tools/cheque-amount', icon: FileText },
+  { key: 'monthlyBills', href: '/tools/monthly-bills', icon: ReceiptText },
 ] as const
 
 const FEATURES = [
@@ -205,7 +206,7 @@ export default function HomePage() {
             {t('home.tools.subtitle')}
           </p>
         </div>
-        <div className="grid gap-6 sm:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {HOME_TOOLS.map(({ key, href, icon: Icon }) => (
             <Link key={key} href={href} className="group">
               <div className="mochi-card mochi-spring flex h-full flex-col p-6 hover:-translate-y-2">

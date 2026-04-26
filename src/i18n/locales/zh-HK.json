@@ -401,6 +401,71 @@
         "tooManyDecimals": "小數最多兩位",
         "amountTooLarge": "金額超過上限（最高 HK$99,999,999.99）"
       }
+    },
+    "monthlyBills": {
+      "title": "月費付款清單",
+      "description": "記低每月帳單、到期日及付款狀態。",
+      "loginRequired": "登入後可以跨裝置保存月費清單，亦可以分享到 Family Space。",
+      "month": "月份",
+      "previousMonth": "上一個月",
+      "nextMonth": "下一個月",
+      "lists": "清單",
+      "createList": "新增清單",
+      "privateList": "私人清單",
+      "shareTo": "分享到 {{name}}",
+      "sharedWith": "已分享至 {{name}}",
+      "sharedMemberHint": "此清單由 Family Space 分享，你可以標記付款狀態。",
+      "addBill": "新增帳單",
+      "editBill": "編輯帳單",
+      "empty": "尚未有每月帳單，先新增一項。",
+      "emptyLists": "尚未有月費清單，先建立一個私人或 Family 清單。",
+      "markPaid": "標記為已付款",
+      "markUnpaid": "標記為未付款",
+      "confirmDelete": "確定要刪除「{{name}}」？",
+      "confirmDeleteList": "確定要刪除清單「{{name}}」？清單內所有帳單及付款紀錄都會刪除。",
+      "checkedBy": "{{name}} 已付款",
+      "access": {
+        "owner": "擁有者",
+        "admin": "Family 管理",
+        "member": "Family 成員"
+      },
+      "fields": {
+        "listName": "清單名稱",
+        "share": "分享設定",
+        "name": "帳單名稱",
+        "dueDay": "每月幾號",
+        "amount": "金額 (HK$)",
+        "note": "備註"
+      },
+      "placeholders": {
+        "listName": "例如：我的月費、屋企開支",
+        "name": "例如：信用卡、電話費",
+        "note": "例如：Autopay、繳費方法、戶口尾數"
+      },
+      "summary": {
+        "month": "月份",
+        "paid": "已付款",
+        "unpaidAmount": "未付金額",
+        "overdue": "今日/逾期"
+      },
+      "status": {
+        "paid": "已付款",
+        "overdue": "已逾期",
+        "dueToday": "今日到期",
+        "upcoming": "未到期"
+      },
+      "errors": {
+        "load": "載入付款清單失敗",
+        "saveList": "儲存清單失敗",
+        "deleteList": "刪除清單失敗",
+        "saveItem": "儲存帳單失敗",
+        "deleteItem": "刪除帳單失敗",
+        "toggleItem": "更新付款狀態失敗",
+        "listNameRequired": "請輸入清單名稱",
+        "nameRequired": "請輸入帳單名稱",
+        "dueDay": "日期需介乎 1 至 31",
+        "amount": "金額最多兩位小數"
+      }
     }
   }
 }

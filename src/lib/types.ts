@@ -157,3 +157,41 @@ export interface BoardResponse {
   space: FamilyTodoSpace
   lists: TodoListWithItems[]
 }
+
+export type MonthlyBillListAccess = 'owner' | 'admin' | 'member'
+
+export interface MonthlyBillListResponse {
+  id: number
+  ownerId: number
+  name: string
+  sharedSpaceId: number | null
+  sharedSpaceName: string | null
+  access: MonthlyBillListAccess
+  createdAt: string
+  updatedAt: string
+}
+
+export interface MonthlyBillItemResponse {
+  id: number
+  listId: number
+  name: string
+  dueDay: number
+  amountCents: number | null
+  note: string | null
+  dueDate: string
+  checkedAt: string | null
+  checkedBy: UserBrief | null
+  status: 'paid' | 'overdue' | 'dueToday' | 'upcoming'
+  createdAt: string
+  updatedAt: string
+}
+
+export interface MonthlyBillBoardResponse {
+  period: {
+    year: number
+    month: number
+  }
+  lists: MonthlyBillListResponse[]
+  activeList: MonthlyBillListResponse | null
+  items: MonthlyBillItemResponse[]
+}

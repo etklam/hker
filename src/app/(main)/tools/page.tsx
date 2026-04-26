@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useTranslation } from 'react-i18next'
-import { Calculator, Calendar, FileText, ArrowRight } from 'lucide-react'
+import { Calculator, Calendar, FileText, ArrowRight, ReceiptText } from 'lucide-react'
 
 const TOOLS = [
   {
@@ -19,6 +19,11 @@ const TOOLS = [
     key: 'chequeAmount',
     href: '/tools/cheque-amount',
     icon: FileText,
+  },
+  {
+    key: 'monthlyBills',
+    href: '/tools/monthly-bills',
+    icon: ReceiptText,
   },
 ] as const
 
@@ -40,7 +45,7 @@ export default function ToolsHubPage() {
       </section>
 
       {/* Tool Cards Grid */}
-      <section className="mb-16 grid gap-6 sm:grid-cols-3">
+      <section className="mb-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {TOOLS.map(({ key, href, icon: Icon }) => (
           <Link key={key} href={href} className="group">
             <div className="mochi-card mochi-spring flex h-full flex-col p-8 hover:-translate-y-2">

@@ -401,6 +401,71 @@
         "tooManyDecimals": "Maximum 2 decimal places",
         "amountTooLarge": "Amount exceeds maximum (HK$99,999,999.99)"
       }
+    },
+    "monthlyBills": {
+      "title": "Monthly Bill Checklist",
+      "description": "Track monthly bills, due dates, and payment status.",
+      "loginRequired": "Log in to save monthly bill lists across devices and share them with a Family Space.",
+      "month": "Month",
+      "previousMonth": "Previous month",
+      "nextMonth": "Next month",
+      "lists": "Lists",
+      "createList": "Create List",
+      "privateList": "Private list",
+      "shareTo": "Share to {{name}}",
+      "sharedWith": "Shared with {{name}}",
+      "sharedMemberHint": "This list is shared from a Family Space. You can update payment status.",
+      "addBill": "Add Bill",
+      "editBill": "Edit Bill",
+      "empty": "No monthly bills yet. Add one to get started.",
+      "emptyLists": "No monthly bill lists yet. Create a private or Family list first.",
+      "markPaid": "Mark as paid",
+      "markUnpaid": "Mark as unpaid",
+      "confirmDelete": "Delete \"{{name}}\"?",
+      "confirmDeleteList": "Delete the list \"{{name}}\"? All bills and payment history in it will be deleted.",
+      "checkedBy": "Paid by {{name}}",
+      "access": {
+        "owner": "Owner",
+        "admin": "Family admin",
+        "member": "Family member"
+      },
+      "fields": {
+        "listName": "List name",
+        "share": "Sharing",
+        "name": "Bill name",
+        "dueDay": "Day of month",
+        "amount": "Amount (HK$)",
+        "note": "Note"
+      },
+      "placeholders": {
+        "listName": "e.g. My bills, household expenses",
+        "name": "e.g. credit card, phone bill",
+        "note": "e.g. autopay, payment method, account suffix"
+      },
+      "summary": {
+        "month": "Month",
+        "paid": "Paid",
+        "unpaidAmount": "Unpaid amount",
+        "overdue": "Due/overdue"
+      },
+      "status": {
+        "paid": "Paid",
+        "overdue": "Overdue",
+        "dueToday": "Due today",
+        "upcoming": "Upcoming"
+      },
+      "errors": {
+        "load": "Failed to load payment checklist",
+        "saveList": "Failed to save list",
+        "deleteList": "Failed to delete list",
+        "saveItem": "Failed to save bill",
+        "deleteItem": "Failed to delete bill",
+        "toggleItem": "Failed to update payment status",
+        "listNameRequired": "List name is required",
+        "nameRequired": "Bill name is required",
+        "dueDay": "Day must be between 1 and 31",
+        "amount": "Amount can have at most 2 decimal places"
+      }
     }
   }
 }

@@ -14,4 +14,9 @@ describe('tool locale definitions', () => {
       'Enter your resignation date and notice period to see the result.',
     )
   })
+
+  it('provides localized copy for the monthly bill checklist', () => {
+    expect(zhHK.tools.monthlyBills.empty).toBe('尚未有每月帳單，先新增一項。')
+    expect(en.tools.monthlyBills.status.dueToday).toBe('Due today')
+  })
 })
