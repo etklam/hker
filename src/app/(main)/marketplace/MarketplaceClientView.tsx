@@ -8,6 +8,7 @@ import { SearchBar } from '@/components/SearchBar'
 import { MarketplaceCard } from '@/components/MarketplaceCard'
 import { api } from '@/lib/api-client'
 import type { MarketplaceListing, PageResponse } from '@/lib/types'
+import { EmptyState } from '@/components/ui/EmptyState'
 
 interface Props {
   initialData: PageResponse<MarketplaceListing>
@@ -112,7 +113,7 @@ export function MarketplaceClientView({ initialData, initialQuery, initialSort }
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
         </div>
       ) : data.content.length === 0 ? (
-        <p className="py-20 text-center text-muted">{t('marketplace.empty')}</p>
+        <EmptyState title={t('marketplace.empty')} />
       ) : (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {data.content.map((listing) => (

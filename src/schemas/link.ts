@@ -1,14 +1,17 @@
 import { z } from 'zod'
 
+const urlField = z.string().trim().url('Must be a valid URL')
+  .regex(/^https?:\/\//, 'URL must start with http:// or https://')
+
 export const createLinkSchema = z.object({
   title: z.string().trim().min(1, 'Title is required'),
-  url: z.string().trim().min(1, 'URL is required'),
+  url: urlField,
   description: z.string().optional(),
 })
 
 export const updateLinkSchema = z.object({
   title: z.string().trim().min(1, 'Title is required').optional(),
-  url: z.string().trim().min(1, 'URL is required').optional(),
+  url: urlField.optional(),
   description: z.string().optional(),
 })
 

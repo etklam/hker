@@ -8,6 +8,7 @@ import { ArrowLeft, Plus, Loader2, Globe, Store } from 'lucide-react'
 import { api } from '@/lib/api-client'
 import { pushToast } from '@/lib/toast'
 import { useCollectionAccess } from '@/hooks/useCollectionAccess'
+import { EmptyState } from '@/components/ui/EmptyState'
 import type { Collection, Link } from '@/lib/types'
 import { LinkCard } from '@/components/LinkCard'
 import { LinkFormModal } from '@/components/LinkFormModal'
@@ -200,7 +201,7 @@ export default function CollectionDetailPage() {
         </div>
 
         {links.length === 0 ? (
-          <p className="py-12 text-center text-muted">{t('collections.linksEmpty')}</p>
+          <EmptyState title={t('collections.linksEmpty')} />
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
             {links.map((link) => (

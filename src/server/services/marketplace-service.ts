@@ -20,45 +20,45 @@ function maskPublisher(row: {
   }
 }
 
-function toListingDto(row: Record<string, unknown>): MarketplaceListing {
-  const r = row as {
-    listingId: number
-    collectionId: number
-    collectionTitle: string
-    collectionDescription: string | null
-    collectionIcon: string | null
-    collectionVisibility: 'private' | 'unlisted' | 'public'
-    collectionSortOrder: number
-    collectionCreatedAt: Date
-    collectionUpdatedAt: Date
-    publisherId: number
-    publisherAnonymous: boolean
-    publisherDisplayName: string | null
-    publisherAvatarUrl: string | null
-    publishedAt: Date
-    subscriberCount: number
-    forkCount: number
-    linkCount: number
-  }
+interface ListingRow {
+  listingId: number
+  collectionId: number
+  collectionTitle: string
+  collectionDescription: string | null
+  collectionIcon: string | null
+  collectionVisibility: 'private' | 'unlisted' | 'public'
+  collectionSortOrder: number
+  collectionCreatedAt: Date
+  collectionUpdatedAt: Date
+  publisherId: number
+  publisherAnonymous: boolean
+  publisherDisplayName: string | null
+  publisherAvatarUrl: string | null
+  publishedAt: Date
+  subscriberCount: number
+  forkCount: number
+  linkCount: number
+}
 
+function toListingDto(row: ListingRow): MarketplaceListing {
   return {
-    id: r.listingId,
+    id: row.listingId,
     collection: {
-      id: r.collectionId,
-      title: r.collectionTitle,
-      description: r.collectionDescription,
-      icon: r.collectionIcon,
-      visibility: r.collectionVisibility,
-      sortOrder: r.collectionSortOrder,
-      linkCount: r.linkCount,
+      id: row.collectionId,
+      title: row.collectionTitle,
+      description: row.collectionDescription,
+      icon: row.collectionIcon,
+      visibility: row.collectionVisibility,
+      sortOrder: row.collectionSortOrder,
+      linkCount: row.linkCount,
       access: 'none',
-      createdAt: r.collectionCreatedAt.toISOString(),
-      updatedAt: r.collectionUpdatedAt.toISOString(),
+      createdAt: row.collectionCreatedAt.toISOString(),
+      updatedAt: row.collectionUpdatedAt.toISOString(),
     },
-    publisher: maskPublisher(r),
-    publishedAt: r.publishedAt.toISOString(),
-    subscriberCount: r.subscriberCount,
-    forkCount: r.forkCount,
+    publisher: maskPublisher(row),
+    publishedAt: row.publishedAt.toISOString(),
+    subscriberCount: row.subscriberCount,
+    forkCount: row.forkCount,
   }
 }
 

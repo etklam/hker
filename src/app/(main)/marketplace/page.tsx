@@ -35,47 +35,47 @@ function baseQuery() {
     .innerJoin(users, eq(marketplaceListings.publisherId, users.id))
 }
 
-function toListingDto(row: Record<string, unknown>): MarketplaceListing {
-  const r = row as {
-    listingId: number
-    collectionId: number
-    collectionTitle: string
-    collectionDescription: string | null
-    collectionIcon: string | null
-    collectionVisibility: 'private' | 'unlisted' | 'public'
-    collectionSortOrder: number
-    collectionCreatedAt: Date
-    collectionUpdatedAt: Date
-    publisherId: number
-    publisherAnonymous: boolean
-    publisherDisplayName: string | null
-    publisherAvatarUrl: string | null
-    publishedAt: Date
-    subscriberCount: number
-    forkCount: number
-    linkCount: number
-  }
+interface ListingRow {
+  listingId: number
+  collectionId: number
+  collectionTitle: string
+  collectionDescription: string | null
+  collectionIcon: string | null
+  collectionVisibility: 'private' | 'unlisted' | 'public'
+  collectionSortOrder: number
+  collectionCreatedAt: Date
+  collectionUpdatedAt: Date
+  publisherId: number
+  publisherAnonymous: boolean
+  publisherDisplayName: string | null
+  publisherAvatarUrl: string | null
+  publishedAt: Date
+  subscriberCount: number
+  forkCount: number
+  linkCount: number
+}
 
+function toListingDto(row: ListingRow): MarketplaceListing {
   return {
-    id: r.listingId,
+    id: row.listingId,
     collection: {
-      id: r.collectionId,
-      title: r.collectionTitle,
-      description: r.collectionDescription,
-      icon: r.collectionIcon,
-      visibility: r.collectionVisibility,
-      sortOrder: r.collectionSortOrder,
-      linkCount: r.linkCount,
+      id: row.collectionId,
+      title: row.collectionTitle,
+      description: row.collectionDescription,
+      icon: row.collectionIcon,
+      visibility: row.collectionVisibility,
+      sortOrder: row.collectionSortOrder,
+      linkCount: row.linkCount,
       access: 'none',
-      createdAt: r.collectionCreatedAt.toISOString(),
-      updatedAt: r.collectionUpdatedAt.toISOString(),
+      createdAt: row.collectionCreatedAt.toISOString(),
+      updatedAt: row.collectionUpdatedAt.toISOString(),
     },
-    publisher: r.publisherAnonymous
+    publisher: row.publisherAnonymous
       ? null
-      : { id: r.publisherId, displayName: r.publisherDisplayName, avatarUrl: r.publisherAvatarUrl },
-    publishedAt: r.publishedAt.toISOString(),
-    subscriberCount: r.subscriberCount,
-    forkCount: r.forkCount,
+      : { id: row.publisherId, displayName: row.publisherDisplayName, avatarUrl: row.publisherAvatarUrl },
+    publishedAt: row.publishedAt.toISOString(),
+    subscriberCount: row.subscriberCount,
+    forkCount: row.forkCount,
   }
 }
 
@@ -99,8 +99,8 @@ export default async function MarketplacePage({
   const sort = params.sort === 'most_subscribed' ? 'most_subscribed' : 'newest'
   const q = params.q?.trim() || ''
 
-  let rows: Record<string, unknown>[]
   let total: number
+  let content: MarketplaceListing[]
 
   if (q) {
     const pattern = `%${q}%`
@@ -122,7 +122,7 @@ export default async function MarketplacePage({
         .where(whereClause),
     ])
 
-    rows = dataRows
+    content = dataRows.map(toListingDto)
     total = countResult[0].total
   } else {
     const orderBy =
@@ -138,12 +138,12 @@ export default async function MarketplacePage({
       db.select({ total: count() }).from(marketplaceListings),
     ])
 
-    rows = dataRows
+    content = dataRows.map(toListingDto)
     total = countResult[0].total
   }
 
   const data: PageResponse<MarketplaceListing> = {
-    content: rows.map(toListingDto),
+    content,
     page,
     size,
     totalElements: total,

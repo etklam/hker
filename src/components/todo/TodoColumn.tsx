@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { Plus, Trash2, GripVertical } from 'lucide-react'
 import { TodoCard } from './TodoCard'
 import type { TodoListWithItems, TodoResponse, TodoPriority } from '@/lib/types'
+import { EmptyState } from '@/components/ui/EmptyState'
 
 interface Props {
   list: TodoListWithItems
@@ -148,7 +149,7 @@ export function TodoColumn({
         </SortableContext>
 
         {list.todos.length === 0 && (
-          <p className="py-4 text-center text-xs text-muted/60">{t('todo.dragOrAdd')}</p>
+          <EmptyState title={t('todo.dragOrAdd')} />
         )}
       </div>
 

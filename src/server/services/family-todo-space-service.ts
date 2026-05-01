@@ -87,7 +87,7 @@ export async function create(userId: number, name: string) {
 }
 
 export async function update(spaceId: number, data: { name?: string }) {
-  const values: Record<string, unknown> = { updatedAt: new Date() }
+  const values: { name?: string; updatedAt: Date } = { updatedAt: new Date() }
   if (data.name !== undefined) values.name = data.name
 
   const [updated] = await db

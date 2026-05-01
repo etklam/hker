@@ -1,11 +1,18 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { X } from 'lucide-react'
+import { X, Loader2 } from 'lucide-react'
 import { api } from '@/lib/api-client'
 import { pushToast } from '@/lib/toast'
 import type { Link } from '@/lib/types'
+
+interface MetadataResult {
+  title: string | null
+  description: string | null
+  faviconUrl: string | null
+  imageUrl: string | null
+}
 
 interface Props {
   collectionId: number
@@ -21,6 +28,8 @@ export function LinkFormModal({ collectionId, link, onClose, onSuccess }: Props)
   const [url, setUrl] = useState(link?.url ?? '')
   const [description, setDescription] = useState(link?.description ?? '')
   const [saving, setSaving] = useState(false)
+  const [fetchingMeta, setFetchingMeta] = useState(false)
+  const lastFetchedUrl = useRef<string | null>(null)
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -33,6 +42,40 @@ export function LinkFormModal({ collectionId, link, onClose, onSuccess }: Props)
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [handleKeyDown])
+
+  async function handleUrlBlur() {
+    const trimmed = url.trim()
+    if (!trimmed || isEdit || trimmed === lastFetchedUrl.current) return
+
+    // Basic validation before making the request
+    try {
+      const parsed = new URL(trimmed)
+      if (!['http:', 'https:'].includes(parsed.protocol)) return
+    } catch {
+      return
+    }
+
+    lastFetchedUrl.current = trimmed
+    setFetchingMeta(true)
+    try {
+      const meta = await api<MetadataResult>('/api/links/fetch-metadata', {
+        method: 'POST',
+        body: { url: trimmed },
+      })
+
+      // Only fill if the fields are empty (don't overwrite user input)
+      if (!title.trim() && meta.title) {
+        setTitle(meta.title)
+      }
+      if (!description.trim() && meta.description) {
+        setDescription(meta.description)
+      }
+    } catch {
+      // Silently fail — metadata fetch is optional
+    } finally {
+      setFetchingMeta(false)
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -114,13 +157,19 @@ export function LinkFormModal({ collectionId, link, onClose, onSuccess }: Props)
             <span className="text-sm font-medium text-text">
               {t('links.fields.url')}
             </span>
-            <input
-              type="url"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              className="rounded-xl border border-border bg-bg px-4 py-2.5 text-text outline-none transition-colors focus:border-accent"
-              placeholder="https://"
-            />
+            <div className="relative">
+              <input
+                type="url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                onBlur={handleUrlBlur}
+                className="w-full rounded-xl border border-border bg-bg px-4 py-2.5 text-text outline-none transition-colors focus:border-accent"
+                placeholder="https://"
+              />
+              {fetchingMeta && (
+                <Loader2 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-muted" />
+              )}
+            </div>
           </label>
 
           {/* Description */}

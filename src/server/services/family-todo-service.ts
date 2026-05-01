@@ -20,14 +20,11 @@ export async function createList(spaceId: number, title: string) {
 }
 
 export async function updateList(spaceId: number, listId: number, data: { title?: string }) {
-  const values: Record<string, unknown> = {}
-  if (data.title !== undefined) values.title = data.title
-
-  if (Object.keys(values).length === 0) return null
+  if (data.title === undefined) return null
 
   const [updated] = await db
     .update(familyTodoLists)
-    .set(values)
+    .set({ title: data.title })
     .where(and(eq(familyTodoLists.id, listId), eq(familyTodoLists.spaceId, spaceId)))
     .returning()
 
@@ -99,12 +96,19 @@ export async function updateTodo(
   data: {
     title?: string
     description?: string | null
-    priority?: string
+    priority?: 'low' | 'medium' | 'high' | 'urgent'
     dueDate?: string | null
     assignedTo?: number | null
   },
 ) {
-  const values: Record<string, unknown> = { updatedAt: new Date() }
+  const values: {
+    title?: string
+    description?: string | null
+    priority?: 'low' | 'medium' | 'high' | 'urgent'
+    dueDate?: Date | null
+    assignedTo?: number | null
+    updatedAt: Date
+  } = { updatedAt: new Date() }
   if (data.title !== undefined) values.title = data.title
   if (data.description !== undefined) values.description = data.description
   if (data.priority !== undefined) values.priority = data.priority
@@ -129,16 +133,16 @@ export async function toggleComplete(
   completed: boolean,
   completedByUserId: number,
 ) {
-  const values: Record<string, unknown> = {
+  const values: {
+    completed: boolean
+    completedAt: Date | null
+    completedBy: number | null
+    updatedAt: Date
+  } = {
     completed,
+    completedAt: completed ? new Date() : null,
+    completedBy: completed ? completedByUserId : null,
     updatedAt: new Date(),
-  }
-  if (completed) {
-    values.completedAt = new Date()
-    values.completedBy = completedByUserId
-  } else {
-    values.completedAt = null
-    values.completedBy = null
   }
 
   const [updated] = await db

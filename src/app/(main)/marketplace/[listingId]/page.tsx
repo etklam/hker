@@ -6,6 +6,7 @@ import { collections, links } from '@/db/schema/collections'
 import { users } from '@/db/schema/users'
 import { eq, asc, sql } from 'drizzle-orm'
 import { ExternalLink } from 'lucide-react'
+import { EmptyState } from '@/components/ui/EmptyState'
 import type { MarketplaceListing, Link as LinkType } from '@/lib/types'
 import { MarketplaceDetailClient } from './MarketplaceDetailClient'
 
@@ -37,47 +38,47 @@ function baseQuery() {
     .innerJoin(users, eq(marketplaceListings.publisherId, users.id))
 }
 
-function toListingDto(row: Record<string, unknown>): MarketplaceListing {
-  const r = row as {
-    listingId: number
-    collectionId: number
-    collectionTitle: string
-    collectionDescription: string | null
-    collectionIcon: string | null
-    collectionVisibility: 'private' | 'unlisted' | 'public'
-    collectionSortOrder: number
-    collectionCreatedAt: Date
-    collectionUpdatedAt: Date
-    publisherId: number
-    publisherAnonymous: boolean
-    publisherDisplayName: string | null
-    publisherAvatarUrl: string | null
-    publishedAt: Date
-    subscriberCount: number
-    forkCount: number
-    linkCount: number
-  }
+interface ListingRow {
+  listingId: number
+  collectionId: number
+  collectionTitle: string
+  collectionDescription: string | null
+  collectionIcon: string | null
+  collectionVisibility: 'private' | 'unlisted' | 'public'
+  collectionSortOrder: number
+  collectionCreatedAt: Date
+  collectionUpdatedAt: Date
+  publisherId: number
+  publisherAnonymous: boolean
+  publisherDisplayName: string | null
+  publisherAvatarUrl: string | null
+  publishedAt: Date
+  subscriberCount: number
+  forkCount: number
+  linkCount: number
+}
 
+function toListingDto(row: ListingRow): MarketplaceListing {
   return {
-    id: r.listingId,
+    id: row.listingId,
     collection: {
-      id: r.collectionId,
-      title: r.collectionTitle,
-      description: r.collectionDescription,
-      icon: r.collectionIcon,
-      visibility: r.collectionVisibility,
-      sortOrder: r.collectionSortOrder,
-      linkCount: r.linkCount,
+      id: row.collectionId,
+      title: row.collectionTitle,
+      description: row.collectionDescription,
+      icon: row.collectionIcon,
+      visibility: row.collectionVisibility,
+      sortOrder: row.collectionSortOrder,
+      linkCount: row.linkCount,
       access: 'none',
-      createdAt: r.collectionCreatedAt.toISOString(),
-      updatedAt: r.collectionUpdatedAt.toISOString(),
+      createdAt: row.collectionCreatedAt.toISOString(),
+      updatedAt: row.collectionUpdatedAt.toISOString(),
     },
-    publisher: r.publisherAnonymous
+    publisher: row.publisherAnonymous
       ? null
-      : { id: r.publisherId, displayName: r.publisherDisplayName, avatarUrl: r.publisherAvatarUrl },
-    publishedAt: r.publishedAt.toISOString(),
-    subscriberCount: r.subscriberCount,
-    forkCount: r.forkCount,
+      : { id: row.publisherId, displayName: row.publisherDisplayName, avatarUrl: row.publisherAvatarUrl },
+    publishedAt: row.publishedAt.toISOString(),
+    subscriberCount: row.subscriberCount,
+    forkCount: row.forkCount,
   }
 }
 
@@ -180,7 +181,7 @@ export default async function MarketplaceDetailPage({
           Links ({listingLinks.length})
         </h2>
         {listingLinks.length === 0 ? (
-          <p className="py-8 text-center text-muted">No links in this collection.</p>
+          <EmptyState title="No links in this collection." />
         ) : (
           <div className="flex flex-col gap-3">
             {listingLinks.map((link) => (

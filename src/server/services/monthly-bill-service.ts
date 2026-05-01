@@ -218,13 +218,13 @@ export async function updateList(
   if (!access) throw new AppError('NOT_FOUND', 'Monthly bill list not found')
   assertCanManageList(access.access)
 
-  const values: Record<string, unknown> = { updatedAt: new Date() }
+  const values: { name?: string; sharedSpaceId?: number | null; updatedAt: Date } = { updatedAt: new Date() }
   if (data.name !== undefined) values.name = data.name
   if (data.sharedSpaceId !== undefined) {
     values.sharedSpaceId = await validateShareTarget(userId, data.sharedSpaceId)
   }
 
-  if (Object.keys(values).length > 1) {
+  if (data.name !== undefined || data.sharedSpaceId !== undefined) {
     await db.update(monthlyBillLists).set(values).where(eq(monthlyBillLists.id, listId))
   }
 
@@ -279,7 +279,7 @@ export async function updateItem(
   assertCanManageItems(access.listAccess.access)
   if (data.dueDay !== undefined) validateDueDay(data.dueDay)
 
-  const values: Record<string, unknown> = { updatedAt: new Date() }
+  const values: { name?: string; dueDay?: number; amountCents?: number | null; note?: string | null; updatedAt: Date } = { updatedAt: new Date() }
   if (data.name !== undefined) values.name = data.name
   if (data.dueDay !== undefined) values.dueDay = data.dueDay
   if (data.amountCents !== undefined) values.amountCents = data.amountCents

@@ -212,12 +212,12 @@
     }
   },
   "invites": {
-    "title": "Invite Links",
+    "title": "邀請連結",
     "subtitle": "建立分享連結給協作者",
     "roleLabel": "角色",
     "role": {
-      "viewer": "Viewer",
-      "editor": "Editor"
+      "viewer": "檢視者",
+      "editor": "編輯者"
     },
     "maxUsesLabel": "最大使用次數",
     "maxUsesPlaceholder": "不限",
@@ -242,7 +242,7 @@
     }
   },
   "members": {
-    "title": "Members",
+    "title": "成員",
     "subtitle": "管理協作者",
     "loading": "載入中...",
     "empty": "目前沒有成員",
@@ -255,7 +255,7 @@
     }
   },
   "inviteJoin": {
-    "title": "Join Collection Invite",
+    "title": "加入收藏邀請",
     "subtitle": "你被邀請加入：{{title}}",
     "invalid": "此邀請連結無效或已超過使用次數上限。",
     "joinNow": "立即加入",
@@ -269,7 +269,7 @@
     }
   },
   "familyTodoInviteJoin": {
-    "title": "Join Space Invite",
+    "title": "加入 Space 邀請",
     "subtitle": "你被邀請加入 space：{{title}}",
     "invalid": "此 space 邀請連結無效或已超過使用次數上限。",
     "joinNow": "立即加入 space",
