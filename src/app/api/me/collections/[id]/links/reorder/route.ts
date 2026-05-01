@@ -3,6 +3,8 @@ import { withAuth } from '@/server/api-helpers'
 import { apiError, AppError } from '@/lib/errors'
 import { getCollectionAccess, requireAtLeast } from '@/server/services/permission-service'
 import * as linkService from '@/server/services/link-service'
+import { parseBody } from '@/schemas/parse-body'
+import { reorderLinksSchema } from '@/schemas/link'
 
 function extractCollectionId(req: NextRequest): number {
   const segments = req.nextUrl.pathname.split('/')
@@ -16,19 +18,16 @@ export const PATCH = withAuth(async (req: NextRequest, { user }) => {
   const access = await getCollectionAccess(user.id, collectionId)
   requireAtLeast(access, 'edit')
 
-  let body: { ids?: number[] }
+  let body: unknown
   try {
     body = await req.json()
   } catch {
     return apiError('INVALID_REQUEST', 'Invalid JSON body')
   }
 
-  if (!Array.isArray(body.ids) || body.ids.some((id) => typeof id !== 'number')) {
-    return apiError('INVALID_REQUEST', 'ids must be an array of numbers')
-  }
-
   try {
-    await linkService.reorder(collectionId, body.ids)
+    const { ids } = parseBody(body, reorderLinksSchema)
+    await linkService.reorder(collectionId, ids)
     return Response.json({ success: true })
   } catch (e) {
     if (e instanceof AppError) return apiError(e.code, e.message)

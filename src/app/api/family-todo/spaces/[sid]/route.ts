@@ -3,6 +3,8 @@ import { withAuth } from '@/server/api-helpers'
 import { apiError, AppError } from '@/lib/errors'
 import { getSpaceAccess, requireSpaceAtLeast } from '@/server/services/permission-service'
 import * as spaceService from '@/server/services/family-todo-space-service'
+import { parseBody } from '@/schemas/parse-body'
+import { updateSpaceSchema } from '@/schemas/family-todo'
 
 function extractSpaceId(req: NextRequest): number {
   const segments = req.nextUrl.pathname.split('/')
@@ -16,7 +18,7 @@ export const PATCH = withAuth(async (req: NextRequest, { user }) => {
   const access = await getSpaceAccess(user.id, sid)
   requireSpaceAtLeast(access, 'admin')
 
-  let body: { name?: string }
+  let body: unknown
   try {
     body = await req.json()
   } catch {
@@ -24,7 +26,8 @@ export const PATCH = withAuth(async (req: NextRequest, { user }) => {
   }
 
   try {
-    const updated = await spaceService.update(sid, { name: body.name?.trim() })
+    const { name } = parseBody(body, updateSpaceSchema)
+    const updated = await spaceService.update(sid, { name: name?.trim() })
     if (!updated) return apiError('NOT_FOUND', 'Space not found')
     return Response.json({
       id: updated.id,

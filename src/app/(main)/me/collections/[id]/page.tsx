@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, notFound } from 'next/navigation'
 import NextLink from 'next/link'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Plus, Loader2, Globe, Store } from 'lucide-react'
@@ -133,13 +133,7 @@ export default function CollectionDetailPage() {
     )
   }
 
-  if (!collection) {
-    return (
-      <div className="mx-auto max-w-5xl px-4 py-8">
-        <p className="text-center text-muted">{t('collections.notFound')}</p>
-      </div>
-    )
-  }
+  if (!collection) notFound()
 
   const isPublished = collection.visibility === 'public'
 

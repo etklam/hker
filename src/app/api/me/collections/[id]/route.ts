@@ -4,6 +4,8 @@ import { apiError, AppError } from '@/lib/errors'
 import { getCollectionAccess, requireAtLeast } from '@/server/services/permission-service'
 import * as collectionService from '@/server/services/collection-service'
 import * as linkService from '@/server/services/link-service'
+import { parseBody } from '@/schemas/parse-body'
+import { updateCollectionSchema } from '@/schemas/collection'
 
 function extractCollectionId(req: NextRequest): number {
   const segments = req.nextUrl.pathname.split('/')
@@ -58,7 +60,7 @@ export const PATCH = withAuth(async (req: NextRequest, { user }) => {
   const access = await getCollectionAccess(user.id, id)
   requireAtLeast(access, 'owner')
 
-  let body: { title?: string; description?: string; icon?: string; sortOrder?: number }
+  let body: unknown
   try {
     body = await req.json()
   } catch {
@@ -66,11 +68,12 @@ export const PATCH = withAuth(async (req: NextRequest, { user }) => {
   }
 
   try {
+    const { title, description, icon, sortOrder } = parseBody(body, updateCollectionSchema)
     const updated = await collectionService.update(id, {
-      title: body.title?.trim(),
-      description: body.description?.trim(),
-      icon: body.icon?.trim(),
-      sortOrder: body.sortOrder,
+      title: title?.trim(),
+      description: description?.trim(),
+      icon: icon?.trim(),
+      sortOrder,
     })
     if (!updated) return apiError('NOT_FOUND', 'Collection not found')
     return Response.json(await toCollectionDto(updated, 'owner'))

@@ -2,6 +2,8 @@ import { NextRequest } from 'next/server'
 import { withAuth } from '@/server/api-helpers'
 import { apiError, AppError } from '@/lib/errors'
 import * as monthlyBillService from '@/server/services/monthly-bill-service'
+import { parseBody } from '@/schemas/parse-body'
+import { updateItemSchema } from '@/schemas/monthly-bills'
 
 function extractItemId(req: NextRequest): number {
   const segments = req.nextUrl.pathname.split('/')
@@ -12,41 +14,20 @@ export const PATCH = withAuth(async (req: NextRequest, { user }) => {
   const itemId = extractItemId(req)
   if (!itemId || isNaN(itemId)) return apiError('INVALID_REQUEST', 'Invalid item ID')
 
-  let body: {
-    name?: string
-    dueDay?: number
-    amountCents?: number | null
-    note?: string | null
-  }
+  let body: unknown
   try {
     body = await req.json()
   } catch {
     return apiError('INVALID_REQUEST', 'Invalid JSON body')
   }
 
-  if (body.name !== undefined && (typeof body.name !== 'string' || body.name.trim().length === 0)) {
-    return apiError('INVALID_REQUEST', 'Name is required')
-  }
-  if (body.dueDay !== undefined && (!Number.isInteger(body.dueDay) || body.dueDay < 1 || body.dueDay > 31)) {
-    return apiError('INVALID_REQUEST', 'Due day must be between 1 and 31')
-  }
-  if (
-    body.amountCents !== undefined &&
-    body.amountCents !== null &&
-    (!Number.isInteger(body.amountCents) || body.amountCents < 0)
-  ) {
-    return apiError('INVALID_REQUEST', 'Invalid amount')
-  }
-  if (body.note !== undefined && body.note !== null && typeof body.note !== 'string') {
-    return apiError('INVALID_REQUEST', 'Invalid note')
-  }
-
   try {
+    const { name, dueDay, amountCents, note } = parseBody(body, updateItemSchema)
     const item = await monthlyBillService.updateItem(user.id, itemId, {
-      name: body.name?.trim(),
-      dueDay: body.dueDay,
-      amountCents: body.amountCents,
-      note: body.note === undefined ? undefined : body.note?.trim() || null,
+      name: name?.trim(),
+      dueDay,
+      amountCents,
+      note: note === undefined ? undefined : note?.trim() || null,
     })
     return Response.json(item)
   } catch (e) {

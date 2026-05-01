@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { useTranslation } from 'react-i18next'
 import { api } from '@/lib/api-client'
@@ -41,12 +41,14 @@ export default function SpaceBoardPage() {
   const isAdmin = canManageLists
 
   const loadBoard = useCallback(async () => {
-    if (isNaN(sid)) return
+    if (isNaN(sid)) notFound()
     try {
       const data = await api<BoardResponse>(`/api/family-todo/spaces/${sid}/board`)
       setSpace(data.space)
       setLists(data.lists)
-    } catch {
+    } catch (e: unknown) {
+      const err = e as { status?: number }
+      if (err.status === 404) notFound()
       pushToast(t('todo.errors.loadBoard'), 'error')
     } finally {
       setLoading(false)
@@ -308,10 +310,6 @@ export default function SpaceBoardPage() {
     } catch {
       pushToast(t('invites.errors.copy'), 'error')
     }
-  }
-
-  if (isNaN(sid)) {
-    return <p className="py-12 text-center text-muted">{t('familyTodo.invalidSpaceId')}</p>
   }
 
   if (loading) {

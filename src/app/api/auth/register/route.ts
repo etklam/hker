@@ -5,38 +5,22 @@ import * as authService from '@/server/services/auth-service'
 import * as sessionService from '@/server/services/session-service'
 import { setSessionCookie } from '@/server/auth'
 import type { SessionResponse } from '@/lib/types'
+import { parseBody } from '@/schemas/parse-body'
+import { registerSchema } from '@/schemas/auth'
 
 export async function POST(req: NextRequest) {
   const rateLimitResponse = await applyRateLimit(req)
   if (rateLimitResponse) return rateLimitResponse
 
-  let body: { email?: string; password?: string; displayName?: string }
+  let body: unknown
   try {
     body = await req.json()
   } catch {
     return apiError('INVALID_REQUEST', 'Invalid JSON body')
   }
 
-  const { email, password, displayName } = body
-
-  if (!email || typeof email !== 'string') {
-    return apiError('INVALID_REQUEST', 'Email is required')
-  }
-
-  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  if (!EMAIL_RE.test(email) || email.length > 255) {
-    return apiError('INVALID_REQUEST', 'Invalid email format')
-  }
-
-  if (!password || typeof password !== 'string') {
-    return apiError('INVALID_REQUEST', 'Password is required')
-  }
-
-  if (password.length < 8 || password.length > 128) {
-    return apiError('INVALID_REQUEST', 'Password must be between 8 and 128 characters')
-  }
-
   try {
+    const { email, password, displayName } = parseBody(body, registerSchema)
     const user = await authService.register(email, password, displayName)
     const token = await sessionService.createSession(user.id)
 

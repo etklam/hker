@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, notFound } from 'next/navigation'
 import { useTranslation } from 'react-i18next'
 import { Loader2, AlertCircle, Users, Clock, Shield, CheckCircle2, LogIn } from 'lucide-react'
 import { api } from '@/lib/api-client'
@@ -17,7 +17,6 @@ export default function InviteJoinPage() {
 
   const [invite, setInvite] = useState<InviteInfo | null>(null)
   const [loading, setLoading] = useState(true)
-  const [notFound, setNotFound] = useState(false)
   const [joining, setJoining] = useState(false)
 
   const load = useCallback(async () => {
@@ -26,9 +25,7 @@ export default function InviteJoinPage() {
       setInvite(data)
     } catch (e: unknown) {
       const err = e as { status?: number }
-      if (err.status === 404) {
-        setNotFound(true)
-      }
+      if (err.status === 404) notFound()
     } finally {
       setLoading(false)
     }
@@ -57,17 +54,6 @@ export default function InviteJoinPage() {
     return (
       <div className="flex items-center justify-center py-24">
         <Loader2 size={32} className="animate-spin text-accent" />
-      </div>
-    )
-  }
-
-  if (notFound) {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-8 py-12 text-center shadow-lg max-w-md w-full mx-4">
-          <AlertCircle size={48} className="mx-auto mb-4 text-[var(--muted)]" />
-          <p className="text-lg font-semibold text-text">{t('inviteJoin.notFound')}</p>
-        </div>
       </div>
     )
   }

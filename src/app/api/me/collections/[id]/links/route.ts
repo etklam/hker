@@ -3,6 +3,8 @@ import { withAuth } from '@/server/api-helpers'
 import { apiError, AppError } from '@/lib/errors'
 import { getCollectionAccess, requireAtLeast } from '@/server/services/permission-service'
 import * as linkService from '@/server/services/link-service'
+import { parseBody } from '@/schemas/parse-body'
+import { createLinkSchema } from '@/schemas/link'
 
 function extractCollectionId(req: NextRequest): number {
   const segments = req.nextUrl.pathname.split('/')
@@ -27,25 +29,19 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
   const access = await getCollectionAccess(user.id, collectionId)
   requireAtLeast(access, 'edit')
 
-  let body: { title?: string; url?: string; description?: string }
+  let body: unknown
   try {
     body = await req.json()
   } catch {
     return apiError('INVALID_REQUEST', 'Invalid JSON body')
   }
 
-  if (!body.title || typeof body.title !== 'string' || body.title.trim().length === 0) {
-    return apiError('INVALID_REQUEST', 'Title is required')
-  }
-  if (!body.url || typeof body.url !== 'string') {
-    return apiError('INVALID_REQUEST', 'URL is required')
-  }
-
   try {
+    const { title, url, description } = parseBody(body, createLinkSchema)
     const link = await linkService.create(collectionId, {
-      title: body.title.trim(),
-      url: body.url.trim(),
-      description: body.description?.trim(),
+      title: title.trim(),
+      url: url.trim(),
+      description: description?.trim(),
     })
     return Response.json(link, { status: 201 })
   } catch (e) {

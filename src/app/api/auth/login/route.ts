@@ -10,36 +10,32 @@ import * as authService from '@/server/services/auth-service'
 import * as sessionService from '@/server/services/session-service'
 import { setSessionCookie } from '@/server/auth'
 import type { SessionResponse } from '@/lib/types'
+import { parseBody } from '@/schemas/parse-body'
+import { loginSchema } from '@/schemas/auth'
 
 export async function POST(req: NextRequest) {
   const rateLimitResponse = await applyRateLimit(req)
   if (rateLimitResponse) return rateLimitResponse
 
-  let body: { email?: string; password?: string }
+  let body: unknown
   try {
     body = await req.json()
   } catch {
     return apiError('INVALID_REQUEST', 'Invalid JSON body')
   }
 
-  const { email, password } = body
-
-  if (!email || typeof email !== 'string') {
-    return apiError('INVALID_REQUEST', 'Email is required')
-  }
-
-  if (!password || typeof password !== 'string') {
-    return apiError('INVALID_REQUEST', 'Password is required')
-  }
-
-  if (await isAccountLocked(email)) {
-    return apiError('FORBIDDEN', 'Account temporarily locked due to too many failed attempts')
-  }
-
+  let email = ''
   try {
-    const user = await authService.login(email, password)
+    const parsed = parseBody(body, loginSchema)
+    email = parsed.email
 
-    await clearLoginFailures(email)
+    if (await isAccountLocked(parsed.email)) {
+      return apiError('FORBIDDEN', 'Account temporarily locked due to too many failed attempts')
+    }
+
+    const user = await authService.login(parsed.email, parsed.password)
+
+    await clearLoginFailures(parsed.email)
 
     const token = await sessionService.createSession(user.id)
 
@@ -63,9 +59,11 @@ export async function POST(req: NextRequest) {
     response.headers.append('Set-Cookie', cookie)
     return response
   } catch (err) {
-    if (err instanceof AppError && err.code === 'INVALID_CREDENTIALS') {
-      await trackLoginFailure(email)
-      return apiError('INVALID_CREDENTIALS', 'Invalid email or password')
+    if (err instanceof AppError) {
+      if (err.code === 'INVALID_CREDENTIALS') {
+        await trackLoginFailure(email)
+      }
+      return apiError(err.code, err.message)
     }
     throw err
   }

@@ -4,6 +4,8 @@ import { apiError, AppError } from '@/lib/errors'
 import { getSpaceAccess, requireSpaceAtLeast } from '@/server/services/permission-service'
 import * as boardService from '@/server/services/family-todo-board-service'
 import * as todoService from '@/server/services/family-todo-service'
+import { parseBody } from '@/schemas/parse-body'
+import { completeTodoSchema } from '@/schemas/family-todo'
 
 function extractTodoId(req: NextRequest): number {
   const segments = req.nextUrl.pathname.split('/')
@@ -21,19 +23,16 @@ export const PATCH = withAuth(async (req: NextRequest, { user }) => {
   const access = await getSpaceAccess(user.id, spaceId)
   requireSpaceAtLeast(access, 'member')
 
-  let body: { completed?: boolean }
+  let body: unknown
   try {
     body = await req.json()
   } catch {
     return apiError('INVALID_REQUEST', 'Invalid JSON body')
   }
 
-  if (typeof body.completed !== 'boolean') {
-    return apiError('INVALID_REQUEST', 'completed must be a boolean')
-  }
-
   try {
-    const updated = await todoService.toggleComplete(tid, body.completed, user.id)
+    const { completed } = parseBody(body, completeTodoSchema)
+    const updated = await todoService.toggleComplete(tid, completed, user.id)
     if (!updated) return apiError('NOT_FOUND', 'Todo not found')
 
     return Response.json(await boardService.buildTodoResponse(updated))

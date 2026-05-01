@@ -3,6 +3,8 @@ import { withAuth } from '@/server/api-helpers'
 import { apiError, AppError } from '@/lib/errors'
 import { getCollectionAccess, requireAtLeast } from '@/server/services/permission-service'
 import * as memberService from '@/server/services/member-service'
+import { parseBody } from '@/schemas/parse-body'
+import { updateMemberRoleSchema } from '@/schemas/member'
 
 function extractIds(req: NextRequest): { collectionId: number; memberId: number } {
   const segments = req.nextUrl.pathname.split('/')
@@ -21,20 +23,16 @@ export const PATCH = withAuth(async (req: NextRequest, { user }) => {
   const access = await getCollectionAccess(user.id, collectionId)
   requireAtLeast(access, 'owner')
 
-  let body: { role?: string }
+  let body: unknown
   try {
     body = await req.json()
   } catch {
     return apiError('INVALID_REQUEST', 'Invalid JSON body')
   }
 
-  const validRoles = ['viewer', 'editor'] as const
-  if (!body.role || !validRoles.includes(body.role as typeof validRoles[number])) {
-    return apiError('INVALID_REQUEST', 'Role must be one of: viewer, editor')
-  }
-
   try {
-    const updated = await memberService.updateRole(collectionId, memberId, body.role as 'viewer' | 'editor')
+    const { role } = parseBody(body, updateMemberRoleSchema)
+    const updated = await memberService.updateRole(collectionId, memberId, role)
     if (!updated) return apiError('NOT_FOUND', 'Member not found')
     return Response.json(updated)
   } catch (e) {

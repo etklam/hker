@@ -3,6 +3,8 @@ import { withAuth } from '@/server/api-helpers'
 import { apiError, AppError } from '@/lib/errors'
 import { getCollectionAccess, requireAtLeast } from '@/server/services/permission-service'
 import * as linkService from '@/server/services/link-service'
+import { parseBody } from '@/schemas/parse-body'
+import { updateLinkSchema } from '@/schemas/link'
 
 function extractIds(req: NextRequest): { collectionId: number; linkId: number } {
   const segments = req.nextUrl.pathname.split('/')
@@ -21,7 +23,7 @@ export const PATCH = withAuth(async (req: NextRequest, { user }) => {
   const access = await getCollectionAccess(user.id, collectionId)
   requireAtLeast(access, 'edit')
 
-  let body: { title?: string; url?: string; description?: string }
+  let body: unknown
   try {
     body = await req.json()
   } catch {
@@ -29,10 +31,11 @@ export const PATCH = withAuth(async (req: NextRequest, { user }) => {
   }
 
   try {
+    const { title, url, description } = parseBody(body, updateLinkSchema)
     const updated = await linkService.update(collectionId, linkId, {
-      title: body.title?.trim(),
-      url: body.url?.trim(),
-      description: body.description?.trim(),
+      title: title?.trim(),
+      url: url?.trim(),
+      description: description?.trim(),
     })
     if (!updated) return apiError('NOT_FOUND', 'Link not found')
     return Response.json(updated)

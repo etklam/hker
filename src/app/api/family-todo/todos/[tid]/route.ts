@@ -4,6 +4,8 @@ import { apiError, AppError } from '@/lib/errors'
 import { getSpaceAccess, requireSpaceAtLeast } from '@/server/services/permission-service'
 import * as boardService from '@/server/services/family-todo-board-service'
 import * as todoService from '@/server/services/family-todo-service'
+import { parseBody } from '@/schemas/parse-body'
+import { updateTodoSchema } from '@/schemas/family-todo'
 
 function extractTodoId(req: NextRequest): number {
   const segments = req.nextUrl.pathname.split('/')
@@ -21,31 +23,21 @@ export const PATCH = withAuth(async (req: NextRequest, { user }) => {
   const access = await getSpaceAccess(user.id, spaceId)
   requireSpaceAtLeast(access, 'member')
 
-  let body: {
-    title?: string
-    description?: string | null
-    priority?: string
-    dueDate?: string | null
-    assignedTo?: number | null
-  }
+  let body: unknown
   try {
     body = await req.json()
   } catch {
     return apiError('INVALID_REQUEST', 'Invalid JSON body')
   }
 
-  const validPriorities = ['low', 'medium', 'high', 'urgent']
-  if (body.priority && !validPriorities.includes(body.priority)) {
-    return apiError('INVALID_REQUEST', 'Priority must be one of: low, medium, high, urgent')
-  }
-
   try {
+    const { title, description, priority, dueDate, assignedTo } = parseBody(body, updateTodoSchema)
     const updated = await todoService.updateTodo(tid, {
-      title: body.title?.trim(),
-      description: body.description,
-      priority: body.priority,
-      dueDate: body.dueDate,
-      assignedTo: body.assignedTo,
+      title: title?.trim(),
+      description,
+      priority,
+      dueDate,
+      assignedTo,
     })
     if (!updated) return apiError('NOT_FOUND', 'Todo not found')
 
