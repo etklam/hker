@@ -76,7 +76,7 @@ function RegisterForm() {
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-xl border border-border bg-bg-elevated px-4 py-3 text-text placeholder:text-muted/50 focus:border-accent focus:outline-none mochi-spring"
+              className="w-full rounded-xl border border-border bg-bg-elevated px-4 py-3 text-text placeholder:text-muted/50 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent-soft mochi-spring"
               placeholder="you@example.com"
             />
           </div>
@@ -91,7 +91,7 @@ function RegisterForm() {
               autoComplete="name"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              className="w-full rounded-xl border border-border bg-bg-elevated px-4 py-3 text-text placeholder:text-muted/50 focus:border-accent focus:outline-none mochi-spring"
+              className="w-full rounded-xl border border-border bg-bg-elevated px-4 py-3 text-text placeholder:text-muted/50 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent-soft mochi-spring"
             />
           </div>
 
@@ -105,7 +105,7 @@ function RegisterForm() {
               autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-xl border border-border bg-bg-elevated px-4 py-3 text-text placeholder:text-muted/50 focus:border-accent focus:outline-none mochi-spring"
+              className="w-full rounded-xl border border-border bg-bg-elevated px-4 py-3 text-text placeholder:text-muted/50 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent-soft mochi-spring"
             />
             <p className="mt-1 text-xs text-muted">{t('auth.passwordHint')}</p>
           </div>
