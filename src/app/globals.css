@@ -58,10 +58,13 @@ html[data-theme='eye'] {
 
 /* Universal Tokens */
 :root {
-  --radius-card:    32px;
+  --radius-sm:      10px;
+  --radius-md:      16px;
+  --radius-card:    24px;
+  --radius-pill:    9999px;
   --spring-ease:    cubic-bezier(0.34, 1.56, 0.64, 1);
-  --font-sans:      'Zen Kaku Gothic New', 'Segoe UI', 'Noto Sans TC', sans-serif;
-  --font-heading:   'M PLUS Rounded 1c', 'Zen Kaku Gothic New', sans-serif;
+  --font-sans:      'Noto Sans HK', 'Noto Sans TC', 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
+  --font-heading:   'M PLUS Rounded 1c', 'Noto Sans HK', 'Noto Sans TC', sans-serif;
 }
 
 @theme inline {
@@ -79,7 +82,9 @@ html[data-theme='eye'] {
   --color-surface-strong: var(--surface-strong);
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
-  --radius-card: 32px;
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-card: 24px;
   --font-sans: var(--font-sans);
   --font-heading: var(--font-heading);
 }
