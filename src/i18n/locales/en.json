@@ -149,7 +149,9 @@
     "signInFailed": "Sign-in failed, please try again.",
     "language": "Language",
     "languageZh": "繁體中文",
-    "languageEn": "English"
+    "languageEn": "English",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu"
   },
   "theme": {
     "label": "Theme",
@@ -172,10 +174,17 @@
       "more": "more links"
     },
     "features": {
+      "heading": "Features",
       "collections": {
         "title": "Collections",
         "description": "Organise your favourite links into beautiful, shareable collections.",
-        "cta": "Browse collections"
+        "cta": "Browse collections",
+        "tags": {
+          "link": "Organise links",
+          "share": "Easy sharing",
+          "team": "Team collab",
+          "private": "Private & safe"
+        }
       },
       "marketplace": {
         "title": "Marketplace",
@@ -327,6 +336,7 @@
     "moreComingSoon": "More tools coming soon",
     "mortgage": {
       "title": "Mortgage Calculator",
+      "cta": "Calculate",
       "description": "Calculate monthly payment, down payment, and total interest. Supports two modes.",
       "modeA": "From Down Payment",
       "modeB": "From Monthly Payment",
@@ -360,6 +370,7 @@
     },
     "resignation": {
       "title": "Last Day Calculator",
+      "cta": "Calculate Date",
       "description": "Enter your resignation date and notice period to calculate your last working day.",
       "emptyState": "Enter your resignation date and notice period to see the result.",
       "resignationDate": "Resignation Date",
@@ -384,6 +395,7 @@
     },
     "chequeAmount": {
       "title": "Cheque Amount Converter",
+      "cta": "Convert",
       "description": "Convert a numeric amount to Chinese and English cheque writing format.",
       "amountLabel": "Amount (HKD)",
       "amountPlaceholder": "e.g. 1234.56",
@@ -404,6 +416,7 @@
     },
     "monthlyBills": {
       "title": "Monthly Bill Checklist",
+      "cta": "Track Bills",
       "description": "Track monthly bills, due dates, and payment status.",
       "loginRequired": "Log in to save monthly bill lists across devices and share them with a Family Space.",
       "month": "Month",

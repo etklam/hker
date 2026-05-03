@@ -149,7 +149,9 @@
     "signInFailed": "登入失敗，請再試一次。",
     "language": "語言",
     "languageZh": "繁體中文",
-    "languageEn": "English"
+    "languageEn": "English",
+    "openMenu": "開啟選單",
+    "closeMenu": "關閉選單"
   },
   "theme": {
     "label": "主題",
@@ -172,10 +174,17 @@
       "more": "更多連結"
     },
     "features": {
+      "heading": "主要功能",
       "collections": {
         "title": "收藏",
         "description": "將你喜歡的連結整理成精美的收藏集，輕鬆分享。",
-        "cta": "瀏覽收藏"
+        "cta": "瀏覽收藏",
+        "tags": {
+          "link": "整理連結",
+          "share": "輕鬆分享",
+          "team": "團隊協作",
+          "private": "私密安全"
+        }
       },
       "marketplace": {
         "title": "市集",
@@ -327,6 +336,7 @@
     "moreComingSoon": "更多工具陸續加入",
     "mortgage": {
       "title": "按揭計算機",
+      "cta": "開始計算",
       "description": "計算月供、首期及總利息，支援由首期或月供反推。",
       "modeA": "由首期推月供",
       "modeB": "由月供倒推首期",
@@ -360,6 +370,7 @@
     },
     "resignation": {
       "title": "辭職 Last Day 計算機",
+      "cta": "計算日子",
       "description": "輸入遞信日及通知期，即時計算最後工作日。",
       "emptyState": "請輸入遞信日期及通知期",
       "resignationDate": "遞信日期",
@@ -384,6 +395,7 @@
     },
     "chequeAmount": {
       "title": "支票金額轉換器",
+      "cta": "轉換金額",
       "description": "把數字金額轉成支票中文及英文大寫格式。",
       "amountLabel": "金額 (HKD)",
       "amountPlaceholder": "例如：1234.56",
@@ -404,6 +416,7 @@
     },
     "monthlyBills": {
       "title": "月費付款清單",
+      "cta": "記低帳單",
       "description": "記低每月帳單、到期日及付款狀態。",
       "loginRequired": "登入後可以跨裝置保存月費清單，亦可以分享到 Family Space。",
       "month": "月份",
