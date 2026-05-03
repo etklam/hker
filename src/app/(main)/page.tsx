@@ -82,11 +82,7 @@ export default function HomePage() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-12 sm:py-20">
       {/* ─── Hero ─── */}
-      <section className="relative mb-16 text-center sm:mb-24">
-        {/* Decorative blobs */}
-        <div className="pointer-events-none absolute -top-24 left-1/2 -z-10 h-72 w-72 -translate-x-1/2 rounded-full bg-accent/20 blur-3xl" />
-        <div className="pointer-events-none absolute -top-16 left-1/4 -z-10 h-48 w-48 rounded-full bg-cta/10 blur-2xl" />
-
+      <section className="mb-16 text-left sm:mb-24">
         {user && (
           <p className="mb-4 text-lg text-muted">
             {t('home.greeting', { name: user.displayName || user.email })}
@@ -96,12 +92,12 @@ export default function HomePage() {
         <h1 className="font-[family-name:var(--font-heading)] text-5xl font-extrabold tracking-tight text-accent sm:text-7xl">
           HKER
         </h1>
-        <p className="mx-auto mt-4 max-w-lg text-lg text-muted sm:text-xl">
+        <p className="mt-4 max-w-lg text-lg text-muted sm:text-xl">
           {t('home.tagline')}
         </p>
 
         {!user && (
-          <div className="mt-8 flex items-center justify-center gap-4">
+          <div className="mt-8 flex items-center gap-4">
             <Link
               href="/register"
               className="mochi-spring rounded-xl bg-accent px-6 py-3 font-medium text-white hover:bg-accent-hover active:scale-[0.98]"
@@ -173,27 +169,91 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* ─── Feature Cards ─── */}
-      <section className="mb-16 grid gap-6 sm:grid-cols-3">
-        {FEATURES.map(({ key, href, icon: Icon }) => (
-          <Link key={key} href={href} className="group">
-            <div className="mochi-card mochi-spring flex h-full flex-col p-8 hover:-translate-y-2">
-              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-accent-soft text-accent">
-                <Icon size={24} strokeWidth={2} />
+      {/* ─── Features — Bento Grid ─── */}
+      <section className="mb-16">
+        <h2 className="mb-8 font-[family-name:var(--font-heading)] text-2xl font-bold text-text sm:text-3xl">
+          {t('home.features.heading')}
+        </h2>
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
+          {/* Hero feature — Collections (span 3 cols, 2 rows) */}
+          <Link
+            href={FEATURES[0].href}
+            className="group lg:col-span-3 lg:row-span-2"
+          >
+            <div className="mochi-card mochi-spring flex h-full flex-col p-8 hover:-translate-y-1">
+              <div className="mb-6 flex items-center gap-3">
+                <div className="flex size-11 items-center justify-center rounded-xl bg-accent-soft text-accent">
+                  <Bookmark size={22} strokeWidth={2} />
+                </div>
+                <h3 className="font-[family-name:var(--font-heading)] text-xl font-bold text-text">
+                  {t('home.features.collections.title')}
+                </h3>
               </div>
-              <h3 className="mb-2 text-lg font-bold text-text">
-                {t(`home.features.${key}.title`)}
-              </h3>
-              <p className="flex-1 text-sm text-muted">
-                {t(`home.features.${key}.description`)}
+              <p className="flex-1 text-base leading-relaxed text-muted max-w-md">
+                {t('home.features.collections.description')}
               </p>
-              <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-accent group-hover:gap-2 mochi-spring">
-                {t(`home.features.${key}.cta`)}
-                <ArrowRight size={14} />
+              <div className="mt-6 flex flex-wrap gap-2">
+                {['link', 'share', 'team', 'private'].map((tag) => (
+                  <span key={tag} className="rounded-full border border-border px-3 py-1 text-xs font-medium text-muted">
+                    {t(`home.features.collections.tags.${tag}`)}
+                  </span>
+                ))}
+              </div>
+              <span className="mt-5 inline-flex items-center gap-1.5 text-sm font-medium text-accent group-hover:gap-2.5 mochi-spring">
+                {t('home.features.collections.cta')}
+                <ArrowRight size={16} />
               </span>
             </div>
           </Link>
-        ))}
+
+          {/* Marketplace (span 2 cols) */}
+          <Link
+            href={FEATURES[1].href}
+            className="group lg:col-span-2"
+          >
+            <div className="mochi-card mochi-spring flex h-full flex-col p-6 hover:-translate-y-1">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex size-10 items-center justify-center rounded-xl bg-cta/10 text-cta">
+                  <Store size={20} strokeWidth={2} />
+                </div>
+                <h3 className="font-[family-name:var(--font-heading)] text-lg font-bold text-text">
+                  {t('home.features.marketplace.title')}
+                </h3>
+              </div>
+              <p className="flex-1 text-base leading-relaxed text-muted">
+                {t('home.features.marketplace.description')}
+              </p>
+              <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-cta group-hover:gap-2.5 mochi-spring">
+                {t('home.features.marketplace.cta')}
+                <ArrowRight size={16} />
+              </span>
+            </div>
+          </Link>
+
+          {/* Family Todo (span 2 cols) */}
+          <Link
+            href={FEATURES[2].href}
+            className="group lg:col-span-2"
+          >
+            <div className="mochi-card mochi-spring flex h-full flex-col p-6 hover:-translate-y-1">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex size-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600">
+                  <CheckSquare size={20} strokeWidth={2} />
+                </div>
+                <h3 className="font-[family-name:var(--font-heading)] text-lg font-bold text-text">
+                  {t('home.features.familyTodo.title')}
+                </h3>
+              </div>
+              <p className="flex-1 text-base leading-relaxed text-muted">
+                {t('home.features.familyTodo.description')}
+              </p>
+              <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600 group-hover:gap-2.5 mochi-spring">
+                {t('home.features.familyTodo.cta')}
+                <ArrowRight size={16} />
+              </span>
+            </div>
+          </Link>
+        </div>
       </section>
 
       {/* ─── Everyday Tools Section ─── */}
@@ -206,22 +266,22 @@ export default function HomePage() {
             {t('home.tools.subtitle')}
           </p>
         </div>
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {HOME_TOOLS.map(({ key, href, icon: Icon }) => (
             <Link key={key} href={href} className="group">
-              <div className="mochi-card mochi-spring flex h-full flex-col p-6 hover:-translate-y-2">
-                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-accent-soft text-accent">
+              <div className="mochi-card mochi-spring flex h-full flex-col p-6 hover:-translate-y-1">
+                <div className="mb-3 flex size-10 items-center justify-center rounded-xl bg-accent-soft text-accent">
                   <Icon size={20} strokeWidth={2} />
                 </div>
-                <h3 className="mb-1 font-bold text-text">
+                <h3 className="mb-1.5 font-bold text-text">
                   {t(`tools.${key}.title`)}
                 </h3>
-                <p className="flex-1 text-xs text-muted">
+                <p className="flex-1 text-sm leading-relaxed text-muted">
                   {t(`tools.${key}.description`)}
                 </p>
-                <span className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-accent group-hover:gap-2 mochi-spring">
-                  {t('home.tools.useNow')}
-                  <ArrowRight size={12} />
+                <span className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-accent group-hover:gap-2 mochi-spring">
+                  {t(`tools.${key}.cta`)}
+                  <ArrowRight size={14} />
                 </span>
               </div>
             </Link>
@@ -230,7 +290,7 @@ export default function HomePage() {
       </section>
 
       {/* ─── Status Footer ─── */}
-      <footer className="flex flex-wrap items-center justify-center gap-4 text-xs text-muted">
+      <footer className="flex flex-wrap items-center justify-center gap-4 text-sm text-muted">
         <span className="flex items-center gap-1">
           <Heart size={12} />
           {t('home.madeWith')}
