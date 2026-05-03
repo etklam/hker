@@ -63,7 +63,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     <div className="min-h-screen flex flex-col">
       {/* ─── Top Nav ─── */}
       <header className="sticky top-0 z-40 bg-surface backdrop-blur-xl border-b border-border">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
           {/* Logo */}
           <Link
             href="/"
@@ -78,7 +78,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
               <Link
                 key={href}
                 href={href}
-                className={`mochi-spring flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                className={`mochi-spring flex items-center gap-2 rounded-full min-h-[44px] px-4 py-3 text-sm font-medium transition-colors ${
                   isActive(href)
                     ? 'bg-accent-soft text-accent'
                     : 'text-muted hover:text-text hover:bg-accent-soft/50'
@@ -91,7 +91,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             {user?.role === 'admin' && (
               <Link
                 href="/admin"
-                className={`mochi-spring flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                className={`mochi-spring flex items-center gap-2 rounded-full min-h-[44px] px-4 py-3 text-sm font-medium transition-colors ${
                   isActive('/admin')
                     ? 'bg-accent-soft text-accent'
                     : 'text-muted hover:text-text hover:bg-accent-soft/50'
@@ -109,7 +109,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             <button
               onClick={cycleTheme}
               title={t(`theme.${theme}`)}
-              className="mochi-spring flex items-center justify-center rounded-full p-2 text-muted hover:text-text hover:bg-accent-soft active:scale-95"
+              className="mochi-spring flex items-center justify-center rounded-full size-11 text-muted hover:text-text hover:bg-accent-soft active:scale-95"
+              aria-label={t('theme.label')}
             >
               {themeIcons[theme]}
             </button>
@@ -118,7 +119,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             <button
               onClick={toggleLang}
               title={t('common.language')}
-              className="mochi-spring flex items-center justify-center rounded-full p-2 text-muted hover:text-text hover:bg-accent-soft active:scale-95"
+              className="mochi-spring flex items-center justify-center rounded-full size-11 text-muted hover:text-text hover:bg-accent-soft active:scale-95"
+              aria-label={t('common.language')}
             >
               <Globe size={18} strokeWidth={2.5} />
             </button>
@@ -128,7 +130,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
               user ? (
                 <button
                   onClick={() => logout()}
-                  className="mochi-spring flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-muted hover:text-text hover:bg-accent-soft active:scale-95"
+                  className="mochi-spring flex items-center gap-2 rounded-full min-h-[44px] px-4 py-3 text-sm font-medium text-muted hover:text-text hover:bg-accent-soft active:scale-95"
                 >
                   <LogOut size={16} strokeWidth={2.5} />
                   {t('common.logout')}
@@ -136,7 +138,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
               ) : (
                 <Link
                   href="/login"
-                  className="mochi-spring flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover active:scale-95"
+                  className="mochi-spring flex items-center gap-2 rounded-full min-h-[44px] bg-accent px-4 py-3 text-sm font-medium text-white hover:bg-accent-hover active:scale-95"
                 >
                   <LogIn size={16} strokeWidth={2.5} />
                   {t('common.login')}
@@ -148,7 +150,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           {/* Mobile menu button */}
           <button
             onClick={() => setMobileOpen(v => !v)}
-            className="md:hidden mochi-spring flex items-center justify-center rounded-full p-2 text-muted hover:text-text hover:bg-accent-soft active:scale-95"
+            aria-label={mobileOpen ? t('common.closeMenu') : t('common.openMenu')}
+            className="md:hidden mochi-spring flex items-center justify-center rounded-full size-11 text-muted hover:text-text hover:bg-accent-soft active:scale-95"
           >
             {mobileOpen ? <X size={22} strokeWidth={2.5} /> : <Menu size={22} strokeWidth={2.5} />}
           </button>
@@ -163,7 +166,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                   key={href}
                   href={href}
                   onClick={() => setMobileOpen(false)}
-                  className={`mochi-spring flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium ${
+                  className={`mochi-spring flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-medium ${
                     isActive(href)
                       ? 'bg-accent-soft text-accent'
                       : 'text-muted hover:text-text hover:bg-accent-soft/50'
@@ -177,7 +180,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                 <Link
                   href="/admin"
                   onClick={() => setMobileOpen(false)}
-                  className={`mochi-spring flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium ${
+                  className={`mochi-spring flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-medium ${
                     isActive('/admin')
                       ? 'bg-accent-soft text-accent'
                       : 'text-muted hover:text-text hover:bg-accent-soft/50'
@@ -192,13 +195,15 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             <div className="flex items-center gap-2 border-t border-border px-4 py-3">
               <button
                 onClick={cycleTheme}
-                className="mochi-spring flex items-center justify-center rounded-full p-2 text-muted hover:text-text hover:bg-accent-soft active:scale-95"
+                aria-label={t('theme.label')}
+                className="mochi-spring flex items-center justify-center rounded-full size-11 text-muted hover:text-text hover:bg-accent-soft active:scale-95"
               >
                 {themeIcons[theme]}
               </button>
               <button
                 onClick={toggleLang}
-                className="mochi-spring flex items-center justify-center rounded-full p-2 text-muted hover:text-text hover:bg-accent-soft active:scale-95"
+                aria-label={t('common.language')}
+                className="mochi-spring flex items-center justify-center rounded-full size-11 text-muted hover:text-text hover:bg-accent-soft active:scale-95"
               >
                 <Globe size={18} strokeWidth={2.5} />
               </button>
@@ -207,7 +212,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                 user ? (
                   <button
                     onClick={() => { logout(); setMobileOpen(false) }}
-                    className="mochi-spring flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-muted hover:text-text hover:bg-accent-soft active:scale-95"
+                    className="mochi-spring flex items-center gap-2 rounded-full min-h-[44px] px-4 py-3 text-sm font-medium text-muted hover:text-text hover:bg-accent-soft active:scale-95"
                   >
                     <LogOut size={16} strokeWidth={2.5} />
                     {t('common.logout')}
@@ -216,7 +221,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                   <Link
                     href="/login"
                     onClick={() => setMobileOpen(false)}
-                    className="mochi-spring flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover active:scale-95"
+                    className="mochi-spring flex items-center gap-2 rounded-full min-h-[44px] bg-accent px-4 py-3 text-sm font-medium text-white hover:bg-accent-hover active:scale-95"
                   >
                     <LogIn size={16} strokeWidth={2.5} />
                     {t('common.login')}
