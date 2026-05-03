@@ -5,16 +5,17 @@ This document is a reusable CapRover runbook for HKER. It is intentionally sanit
 ## What You Need
 
 - a CapRover server
-- `caprover` CLI installed locally
-- a Git branch or image you want to deploy
+- SSH access to the server (password or key)
 - a PostgreSQL database app on the same CapRover cluster
+- the project repo at `~/Desktop/project/hker`
 
 ## App Topology
 
-- App: `hker` for the Next.js application
-- App: `hker-db` for PostgreSQL
-- Internal DB host: `srv-captain--hker-db`
+- App: `hker` — Next.js application (Docker service: `srv-captain--hker`)
+- App: `hker-db` — PostgreSQL (Docker service: `srv-captain--hker-db`)
+- Internal DB host: `srv-captain--hker-db:5432`
 - App container port: `3000`
+- Docker image: `hker:latest`
 
 ## Required Environment Variables
 
@@ -37,131 +38,227 @@ For the database app:
 | `POSTGRES_USER` | Database user |
 | `POSTGRES_PASSWORD` | Database password |
 
-## One-Time Setup
+---
 
-### 1. Create the PostgreSQL app with persistent storage
+## Deployment Method: Direct Docker Build (Recommended)
+
+The CapRover API (upload tarball, set env vars) is unreliable — frequently returns 404 or ISE. The most reliable method is to build the Docker image directly on the server and update the Swarm service.
+
+### Quick Deploy (script)
+
+A deploy script is provided at `scripts/deploy.sh`. Usage:
 
 ```bash
-caprover api -n <machine-name> -t /user/apps/appDefinitions/register -m POST
-# data:
-# {"appName":"hker-db","hasPersistentData":true}
+# From the project root
+bash scripts/deploy.sh
 ```
 
-### 2. Configure the PostgreSQL app
+This will:
+1. Package the source into a clean tarball
+2. SCP tarball + deploy script to the server
+3. Build the Docker image on the server
+4. Run `drizzle-kit push` for DB migration
+5. Update the Docker Swarm service
+6. Verify the service is running
+7. Fix nginx port if needed
+
+### Manual Step-by-Step
+
+#### 1. Package source code
 
 ```bash
-caprover api -n <machine-name> -t /user/apps/appDefinitions/update -m POST
-# data:
-# {
-#   "appName":"hker-db",
-#   "instanceCount":1,
-#   "notExposeAsWebApp":true,
-#   "forceSsl":false,
-#   "envVars":[
-#     {"key":"POSTGRES_DB","value":"<db-name>"},
-#     {"key":"POSTGRES_USER","value":"<db-user>"},
-#     {"key":"POSTGRES_PASSWORD","value":"<db-password>"}
-#   ],
-#   "volumes":[{"containerPath":"/var/lib/postgresql/data","volumeName":"hker-db-data"}],
-#   "ports":[{"hostPort":54322,"containerPort":5432}]
-# }
-```
+cd ~/Desktop/project/hker
 
-### 3. Deploy PostgreSQL
-
-```bash
-caprover deploy -n <machine-name> -a hker-db -i postgres:16-alpine
-```
-
-### 4. Create the HKER app
-
-```bash
-caprover api -n <machine-name> -t /user/apps/appDefinitions/register -m POST
-# data:
-# {"appName":"hker"}
-```
-
-### 5. Configure the HKER app
-
-`containerHttpPort` must be `3000`. If you leave the CapRover default at `80`, the app will deploy and still serve 502s.
-
-```bash
-caprover api -n <machine-name> -t /user/apps/appDefinitions/update -m POST
-# data:
-# {
-#   "appName":"hker",
-#   "instanceCount":1,
-#   "notExposeAsWebApp":false,
-#   "forceSsl":false,
-#   "containerHttpPort":3000,
-#   "envVars":[
-#     {
-#       "key":"DATABASE_URL",
-#       "value":"postgresql://<db-user>:<db-password>@srv-captain--hker-db:5432/<db-name>"
-#     },
-#     {"key":"APP_BASE_URL","value":"https://<your-domain>"},
-#     {"key":"AUTH_SESSION_SECRET","value":"<32+ byte random secret>"},
-#     {"key":"AUTH_SESSION_COOKIE_NAME","value":"hker_session"},
-#     {"key":"AUTH_SESSION_TTL_DAYS","value":"30"},
-#     {"key":"TRUSTED_PROXIES","value":""}
-#   ]
-# }
-```
-
-### 6. Deploy the app
-
-From a Git branch:
-
-```bash
-caprover deploy -n <machine-name> -a hker -b <branch>
-```
-
-Or from a built image:
-
-```bash
-caprover deploy -n <machine-name> -a hker -i <image:tag>
-```
-
-## Database Bootstrap Note
-
-At the moment this repo contains Drizzle schema definitions and `drizzle.config.ts`, but it does not check in generated `drizzle/` migration SQL yet.
-
-That means you currently have two sane production bootstrap options:
-
-1. generate and commit migrations before release, then run `npm run db:migrate`
-2. for first-time environment setup only, run `npm run db:push` against the target database from a trusted operator machine
-
-Do not treat `db:push` as a long-term release process for a multi-person production workflow.
-
-## Routine Deploys
-
-If the app and database definitions are already set up:
-
-```bash
-git push origin <branch>
-caprover deploy -n <machine-name> -a hker -b <branch>
-```
-
-If you need to deploy the current local workspace from macOS instead of a Git branch, create the tarball with AppleDouble metadata disabled. Otherwise `._*` files can end up in the build context and break `next build` / ESLint.
-
-```bash
 env COPYFILE_DISABLE=1 tar \
   --exclude='./node_modules' \
   --exclude='./.git' \
   --exclude='./.next' \
   --exclude='./.claude' \
-  -czf /tmp/hker-caprover.tgz .
+  --exclude='./coverage' \
+  --exclude='./.gstack' \
+  --exclude='./src/db/migrations' \
+  --exclude='._*' \
+  -czf /tmp/hker-deploy.tgz .
 
-caprover deploy -n <machine-name> -a hker -t /tmp/hker-caprover.tgz
+# Verify no AppleDouble contamination
+tar -tzf /tmp/hker-deploy.tgz | grep '/\._\|^\._' && echo "CONTAMINATED" || echo "CLEAN"
 ```
+
+#### 2. Upload to server
+
+```bash
+scp /tmp/hker-deploy.tgz root@SERVER_IP:/tmp/
+scp scripts/deploy-remote.sh root@SERVER_IP:/tmp/
+```
+
+#### 3. SSH to server and build
+
+```bash
+ssh root@SERVER_IP
+mkdir -p /tmp/hker-build && cd /tmp/hker-build
+tar xzf /tmp/hker-deploy.tgz
+docker build --network=host -t hker:latest -f Dockerfile .
+```
+
+#### 4. Run DB migration
+
+```bash
+# Get DATABASE_URL from the running container
+HKER_ID=$(docker ps --filter name=srv-captain--hker --format "{{.ID}}" | head -1)
+DB_URL=$(docker inspect "$HKER_ID" --format '{{range .Config.Env}}{{println .}}{{end}}' | grep DATABASE_URL | cut -d= -f2-)
+
+# Run drizzle-kit push via a temporary container on the overlay network
+docker run --rm \
+  --network captain-overlay-network \
+  -v /tmp/hker-build:/app \
+  -w /app \
+  -e DATABASE_URL="$DB_URL" \
+  node:20-alpine \
+  sh -c "npm install && npx drizzle-kit push"
+```
+
+#### 5. Update the service
+
+```bash
+docker service update --image hker:latest --force srv-captain--hker
+```
+
+#### 6. Fix nginx port (if needed)
+
+CapRover sometimes regenerates nginx config with port 80 instead of 3000.
+
+```bash
+NGINX=$(docker ps --filter name=captain-nginx --format "{{.ID}}" | head -1)
+
+# Check current config
+docker exec "$NGINX" grep "srv-captain--hker" /etc/nginx/conf.d/captain.conf
+
+# Fix if showing :80 instead of :3000
+docker exec "$NGINX" sed -i 's|http://srv-captain--hker:80|http://srv-captain--hker:3000|g' /etc/nginx/conf.d/captain.conf
+docker exec "$NGINX" nginx -t && docker exec "$NGINX" nginx -s reload
+```
+
+#### 7. Verify
+
+```bash
+curl -sf http://hker.<domain>/api/health
+# Expected: {"status":"ok","service":"hker",...}
+```
+
+---
+
+## One-Time Setup (First Deploy Only)
+
+### 1. Create the PostgreSQL app
+
+```bash
+# Login to CapRover API
+TOKEN=$(curl -s "http://SERVER_IP:3000/api/v2/login" \
+  -X POST -H "Content-Type: application/json" \
+  -d '{"password":"PASSWORD"}' | python3 -c "import sys,json;print(json.load(sys.stdin)['data']['token'])")
+
+# Create app with persistent data
+curl -s "http://SERVER_IP:3000/api/v2/user/apps/appData" \
+  -X POST -H "Content-Type: application/json" \
+  -H "x-captain-auth: $TOKEN" \
+  -d '{"appName":"hker-db","hasPersistentData":true}'
+```
+
+Then set env vars and deploy the `postgres:16-alpine` image (see "Alternative: CapRover API / CLI" below).
+
+### 2. Create the HKER app
+
+```bash
+curl -s "http://SERVER_IP:3000/api/v2/user/apps/appData" \
+  -X POST -H "Content-Type: application/json" \
+  -H "x-captain-auth: $TOKEN" \
+  -d '{"appName":"hker"}'
+```
+
+### 3. Set environment variables
+
+The CapRover API env var endpoint (`PUT /api/v2/user/apps/appData/:appName`) is unreliable. Prefer editing `/captain/data/config-captain.json` directly on the server, then restarting captain:
+
+```bash
+ssh root@SERVER_IP
+# Edit the JSON, add env vars under appDefinitions.hker.envVars
+vi /captain/data/config-captain.json
+docker service update --force captain-captain
+```
+
+Or use `docker service create` with `--env` flags directly (see skill).
+
+**Critical:** `containerHttpPort` must be `3000`. If left at the default `80`, nginx will route to the wrong port → 502.
+
+### 4. Initial DB bootstrap
+
+```bash
+# After first deploy, run migration to create tables
+docker run --rm \
+  --network captain-overlay-network \
+  -v /tmp/hker-build:/app \
+  -w /app \
+  -e DATABASE_URL="postgresql://<user>:<pass>@srv-captain--hker-db:5432/<db>" \
+  node:20-alpine \
+  sh -c "npm install && npx drizzle-kit push"
+```
+
+---
+
+## Alternative: CapRover API / CLI (Unreliable)
+
+The `caprover` CLI and API endpoints can be used for simpler operations. The app creation endpoint is reliable; env var updates and tarball uploads are not.
+
+```bash
+# Login
+TOKEN=$(curl -s "http://SERVER_IP:3000/api/v2/login" \
+  -X POST -H "Content-Type: application/json" \
+  -d '{"password":"PASSWORD"}' | python3 -c "import sys,json;print(json.load(sys.stdin)['data']['token'])")
+
+# Create app
+curl -s "http://SERVER_IP:3000/api/v2/user/apps/appData" \
+  -X POST -H "Content-Type: application/json" \
+  -H "x-captain-auth: $TOKEN" \
+  -d '{"appName":"hker"}'
+
+# Upload tarball — field name MUST be "sourceFile"
+curl -s "http://SERVER_IP:3000/api/v2/user/apps/appData/hker" \
+  -X POST \
+  -H "x-captain-auth: $TOKEN" \
+  -F "sourceFile=@/tmp/hker-deploy.tgz"
+```
+
+### CapRover API Reliability Reference
+
+| Endpoint | Method | Purpose | Reliability |
+|----------|--------|---------|-------------|
+| `/api/v2/login` | POST | Auth → token | ✅ Reliable |
+| `/api/v2/user/apps/appData` | POST | Create app | ✅ Reliable |
+| `/api/v2/user/apps/appData/:appName` | PUT | Update config (env vars, volumes) | ❌ Often 404/ISE |
+| `/api/v2/user/apps/appData/:appName` | POST | Deploy (upload tarball) | ⚠️ Sometimes ISE |
+
+---
+
+## Database Migration Notes
+
+The repo uses Drizzle ORM. Schema changes require migration before or during deploy.
+
+- **`drizzle-kit push`** — Pushes schema directly to DB (no migration files needed). Use for solo dev / first-time setup.
+- **`drizzle-kit migrate`** — Applies generated SQL migration files. Preferred for multi-person teams.
+
+Current workflow: `drizzle-kit push` via temporary container on the overlay network during deploy.
+
+Do not treat `db:push` as a long-term release process for a multi-person production workflow.
+
+---
 
 ## Post-Deploy Checks
 
 Run these after each deploy:
 
 ```bash
-curl -sf https://<your-domain>/api/health
-curl -I https://<your-domain>
+curl -sf http://hker.<domain>/api/health
+curl -I http://hker.<domain>
 ```
 
 Then manually verify:
@@ -172,88 +269,68 @@ Then manually verify:
 - marketplace page loads
 - family todo page loads
 - admin page is reachable only for admin users
+- monthly bills tool loads
 
-## Known CapRover Pitfalls
+---
+
+## Known Issues & Pitfalls
+
+### `npm ci` fails in Docker build
+
+**Symptom:**
+
+```text
+npm error Missing: @esbuild/linux-x64@0.28.0 from lock file
+```
+
+**Cause:** Local `package-lock.json` is out of sync (e.g. npm version mismatch between macOS and Docker).
+
+**Fix:** Either:
+1. Run `npm install` locally to regenerate the lock file, then commit and redeploy
+2. Temporarily change `npm ci` to `npm install` in the Dockerfile for this deploy
 
 ### `public/` missing during Docker build
 
-Symptom:
+**Symptom:**
 
 ```text
 COPY failed: stat app/public: file does not exist
 ```
 
-Fix:
-
-- keep `public/` in the repo with at least one tracked file such as `public/.gitkeep`
+**Fix:** Keep `public/` in the repo with at least one tracked file such as `public/.gitkeep`.
 
 ### App config update silently resets `containerHttpPort`
 
-Symptom:
+**Symptom:** NGINX 502 after config update.
 
-```text
-NGINX 502 Error :/
-```
-
-Cause:
-
-- a manual CapRover app-definition update dropped the app back to the default HTTP port `80`
-
-Fix:
-
-- set `containerHttpPort` back to `3000`
-- re-check `/api/health` after the config save
-
-### App deploys but returns 502
-
-Cause:
-
-- CapRover is still routing to port `80`
-
-Fix:
-
-- set `containerHttpPort` to `3000`
+**Fix:** Set `containerHttpPort` back to `3000` in the app definition or fix nginx manually (see step 6 above).
 
 ### Auth routes fail after a DB rebuild but `/api/health` is still 200
 
-Cause:
+**Cause:** `/api/health` does not touch the database. The DB may be missing schema or has wrong credentials.
 
-- `/api/health` does not touch the database
-- the PostgreSQL app was recreated without the expected schema
-- or the attached DB volume was initialized with credentials that no longer match `DATABASE_URL`
-
-Fix:
-
-- verify the PostgreSQL app still has a persistent volume attached
-- if the volume state is unknown, attach a fresh volume and initialize Postgres with known credentials
-- run `npm run db:push` or the committed migration flow against the target DB before testing auth
-- only treat the deploy as healthy after `register` and `login` both succeed
+**Fix:**
+- Verify PostgreSQL app has a persistent volume attached
+- Re-run `drizzle-kit push` against the target DB
+- Only treat the deploy as healthy after `register` and `login` both succeed
 
 ### macOS tar deploy includes `._*` files
 
-Symptom:
+**Symptom:**
 
 ```text
 Parsing error: Invalid character.
 ./src/app/.../._page.tsx
 ```
 
-Cause:
+**Fix:** Create the tarball with `COPYFILE_DISABLE=1` and verify before deploy:
 
-- the deployment tarball included AppleDouble metadata files from macOS
-
-Fix:
-
-- create the tarball with `COPYFILE_DISABLE=1`
-- verify `tar -tzf <tarball> | rg '/\._|^\._'` returns no matches before deploy
+```bash
+tar -tzf /tmp/hker-deploy.tgz | grep '/\._\|^\._' && echo "CONTAMINATED" || echo "CLEAN"
+```
 
 ### SSL issuance fails temporarily
 
-Cause:
+**Cause:** DNS propagation or ACME timing.
 
-- usually DNS propagation or ACME timing
-
-Fix:
-
-- confirm plain HTTP works first
-- retry SSL issuance later
+**Fix:** Confirm plain HTTP works first, then retry SSL issuance from the CapRover dashboard.
