@@ -1,6 +1,8 @@
 # Stage 1: Build
 FROM node:20-alpine AS builder
 WORKDIR /app
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NPM_CONFIG_UPDATE_NOTIFIER=false
 
 # CapRover injects app env vars as build args
 ARG DATABASE_URL
@@ -16,7 +18,7 @@ ENV AUTH_SESSION_COOKIE_NAME=$AUTH_SESSION_COOKIE_NAME
 ENV AUTH_SESSION_TTL_DAYS=$AUTH_SESSION_TTL_DAYS
 
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --omit=dev --no-audit --no-fund
 COPY . .
 RUN npm run build
 
