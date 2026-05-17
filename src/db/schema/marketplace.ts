@@ -10,6 +10,7 @@ export const marketplaceListings = pgTable('marketplace_listings', {
   subscriberCount: integer('subscriber_count').notNull().default(0),
   forkCount: integer('fork_count').notNull().default(0),
   publisherAnonymous: boolean('publisher_anonymous').notNull().default(false),
+  active: boolean('active').notNull().default(true),
 })
 
 export const subscriptions = pgTable('subscriptions', {

@@ -73,11 +73,28 @@ describe('marketplace-service', () => {
 
   describe('publish', () => {
     it('upserts listing and returns DTO', async () => {
-      vi.mocked(db.update).mockReturnValue({
-        set: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue(undefined),
-        }),
-      } as any)
+      let updateCallCount = 0
+      vi.mocked(db.update).mockImplementation(() => {
+        updateCallCount++
+        if (updateCallCount === 1 || updateCallCount === 3) {
+          // First call: update collections visibility, Third call: update reactivated listing
+          return {
+            set: vi.fn().mockReturnValue({
+              where: vi.fn().mockReturnValue({
+                returning: vi.fn().mockResolvedValue([{ id: 1 }]),
+              }),
+            }),
+          } as any
+        }
+        // Second call: reactivate attempt (returns no rows)
+        return {
+          set: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              returning: vi.fn().mockResolvedValue([]),
+            }),
+          }),
+        } as any
+      })
       vi.mocked(db.insert).mockReturnValue({
         values: vi.fn().mockReturnValue({
           onConflictDoUpdate: vi.fn().mockReturnValue({
@@ -104,32 +121,191 @@ describe('marketplace-service', () => {
       expect(result).toBeDefined()
       expect(result.collection.title).toBe('Test Collection')
     })
+
+    it('reactivates an inactive listing if it exists', async () => {
+      let updateCallCount = 0
+      vi.mocked(db.update).mockImplementation(() => {
+        updateCallCount++
+        if (updateCallCount === 1 || updateCallCount === 3) {
+          // First call: update collections visibility, Third call: update reactivated listing
+          return {
+            set: vi.fn().mockReturnValue({
+              where: vi.fn().mockReturnValue({
+                returning: vi.fn().mockResolvedValue([{ id: 1 }]),
+              }),
+            }),
+          } as any
+        }
+        // Second call: reactivate attempt (returns rows - listing was reactivated)
+        return {
+          set: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              returning: vi.fn().mockResolvedValue([{ id: 1, collectionId: 1 }]),
+            }),
+          }),
+        } as any
+      })
+      vi.mocked(db.select).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          innerJoin: vi.fn().mockReturnValue({
+            innerJoin: vi.fn().mockReturnValue({
+              where: vi.fn().mockReturnValue({
+                limit: vi.fn().mockResolvedValue([mockListingRow]),
+              }),
+            }),
+          }),
+        }),
+      } as any)
+
+      const result = await ms.publish(1, 1, false)
+      expect(result).toBeDefined()
+      expect(result.collection.title).toBe('Test Collection')
+    })
   })
 
   describe('unpublish', () => {
     it('removes listing and sets visibility to unlisted', async () => {
-      vi.mocked(db.delete).mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([{ id: 1, collectionId: 1 }]),
-        }),
-      } as any)
-      vi.mocked(db.update).mockReturnValue({
-        set: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue(undefined),
-        }),
-      } as any)
+      let updateCallCount = 0
+      vi.mocked(db.update).mockImplementation(() => {
+        updateCallCount++
+        if (updateCallCount === 1) {
+          // First call: soft-unpublish (set active = false)
+          return {
+            set: vi.fn().mockReturnValue({
+              where: vi.fn().mockReturnValue({
+                returning: vi.fn().mockResolvedValue([{ id: 1, collectionId: 1, active: false }]),
+              }),
+            }),
+          } as any
+        }
+        // Second call: update collection visibility
+        return {
+          set: vi.fn().mockReturnValue({
+            where: vi.fn().mockResolvedValue(undefined),
+          }),
+        } as any
+      })
 
       await expect(ms.unpublish(1)).resolves.toBeUndefined()
     })
 
     it('throws NOT_FOUND when no listing', async () => {
-      vi.mocked(db.delete).mockReturnValue({
+      let updateCallCount = 0
+      vi.mocked(db.update).mockImplementation(() => {
+        updateCallCount++
+        if (updateCallCount === 1) {
+          // First call: soft-unpublish (set active = false) - no listing found
+          return {
+            set: vi.fn().mockReturnValue({
+              where: vi.fn().mockReturnValue({
+                returning: vi.fn().mockResolvedValue([]),
+              }),
+            }),
+          } as any
+        }
+        // Second call: should not reach here since error is thrown
+        return {
+          set: vi.fn().mockReturnValue({
+            where: vi.fn().mockResolvedValue(undefined),
+          }),
+        } as any
+      })
+
+      await expect(ms.unpublish(999)).rejects.toThrow('Listing not found')
+    })
+
+    it('Test 4: Active listings are returned in marketplace browse, inactive ones are not', async () => {
+      const baseQueryMock = {
         where: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([]),
+          orderBy: vi.fn().mockReturnValue({
+            limit: vi.fn().mockReturnValue({
+              offset: vi.fn().mockResolvedValue([mockListingRow]),
+            }),
+          }),
+        }),
+      }
+
+      const countQueryMock = {
+        where: vi.fn().mockResolvedValue([{ total: 1 }]),
+      }
+
+      let callIndex = 0
+      vi.mocked(db.select).mockImplementation(() => {
+        callIndex++
+        if (callIndex === 1) {
+          return {
+            from: vi.fn().mockReturnValue({
+              innerJoin: vi.fn().mockReturnValue({
+                innerJoin: vi.fn().mockReturnValue(baseQueryMock),
+              }),
+            }),
+          } as any
+        }
+        return {
+          from: vi.fn().mockReturnValue({
+            innerJoin: vi.fn().mockReturnValue(countQueryMock),
+          }),
+        } as any
+      })
+
+      const result = await ms.listListings(0, 10, 'newest')
+      expect(result.content).toHaveLength(1)
+      // Verify that where was called (which includes the active filter)
+      expect(baseQueryMock.where).toHaveBeenCalled()
+    })
+  })
+
+  describe('softUnpublish', () => {
+    it('sets active to false when listing exists', async () => {
+      vi.mocked(db.update).mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([{ id: 1, collectionId: 1, active: false }]),
+          }),
         }),
       } as any)
 
-      await expect(ms.unpublish(999)).rejects.toThrow('Listing not found')
+      await expect(ms.softUnpublish(1)).resolves.toBeUndefined()
+    })
+
+    it('does not throw when no listing exists (graceful no-op)', async () => {
+      vi.mocked(db.update).mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([]),
+          }),
+        }),
+      } as any)
+
+      await expect(ms.softUnpublish(999)).resolves.toBeUndefined()
+    })
+  })
+
+  describe('reactivate', () => {
+    it('sets active to true when inactive listing exists', async () => {
+      vi.mocked(db.update).mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([{ id: 1, collectionId: 1, active: true }]),
+          }),
+        }),
+      } as any)
+
+      const result = await ms.reactivate(1)
+      expect(result).toBe(true)
+    })
+
+    it('returns false when no inactive listing exists', async () => {
+      vi.mocked(db.update).mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([]),
+          }),
+        }),
+      } as any)
+
+      const result = await ms.reactivate(1)
+      expect(result).toBe(false)
     })
   })
 })

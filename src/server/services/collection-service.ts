@@ -3,6 +3,7 @@ import { db } from '@/server/db'
 import { collections } from '@/db/schema/collections'
 import { links } from '@/db/schema/collections'
 import { collectionMembers } from '@/db/schema/collaboration'
+import * as marketplaceService from './marketplace-service'
 
 export async function listForUser(userId: number) {
   const ownedRows = await db
@@ -131,7 +132,16 @@ export async function updateVisibility(
     .set({ visibility, updatedAt: new Date() })
     .where(eq(collections.id, id))
     .returning()
-  return row ?? null
+
+  if (!row) return null
+
+  // Auto-unpublish marketplace listing when visibility is downgraded from public
+  if (visibility === 'private' || visibility === 'unlisted') {
+    // softUnpublish handles cases where no listing exists gracefully (no-op)
+    await marketplaceService.softUnpublish(id)
+  }
+
+  return row
 }
 
 export async function remove(id: number) {

@@ -1,4 +1,4 @@
-import { eq, desc, asc, sql, or, ilike, count } from 'drizzle-orm'
+import { eq, desc, asc, sql, or, ilike, count, and } from 'drizzle-orm'
 import { db } from '@/server/db'
 import { marketplaceListings } from '@/db/schema/marketplace'
 import { collections, links } from '@/db/schema/collections'
@@ -109,10 +109,11 @@ export async function listListings(
 
   const [rows, [{ total }]] = await Promise.all([
     baseQuery()
+      .where(eq(marketplaceListings.active, true))
       .orderBy(...orderBy)
       .limit(size)
       .offset(page * size),
-    baseCountQuery(),
+    baseCountQuery().where(eq(marketplaceListings.active, true)),
   ])
 
   return {
@@ -131,9 +132,12 @@ export async function searchListings(
 ): Promise<PageResponse<MarketplaceListing>> {
   const pattern = `%${query}%`
 
-  const whereClause = or(
-    ilike(collections.title, pattern),
-    ilike(collections.description, pattern),
+  const whereClause = and(
+    eq(marketplaceListings.active, true),
+    or(
+      ilike(collections.title, pattern),
+      ilike(collections.description, pattern),
+    ),
   )
 
   const [rows, countResult] = await Promise.all([
@@ -158,7 +162,9 @@ export async function searchListings(
 }
 
 export async function getDetail(listingId: number): Promise<MarketplaceDetail> {
-  const rows = await baseQuery().where(eq(marketplaceListings.id, listingId)).limit(1)
+  const rows = await baseQuery()
+    .where(and(eq(marketplaceListings.id, listingId), eq(marketplaceListings.active, true)))
+    .limit(1)
 
   if (rows.length === 0) {
     throw new AppError('NOT_FOUND', 'Listing not found')
@@ -197,33 +203,58 @@ export async function publish(
     .set({ visibility: 'public', updatedAt: new Date() })
     .where(eq(collections.id, collectionId))
 
-  const [listing] = await db
-    .insert(marketplaceListings)
-    .values({
-      collectionId,
-      publisherId,
-      publisherAnonymous: anonymous,
-    })
-    .onConflictDoUpdate({
-      target: marketplaceListings.collectionId,
-      set: {
-        publisherAnonymous: anonymous,
-        publishedAt: new Date(),
-      },
-    })
-    .returning()
+  // Try to reactivate an existing inactive listing first
+  const reactivated = await reactivate(collectionId)
 
-  const rows = await baseQuery().where(eq(marketplaceListings.id, listing.id)).limit(1)
+  let listing: { id: number }
+
+  if (reactivated) {
+    // Update the reactivated listing with new publisher settings
+    const [updated] = await db
+      .update(marketplaceListings)
+      .set({
+        publisherId,
+        publisherAnonymous: anonymous,
+      })
+      .where(eq(marketplaceListings.collectionId, collectionId))
+      .returning()
+    listing = updated!
+  } else {
+    // Create new listing or update existing active one
+    const [inserted] = await db
+      .insert(marketplaceListings)
+      .values({
+        collectionId,
+        publisherId,
+        publisherAnonymous: anonymous,
+        active: true,
+      })
+      .onConflictDoUpdate({
+        target: marketplaceListings.collectionId,
+        set: {
+          publisherAnonymous: anonymous,
+          publishedAt: new Date(),
+          active: true,
+        },
+      })
+      .returning()
+    listing = inserted!
+  }
+
+  const rows = await baseQuery()
+    .where(and(eq(marketplaceListings.id, listing.id), eq(marketplaceListings.active, true)))
+    .limit(1)
   return toListingDto(rows[0])
 }
 
 export async function unpublish(collectionId: number): Promise<void> {
-  const [deleted] = await db
-    .delete(marketplaceListings)
+  const [updated] = await db
+    .update(marketplaceListings)
+    .set({ active: false })
     .where(eq(marketplaceListings.collectionId, collectionId))
     .returning()
 
-  if (!deleted) {
+  if (!updated) {
     throw new AppError('NOT_FOUND', 'Listing not found')
   }
 
@@ -231,4 +262,30 @@ export async function unpublish(collectionId: number): Promise<void> {
     .update(collections)
     .set({ visibility: 'unlisted', updatedAt: new Date() })
     .where(eq(collections.id, collectionId))
+}
+
+/**
+ * Soft-unpublish a marketplace listing by setting active = false.
+ * This is called automatically when collection visibility is downgraded.
+ * Gracefully handles cases where no listing exists (no-op).
+ */
+export async function softUnpublish(collectionId: number): Promise<void> {
+  await db
+    .update(marketplaceListings)
+    .set({ active: false })
+    .where(eq(marketplaceListings.collectionId, collectionId))
+}
+
+/**
+ * Reactivate a previously soft-unpublished listing.
+ * Returns true if a listing was reactivated, false if no inactive listing exists.
+ */
+export async function reactivate(collectionId: number): Promise<boolean> {
+  const [updated] = await db
+    .update(marketplaceListings)
+    .set({ active: true, publishedAt: new Date() })
+    .where(and(eq(marketplaceListings.collectionId, collectionId), eq(marketplaceListings.active, false)))
+    .returning()
+
+  return !!updated
 }
