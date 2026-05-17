@@ -101,3 +101,13 @@ export function requireSpaceAtLeast(actual: SpaceAccess, required: SpaceAccess):
     throw new AppError('FORBIDDEN', 'Insufficient space access')
   }
 }
+
+export type UserRole = 'user' | 'admin' | 'superadmin'
+
+export function isAdmin(role: UserRole): boolean {
+  return role === 'admin' || role === 'superadmin'
+}
+
+export function isSuperAdmin(role: UserRole): boolean {
+  return role === 'superadmin'
+}

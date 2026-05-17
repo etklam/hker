@@ -125,4 +125,28 @@ describe('permission-service', () => {
       expect(() => ps.requireSpaceAtLeast('member', 'admin')).toThrow(AppError)
     })
   })
+
+  describe('isAdmin', () => {
+    it('returns true for admin role', () => {
+      expect(ps.isAdmin('admin')).toBe(true)
+    })
+    it('returns true for superadmin role', () => {
+      expect(ps.isAdmin('superadmin')).toBe(true)
+    })
+    it('returns false for user role', () => {
+      expect(ps.isAdmin('user')).toBe(false)
+    })
+  })
+
+  describe('isSuperAdmin', () => {
+    it('returns true only for superadmin role', () => {
+      expect(ps.isSuperAdmin('superadmin')).toBe(true)
+    })
+    it('returns false for admin role', () => {
+      expect(ps.isSuperAdmin('admin')).toBe(false)
+    })
+    it('returns false for user role', () => {
+      expect(ps.isSuperAdmin('user')).toBe(false)
+    })
+  })
 })

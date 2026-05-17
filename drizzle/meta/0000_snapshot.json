@@ -1,5 +1,5 @@
 {
-  "id": "56b6b113-4bed-49f8-af47-f9374927f1f7",
+  "id": "7bcfd4cf-145f-4b72-8867-1a771b01acc1",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -1211,13 +1211,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
-        },
-        "active": {
-          "name": "active",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
         }
       },
       "indexes": {},
@@ -1927,7 +1920,8 @@
       "schema": "public",
       "values": [
         "user",
-        "admin"
+        "admin",
+        "superadmin"
       ]
     }
   },

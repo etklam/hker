@@ -5,6 +5,7 @@ import type { AuthUser } from '@/lib/types'
 import { db } from '@/server/db'
 import { rateLimitEntries, loginFailures } from '@/db/schema/rateLimit'
 import { eq, sql, and, lt, gte } from 'drizzle-orm'
+import { isAdmin } from '@/server/services/permission-service'
 
 // --- Rate limiting (DB-backed sliding window) ---
 
@@ -267,8 +268,17 @@ export function withOptionalAuth(handler: OptionalAuthHandler) {
 
 export function withAdmin(handler: AuthenticatedHandler) {
   return withAuth(async (req, ctx) => {
-    if (ctx.user.role !== 'admin') {
+    if (!isAdmin(ctx.user.role)) {
       return apiError('FORBIDDEN', 'Admin access required')
+    }
+    return handler(req, ctx)
+  })
+}
+
+export function withSuperAdmin(handler: AuthenticatedHandler) {
+  return withAuth(async (req, ctx) => {
+    if (ctx.user.role !== 'superadmin') {
+      return apiError('FORBIDDEN', 'Superadmin access required')
     }
     return handler(req, ctx)
   })
