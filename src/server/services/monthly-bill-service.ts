@@ -1,7 +1,7 @@
 import { and, eq, ne } from 'drizzle-orm'
 import { db } from '@/server/db'
 import { monthlyBillChecks, monthlyBillItems, monthlyBillLists } from '@/db/schema/monthlyBills'
-import { familyTodoSpaceMembers, familyTodoSpaces } from '@/db/schema/familyTodo'
+import { spaceMembers, spaces } from '@/db/schema/space'
 import { AppError } from '@/lib/errors'
 import { getSpaceAccess, requireSpaceAtLeast } from './permission-service'
 import { fetchUsersById } from './user-service'
@@ -99,25 +99,25 @@ export async function listAccessibleLists(userId: number): Promise<MonthlyBillLi
   const ownedRows = await db
     .select({
       list: monthlyBillLists,
-      sharedSpaceName: familyTodoSpaces.name,
+      sharedSpaceName: spaces.name,
     })
     .from(monthlyBillLists)
-    .leftJoin(familyTodoSpaces, eq(monthlyBillLists.sharedSpaceId, familyTodoSpaces.id))
+    .leftJoin(spaces, eq(monthlyBillLists.sharedSpaceId, spaces.id))
     .where(eq(monthlyBillLists.ownerId, userId))
 
   const sharedRows = await db
     .select({
       list: monthlyBillLists,
-      sharedSpaceName: familyTodoSpaces.name,
-      memberRole: familyTodoSpaceMembers.role,
+      sharedSpaceName: spaces.name,
+      memberRole: spaceMembers.role,
     })
     .from(monthlyBillLists)
-    .innerJoin(familyTodoSpaces, eq(monthlyBillLists.sharedSpaceId, familyTodoSpaces.id))
+    .innerJoin(spaces, eq(monthlyBillLists.sharedSpaceId, spaces.id))
     .innerJoin(
-      familyTodoSpaceMembers,
+      spaceMembers,
       and(
-        eq(familyTodoSpaceMembers.spaceId, familyTodoSpaces.id),
-        eq(familyTodoSpaceMembers.userId, userId),
+        eq(spaceMembers.spaceId, spaces.id),
+        eq(spaceMembers.userId, userId),
       ),
     )
     .where(ne(monthlyBillLists.ownerId, userId))
@@ -145,10 +145,10 @@ export async function getListAccess(userId: number, listId: number): Promise<Lis
   const [row] = await db
     .select({
       list: monthlyBillLists,
-      sharedSpaceName: familyTodoSpaces.name,
+      sharedSpaceName: spaces.name,
     })
     .from(monthlyBillLists)
-    .leftJoin(familyTodoSpaces, eq(monthlyBillLists.sharedSpaceId, familyTodoSpaces.id))
+    .leftJoin(spaces, eq(monthlyBillLists.sharedSpaceId, spaces.id))
     .where(eq(monthlyBillLists.id, listId))
     .limit(1)
 

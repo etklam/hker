@@ -29,7 +29,7 @@ import {
   type MonthlyBillStatus,
 } from '@/lib/tools/monthly-bills'
 import type {
-  FamilyTodoSpace,
+  Space,
   MonthlyBillBoardResponse,
   MonthlyBillItemResponse,
   MonthlyBillListResponse,
@@ -96,7 +96,7 @@ export default function MonthlyBillsPage() {
   const [month, setMonth] = useState(() => getCurrentMonthKey())
   const [selectedListId, setSelectedListId] = useState<number | null>(null)
   const [board, setBoard] = useState<MonthlyBillBoardResponse | null>(null)
-  const [spaces, setSpaces] = useState<FamilyTodoSpace[]>([])
+  const [spaces, setSpaces] = useState<Space[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [newListName, setNewListName] = useState('')
@@ -139,7 +139,7 @@ export default function MonthlyBillsPage() {
 
   useEffect(() => {
     if (!user) return
-    api<FamilyTodoSpace[]>('/api/family-todo/spaces')
+    api<Space[]>('/api/spaces/spaces')
       .then(setSpaces)
       .catch(() => setSpaces([]))
   }, [user])

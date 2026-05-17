@@ -88,8 +88,8 @@ export interface InviteJoinResponse {
   role: string
 }
 
-export interface FamilyTodoInviteInfo {
-  space: FamilyTodoSpace
+export interface SpaceInviteInfo {
+  space: Space
   maxUses: number | null
   useCount: number
   expiresAt: string | null

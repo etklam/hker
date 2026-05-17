@@ -33,7 +33,7 @@ const NAV_ITEMS = [
   { href: '/', labelKey: 'home.brand', icon: Home },
   { href: '/me/collections', labelKey: 'nav.myCollections', icon: Bookmark },
   { href: '/marketplace', labelKey: 'nav.marketplace', icon: Store },
-  { href: '/family-todo', labelKey: 'nav.familyTodo', icon: CheckSquare },
+  { href: '/spaces', labelKey: 'nav.spaces', icon: CheckSquare },
 ] as const
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {

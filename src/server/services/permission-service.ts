@@ -2,7 +2,7 @@ import { eq, and } from 'drizzle-orm'
 import { db } from '@/server/db'
 import { collections } from '@/db/schema/collections'
 import { collectionMembers } from '@/db/schema/collaboration'
-import { familyTodoSpaces, familyTodoSpaceMembers } from '@/db/schema/familyTodo'
+import { spaces, spaceMembers } from '@/db/schema/space'
 import { AppError } from '@/lib/errors'
 
 export type CollectionAccess = 'none' | 'view' | 'edit' | 'owner'
@@ -66,8 +66,8 @@ export async function getSpaceAccess(
 ): Promise<SpaceAccess> {
   const [space] = await db
     .select()
-    .from(familyTodoSpaces)
-    .where(eq(familyTodoSpaces.id, spaceId))
+    .from(spaces)
+    .where(eq(spaces.id, spaceId))
     .limit(1)
 
   if (!space) return 'none'
@@ -76,11 +76,11 @@ export async function getSpaceAccess(
 
   const [membership] = await db
     .select()
-    .from(familyTodoSpaceMembers)
+    .from(spaceMembers)
     .where(
       and(
-        eq(familyTodoSpaceMembers.spaceId, spaceId),
-        eq(familyTodoSpaceMembers.userId, userId),
+        eq(spaceMembers.spaceId, spaceId),
+        eq(spaceMembers.userId, userId),
       ),
     )
     .limit(1)

@@ -2,7 +2,7 @@
   "nav": {
     "myCollections": "My Collections",
     "marketplace": "Marketplace",
-    "familyTodo": "Family Todo"
+    "spaces": "Spaces"
   },
   "collections": {
     "title": "My Collections",
@@ -68,7 +68,7 @@
       "fork": "Failed to fork collection"
     }
   },
-  "familyTodo": {
+  "spaces": {
     "spacesCount": "{{count}} spaces",
     "createSpace": "New Space",
     "editSpace": "Edit Space",
@@ -191,8 +191,8 @@
         "description": "Discover public collections, subscribe for updates, or fork your own copy.",
         "cta": "Explore marketplace"
       },
-      "familyTodo": {
-        "title": "Family Todo",
+      "spaces": {
+        "title": "Spaces",
         "description": "Collaborative task boards for your family or team — priorities, due dates & more.",
         "cta": "Open boards"
       }
@@ -277,7 +277,7 @@
       "forbidden": "You don't have permission to join this invite"
     }
   },
-  "familyTodoInviteJoin": {
+  "spaceInviteJoin": {
     "title": "Join Space Invite",
     "subtitle": "You've been invited to join the space: {{title}}",
     "invalid": "This space invite link is invalid or has reached its usage limit.",
