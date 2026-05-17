@@ -158,6 +158,9 @@ describe('api-helpers', () => {
         }),
       } as any)
       vi.mocked(db.insert).mockReturnValue({ values: vi.fn().mockResolvedValue(undefined) } as any)
+      vi.mocked(db.delete).mockReturnValue({
+        where: vi.fn().mockReturnValue(Promise.resolve({})),
+      } as any)
       vi.stubEnv('APP_BASE_URL', '')
       vi.stubEnv('NODE_ENV', 'test')
 
@@ -180,6 +183,9 @@ describe('api-helpers', () => {
         }),
       } as any)
       vi.mocked(db.insert).mockReturnValue({ values: vi.fn().mockResolvedValue(undefined) } as any)
+      vi.mocked(db.delete).mockReturnValue({
+        where: vi.fn().mockReturnValue(Promise.resolve({})),
+      } as any)
       vi.stubEnv('APP_BASE_URL', '')
       vi.stubEnv('NODE_ENV', 'test')
 
@@ -204,6 +210,9 @@ describe('api-helpers', () => {
         }),
       } as any)
       vi.mocked(db.insert).mockReturnValue({ values: vi.fn().mockResolvedValue(undefined) } as any)
+      vi.mocked(db.delete).mockReturnValue({
+        where: vi.fn().mockReturnValue(Promise.resolve({})),
+      } as any)
       vi.stubEnv('APP_BASE_URL', '')
       vi.stubEnv('NODE_ENV', 'test')
 
@@ -226,6 +235,9 @@ describe('api-helpers', () => {
         }),
       } as any)
       vi.mocked(db.insert).mockReturnValue({ values: vi.fn().mockResolvedValue(undefined) } as any)
+      vi.mocked(db.delete).mockReturnValue({
+        where: vi.fn().mockReturnValue(Promise.resolve({})),
+      } as any)
       vi.stubEnv('APP_BASE_URL', '')
       vi.stubEnv('NODE_ENV', 'test')
 

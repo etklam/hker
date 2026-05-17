@@ -2,7 +2,7 @@
   "nav": {
     "myCollections": "我的收藏",
     "marketplace": "市集",
-    "familyTodo": "家庭待辦"
+    "spaces": "Spaces"
   },
   "collections": {
     "title": "我的收藏",
@@ -68,7 +68,7 @@
       "fork": "複製收藏失敗"
     }
   },
-  "familyTodo": {
+  "spaces": {
     "spacesCount": "{{count}} 個 spaces",
     "createSpace": "新增 Space",
     "editSpace": "編輯 Space",
@@ -191,8 +191,8 @@
         "description": "探索公開收藏，訂閱更新或 Fork 你的版本。",
         "cta": "探索市集"
       },
-      "familyTodo": {
-        "title": "家庭待辦",
+      "spaces": {
+        "title": "Spaces",
         "description": "與家人或團隊協作的任務看板 — 支援優先級、到期日等功能。",
         "cta": "開啟看板"
       }
@@ -277,7 +277,7 @@
       "forbidden": "你沒有權限加入此邀請"
     }
   },
-  "familyTodoInviteJoin": {
+  "spaceInviteJoin": {
     "title": "加入 Space 邀請",
     "subtitle": "你被邀請加入 space：{{title}}",
     "invalid": "此 space 邀請連結無效或已超過使用次數上限。",

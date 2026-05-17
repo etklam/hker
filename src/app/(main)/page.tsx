@@ -54,8 +54,8 @@ const FEATURES = [
     icon: Store,
   },
   {
-    key: 'familyTodo',
-    href: '/family-todo',
+    key: 'spaces',
+    href: '/spaces',
     icon: CheckSquare,
   },
 ] as const
@@ -230,7 +230,7 @@ export default function HomePage() {
             </div>
           </Link>
 
-          {/* Family Todo (span 2 cols) */}
+          {/* Spaces (span 2 cols) */}
           <Link
             href={FEATURES[2].href}
             className="group lg:col-span-2"
@@ -241,14 +241,14 @@ export default function HomePage() {
                   <CheckSquare size={20} strokeWidth={2} />
                 </div>
                 <h3 className="font-[family-name:var(--font-heading)] text-lg font-bold text-text">
-                  {t('home.features.familyTodo.title')}
+                  {t('home.features.spaces.title')}
                 </h3>
               </div>
               <p className="flex-1 text-base leading-relaxed text-muted">
-                {t('home.features.familyTodo.description')}
+                {t('home.features.spaces.description')}
               </p>
               <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600 group-hover:gap-2.5 mochi-spring">
-                {t('home.features.familyTodo.cta')}
+                {t('home.features.spaces.cta')}
                 <ArrowRight size={16} />
               </span>
             </div>

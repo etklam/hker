@@ -1,0 +1,39 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+
+vi.mock('@/server/api-helpers', () => ({
+  withAuth: (handler: any) => handler,
+}))
+
+vi.mock('@/server/services/permission-service', () => ({
+  getSpaceAccess: vi.fn(),
+  requireSpaceAtLeast: vi.fn(),
+}))
+
+vi.mock('@/server/services/space-service', () => ({
+  removeMember: vi.fn(),
+}))
+
+describe('DELETE /api/spaces/[sid]/members/[mid]', () => {
+  let DELETE: any
+  let spaceService: any
+  const user = { id: 1 }
+
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    const mod = await import('./route')
+    DELETE = mod.DELETE
+    spaceService = await import('@/server/services/space-service')
+  })
+
+  function makeReq(url: string) {
+    const req = new Request(`http://localhost:3000${url}`, { method: 'DELETE' }) as any
+    req.nextUrl = new URL(`http://localhost:3000${url}`)
+    return req
+  }
+
+  it('removes member and returns 204', async () => {
+    const res = await DELETE(makeReq('/api/spaces/1/members/5'), { user })
+    expect(res.status).toBe(204)
+    expect(spaceService.removeMember).toHaveBeenCalledWith(1, 5)
+  })
+})

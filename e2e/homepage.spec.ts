@@ -38,18 +38,18 @@ test.describe('Homepage', () => {
     await expect(body).toBeVisible();
   });
 
-  test('should navigate to family-todo', async ({ page }) => {
+  test('should navigate to spaces', async ({ page }) => {
     await page.goto('/');
-    // Look for family-todo link and try to click it
-    const familyTodoLink = page.locator('a').filter({ hasText: /family|todo|待办|家庭/i });
-    const count = await familyTodoLink.count();
+    // Look for spaces link and try to click it
+    const spacesLink = page.locator('a').filter({ hasText: /family|todo|待办|家庭/i });
+    const count = await spacesLink.count();
     if (count > 0) {
-      await familyTodoLink.first().click();
-      await expect(page).toHaveURL(/\/family-todo/);
+      await spacesLink.first().click();
+      await expect(page).toHaveURL(/\/spaces/);
     } else {
       // If link doesn't exist, just verify we can navigate directly
-      await page.goto('/family-todo');
-      await expect(page).toHaveURL(/\/family-todo/);
+      await page.goto('/spaces');
+      await expect(page).toHaveURL(/\/spaces/);
     }
   });
 

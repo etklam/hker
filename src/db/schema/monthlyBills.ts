@@ -1,12 +1,12 @@
 import { pgTable, serial, integer, text, timestamp, uniqueIndex, index } from 'drizzle-orm/pg-core'
 import { users } from './users'
-import { familyTodoSpaces } from './familyTodo'
+import { spaces } from './space'
 
 export const monthlyBillLists = pgTable('monthly_bill_lists', {
   id: serial('id').primaryKey(),
   ownerId: integer('owner_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
-  sharedSpaceId: integer('shared_space_id').references(() => familyTodoSpaces.id, { onDelete: 'set null' }),
+  sharedSpaceId: integer('shared_space_id').references(() => spaces.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
