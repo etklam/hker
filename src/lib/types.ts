@@ -115,7 +115,7 @@ export interface UserBrief {
   email: string | null
 }
 
-export interface FamilyTodoSpace {
+export interface Space {
   id: number
   name: string
   ownerId: number
@@ -154,7 +154,7 @@ export interface TodoListWithItems extends TodoListResponse {
 }
 
 export interface BoardResponse {
-  space: FamilyTodoSpace
+  space: Space
   lists: TodoListWithItems[]
 }
 

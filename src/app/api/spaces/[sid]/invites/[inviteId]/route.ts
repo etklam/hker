@@ -6,7 +6,7 @@ import * as spaceService from '@/server/services/space-service'
 
 function extractIds(req: NextRequest): { sid: number; inviteId: number } {
   const segments = req.nextUrl.pathname.split('/')
-  // /api/family-todo/spaces/[sid]/invites/[inviteId]
+  // /api/spaces/spaces/[sid]/invites/[inviteId]
   return {
     sid: Number(segments[3]),
     inviteId: Number(segments[5]),

@@ -9,7 +9,7 @@ import { completeSpaceTodoSchema } from '@/schemas/space'
 
 function extractTodoId(req: NextRequest): number {
   const segments = req.nextUrl.pathname.split('/')
-  // /api/family-todo/todos/[tid]/complete
+  // /api/spaces/todos/[tid]/complete
   return Number(segments[4])
 }
 

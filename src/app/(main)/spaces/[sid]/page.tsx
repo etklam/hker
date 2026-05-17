@@ -325,7 +325,7 @@ export default function SpaceBoardPage() {
       {/* Header */}
       <div className="mb-6 flex flex-wrap items-center gap-4">
         <Link
-          href="/family-todo"
+          href="/spaces"
           className="flex items-center gap-1 text-sm text-muted hover:text-accent mochi-spring"
         >
           <ArrowLeft size={16} />

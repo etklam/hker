@@ -8,7 +8,7 @@ import { reorderSpaceTodosSchema } from '@/schemas/space'
 
 function extractListId(req: NextRequest): number {
   const segments = req.nextUrl.pathname.split('/')
-  // /api/family-todo/lists/[lid]/todos/reorder
+  // /api/spaces/lists/[lid]/todos/reorder
   return Number(segments[4])
 }
 

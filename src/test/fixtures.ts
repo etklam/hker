@@ -81,7 +81,7 @@ export const mockMarketplaceListing = {
   publisherAnonymous: false,
 }
 
-export const mockFamilyTodoSpace = {
+export const mockSpace = {
   id: 1,
   name: 'Family Space',
   ownerId: 1,

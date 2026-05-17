@@ -5,13 +5,13 @@ import * as spaceService from '@/server/services/space-service'
 
 function extractToken(req: NextRequest): string {
   const segments = req.nextUrl.pathname.split('/')
-  // /api/family-todo/invites/[token]/join
+  // /api/spaces/invites/[token]/join
   return segments[4]
 }
 
 export const POST = withAuth(async (req: NextRequest, { user }) => {
   const ip = getClientIp(req)
-  const { allowed, retryAfterMs } = await rateLimit(`family-todo-invite-join:${ip}`, 30, 60_000)
+  const { allowed, retryAfterMs } = await rateLimit(`space-invite-join:${ip}`, 30, 60_000)
   if (!allowed) {
     const retryAfterSeconds = Math.ceil(retryAfterMs / 1000)
     return new Response(
