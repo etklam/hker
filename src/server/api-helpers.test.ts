@@ -6,6 +6,20 @@ vi.mock('@/server/auth', () => ({
   resolveSession: vi.fn(),
 }))
 
+// Helper to mock rate limit DB calls (select, insert, delete with .catch support)
+function mockRateLimitDb() {
+  vi.mocked(db.select).mockReturnValue({
+    from: vi.fn().mockReturnValue({
+      where: vi.fn().mockResolvedValue([{ hitCount: 0 }]),
+    }),
+  } as any)
+  vi.mocked(db.insert).mockReturnValue({ values: vi.fn().mockResolvedValue(undefined) } as any)
+  // rateLimitCheck cleanup calls db.delete().where().catch()
+  vi.mocked(db.delete).mockReturnValue({
+    where: vi.fn().mockReturnValue(Promise.resolve({})),
+  } as any)
+}
+
 describe('api-helpers', () => {
   let ah: typeof import('@/server/api-helpers')
   let auth: typeof import('@/server/auth')
@@ -152,12 +166,7 @@ describe('api-helpers', () => {
     it('returns 401 when no session', async () => {
       vi.mocked(auth.resolveSession).mockResolvedValue(null)
       // Rate limit allows
-      vi.mocked(db.select).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([{ hitCount: 0 }]),
-        }),
-      } as any)
-      vi.mocked(db.insert).mockReturnValue({ values: vi.fn().mockResolvedValue(undefined) } as any)
+      mockRateLimitDb()
       vi.stubEnv('APP_BASE_URL', '')
       vi.stubEnv('NODE_ENV', 'test')
 
@@ -174,12 +183,7 @@ describe('api-helpers', () => {
 
     it('calls handler when authenticated', async () => {
       vi.mocked(auth.resolveSession).mockResolvedValue({ id: 1, role: 'user' } as any)
-      vi.mocked(db.select).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([{ hitCount: 0 }]),
-        }),
-      } as any)
-      vi.mocked(db.insert).mockReturnValue({ values: vi.fn().mockResolvedValue(undefined) } as any)
+      mockRateLimitDb()
       vi.stubEnv('APP_BASE_URL', '')
       vi.stubEnv('NODE_ENV', 'test')
 
@@ -198,12 +202,7 @@ describe('api-helpers', () => {
   describe('withAdmin', () => {
     it('returns 403 for non-admin', async () => {
       vi.mocked(auth.resolveSession).mockResolvedValue({ id: 1, role: 'user' } as any)
-      vi.mocked(db.select).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([{ hitCount: 0 }]),
-        }),
-      } as any)
-      vi.mocked(db.insert).mockReturnValue({ values: vi.fn().mockResolvedValue(undefined) } as any)
+      mockRateLimitDb()
       vi.stubEnv('APP_BASE_URL', '')
       vi.stubEnv('NODE_ENV', 'test')
 
@@ -220,12 +219,24 @@ describe('api-helpers', () => {
 
     it('allows admin users', async () => {
       vi.mocked(auth.resolveSession).mockResolvedValue({ id: 1, role: 'admin' } as any)
-      vi.mocked(db.select).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([{ hitCount: 0 }]),
-        }),
-      } as any)
-      vi.mocked(db.insert).mockReturnValue({ values: vi.fn().mockResolvedValue(undefined) } as any)
+      mockRateLimitDb()
+      vi.stubEnv('APP_BASE_URL', '')
+      vi.stubEnv('NODE_ENV', 'test')
+
+      const handler = ah.withAdmin(async () => Response.json({ ok: true }))
+      const req = {
+        url: 'http://localhost:3000/api/admin', method: 'GET',
+        headers: new Headers(), cookies: { get: vi.fn() },
+        nextUrl: new URL('http://localhost:3000/api/admin'),
+      } as any
+
+      const response = await handler(req)
+      expect(response.status).toBe(200)
+    })
+
+    it('allows superadmin users', async () => {
+      vi.mocked(auth.resolveSession).mockResolvedValue({ id: 1, role: 'superadmin' } as any)
+      mockRateLimitDb()
       vi.stubEnv('APP_BASE_URL', '')
       vi.stubEnv('NODE_ENV', 'test')
 

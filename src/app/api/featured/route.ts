@@ -6,18 +6,24 @@ import { links } from '@/db/schema/collections'
 import { eq, sql, and } from 'drizzle-orm'
 
 export async function GET(_req: NextRequest) {
-  // Find the admin user
-  const [admin] = await db
+  // Find the superadmin user first, fall back to admin
+  const [superadmin] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.role, 'superadmin'))
+    .limit(1)
+
+  const featuredUser = superadmin ?? (await db
     .select({ id: users.id })
     .from(users)
     .where(eq(users.role, 'admin'))
-    .limit(1)
+    .limit(1))[0]
 
-  if (!admin) {
+  if (!featuredUser) {
     return Response.json({ collections: [] })
   }
 
-  // Get admin's public collections
+  // Get featured user's public collections
   const rows = await db
     .select({
       id: collections.id,
@@ -32,7 +38,7 @@ export async function GET(_req: NextRequest) {
     .from(collections)
     .where(
       and(
-        eq(collections.ownerId, admin.id),
+        eq(collections.ownerId, featuredUser.id),
         eq(collections.visibility, 'public'),
       ),
     )

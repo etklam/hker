@@ -1,6 +1,6 @@
 import { pgTable, serial, text, timestamp, uniqueIndex, pgEnum } from 'drizzle-orm/pg-core'
 
-export const userRoleEnum = pgEnum('user_role', ['user', 'admin'])
+export const userRoleEnum = pgEnum('user_role', ['user', 'admin', 'superadmin'])
 
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
