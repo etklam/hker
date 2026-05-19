@@ -33,6 +33,11 @@ jobs:
           docker image prune -f --filter "dangling=true" || true
           docker build \
             --pull \
+            --build-arg DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+            --build-arg AUTH_SESSION_SECRET="${{ secrets.AUTH_SESSION_SECRET }}" \
+            --build-arg APP_BASE_URL="${{ secrets.APP_BASE_URL }}" \
+            --build-arg AUTH_SESSION_COOKIE_NAME="${{ secrets.AUTH_SESSION_COOKIE_NAME }}" \
+            --build-arg AUTH_SESSION_TTL_DAYS="${{ secrets.AUTH_SESSION_TTL_DAYS }}" \
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${SHA} \
             .
           docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${SHA} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
