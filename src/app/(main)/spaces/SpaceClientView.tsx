@@ -15,7 +15,7 @@ import {
   Pencil,
   X,
 } from 'lucide-react'
-import type { SpaceSpace } from '@/lib/types'
+import type { Space } from '@/lib/types'
 import { EmptyState } from '@/components/ui/EmptyState'
 
 const roleBadge: Record<string, string> = {
@@ -25,13 +25,13 @@ const roleBadge: Record<string, string> = {
 }
 
 interface Props {
-  initialSpaces: SpaceSpace[]
+  initialSpaces: Space[]
 }
 
 export function SpaceClientView({ initialSpaces }: Props) {
   const { t } = useTranslation()
   const { user, loading: authLoading } = useAuth()
-  const [spaces, setSpaces] = useState<SpaceSpace[]>(initialSpaces)
+  const [spaces, setSpaces] = useState<Space[]>(initialSpaces)
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [showCreate, setShowCreate] = useState(false)
@@ -45,7 +45,7 @@ export function SpaceClientView({ initialSpaces }: Props) {
 
     setCreating(true)
     try {
-      const space = await api<SpaceSpace>('/api/spaces/spaces', {
+      const space = await api<Space>('/api/spaces/spaces', {
         method: 'POST',
         body: { name: trimmed },
       })
@@ -74,7 +74,7 @@ export function SpaceClientView({ initialSpaces }: Props) {
     if (!trimmed) { setEditingId(null); return }
 
     try {
-      const updated = await api<SpaceSpace>(`/api/spaces/spaces/${sid}`, {
+      const updated = await api<Space>(`/api/spaces/spaces/${sid}`, {
         method: 'PATCH',
         body: { name: trimmed },
       })
