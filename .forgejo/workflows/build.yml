@@ -1,0 +1,40 @@
+name: Build and Push Docker Image
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  REGISTRY: git.913555.xyz
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: hk
+    steps:
+      - name: Install Docker CLI
+        run: |
+          curl -fsSL https://download.docker.com/linux/static/stable/x86_64/docker-27.5.1.tgz | \
+            tar xz --strip-components=1 -C /usr/bin docker/docker
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to Forgejo Registry
+        run: echo "${{ secrets.FORGEJO_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+
+      - name: Pull previous image for cache
+        run: docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest || true
+
+      - name: Build and push
+        run: |
+          SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          docker image prune -f --filter "dangling=true" || true
+          docker build \
+            --pull \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${SHA} \
+            .
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${SHA} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${SHA}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
