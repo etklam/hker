@@ -14,7 +14,7 @@ import type {
   TodoListWithItems,
   TodoResponse,
   TodoPriority,
-  SpaceSpace,
+  Space,
   Member,
   InviteLink,
 } from '@/lib/types'
@@ -24,7 +24,7 @@ export default function SpaceBoardPage() {
   const params = useParams<{ sid: string }>()
   const sid = Number(params.sid)
 
-  const [space, setSpace] = useState<SpaceSpace | null>(null)
+  const [space, setSpace] = useState<Space | null>(null)
   const [lists, setLists] = useState<TodoListWithItems[]>([])
   const [loading, setLoading] = useState(true)
   const [editingTodo, setEditingTodo] = useState<TodoResponse | null>(null)
