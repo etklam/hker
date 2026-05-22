@@ -3,7 +3,7 @@ import { db } from '@/server/db'
 import { users } from '@/db/schema/users'
 import { collections } from '@/db/schema/collections'
 import { links } from '@/db/schema/collections'
-import { eq, sql, and } from 'drizzle-orm'
+import { eq, sql, and, inArray } from 'drizzle-orm'
 
 export async function GET(_req: NextRequest) {
   // Find the superadmin user first, fall back to admin
@@ -55,7 +55,7 @@ export async function GET(_req: NextRequest) {
         count: sql<number>`count(*)::int`,
       })
       .from(links)
-      .where(sql`${links.collectionId} = ANY(${collectionIds})`)
+      .where(inArray(links.collectionId, collectionIds))
       .groupBy(links.collectionId)
 
     for (const row of counts) {

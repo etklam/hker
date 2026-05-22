@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm'
+import { eq, sql, inArray } from 'drizzle-orm'
 import { db } from '@/server/db'
 import { collections } from '@/db/schema/collections'
 import { links } from '@/db/schema/collections'
@@ -51,7 +51,7 @@ export async function listForUser(userId: number) {
         count: sql<number>`count(*)::int`,
       })
       .from(links)
-      .where(sql`${links.collectionId} = ANY(${collectionIds})`)
+      .where(inArray(links.collectionId, collectionIds))
       .groupBy(links.collectionId)
 
     for (const row of counts) {
