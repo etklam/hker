@@ -10,7 +10,7 @@ interface UserRow {
   email: string | null
   displayName: string | null
   avatarUrl: string | null
-  role: 'user' | 'admin'
+  role: 'user' | 'admin' | 'superadmin'
   createdAt: string
   updatedAt: string
 }
@@ -73,7 +73,12 @@ export default function AdminUsersPage() {
                 <td className="px-4 py-3 text-text">{u.email ?? '-'}</td>
                 <td className="px-4 py-3 text-text">{u.displayName ?? '-'}</td>
                 <td className="px-4 py-3">
-                  {u.role === 'admin' ? (
+                  {u.role === 'superadmin' ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-red-100 dark:bg-red-900/30 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">
+                      <Shield size={12} />
+                      Superadmin
+                    </span>
+                  ) : u.role === 'admin' ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent">
                       <Shield size={12} />
                       Admin

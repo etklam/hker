@@ -21,7 +21,7 @@ The three long-term tool surfaces (Collections, Marketplace, Spaces) are intenti
 Three modes: `light` (default), `dark`, `eye` (green tint). Persisted via local preference. More themes planned for the future.
 
 ### User
-A registered account. Has a `role` of `user`, `admin`, or `superadmin`. Currently the schema only has `user | admin` — needs migration to add `superadmin`. Role hierarchy: superadmin manages admins and has full system access; admin manages users and content; user is a regular member. Owns collections, spaces, and bill lists. `email` and `displayName` on the `users` table are nullable to support future SSO providers that may not provide an email. The provider-neutral auth model separates user identity from login methods: `users` is the application-level identity, `auth_identities` stores login credentials per provider. Email source of truth: `auth_identities.email` (per-provider) supersedes `users.email`. If multiple identities exist, the most recently used identity's email takes precedence.
+A registered account. Has a `role` of `user`, `admin`, or `superadmin`. Role hierarchy: superadmin manages admins and has full system access; admin manages users and content; user is a regular member. Owns collections, spaces, and bill lists. `email` and `displayName` on the `users` table are nullable to support future SSO providers that may not provide an email. The provider-neutral auth model separates user identity from login methods: `users` is the application-level identity, `auth_identities` stores login credentials per provider. Email source of truth: `auth_identities.email` (per-provider) supersedes `users.email`. If multiple identities exist, the most recently used identity's email takes precedence.
 
 ### Collection
 A curated group of links. Owned by one User. Can be shared with other Users via membership and invite links. Has three visibility levels:
@@ -91,10 +91,10 @@ A client-side only utility (no backend, no auth). Instant use, no persistence. C
 - **Publisher demotion edge case:** If an Editor publishes a Collection to the Marketplace and is later demoted to Viewer or removed, the `publisherId` on the Listing still references them. Need to decide: does unpublish require `publisherId` match, or any editor/owner? What happens to the Listing if the publisher loses access?
 - **Admin capabilities to implement:** Admin can edit/delete any user's collections, ban/delete users, pin/unpin marketplace listings. None of these are implemented yet — only dashboard stats and user listing exist.
 - **Rate limiting migration:** `rateLimitEntries` and `loginFailures` tables exist in schema but are not yet used — rate limiting and login lockout are still in-memory. Plan: migrate to DB-based first, then switch to Redis when available.
-- **Role schema migration:** `user_role` enum currently only has `user | admin`. Needs `superadmin` added. Homepage featured content currently sourced from "first admin user's public collections" — needs to change to "superadmin's public collections".
 
 ## Resolved Decisions
 
+- **superadmin role added to user_role enum:** Homepage featured content now sources from superadmin's public collections with admin fallback.
 - **Visibility downgrade auto-unpublishes:** If a published Collection's visibility is changed from `public` to `private` or `unlisted`, the associated Marketplace Listing is automatically unpublished. Subscription and Fork records are preserved.
 - **Space invite default role:** New Space members join as `member`. Owner and admin can change roles. Future: add `role` field to Space invite links.
 - **Space naming:** "Family Todo Space" renamed to "Space" throughout. Code refactor pending.
