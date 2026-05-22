@@ -11,7 +11,8 @@ describe('marketplace-service', () => {
   })
 
   const mockListingRow = {
-    listingId: 1, collectionId: 1, collectionTitle: 'Test Collection', collectionDescription: null,
+    listingId: 1, listingTitle: 'Test Listing Title', listingDescription: 'Test Listing Description',
+    collectionId: 1, collectionTitle: 'Test Collection', collectionDescription: null,
     collectionIcon: null, collectionVisibility: 'public' as const, collectionSortOrder: 0,
     collectionCreatedAt: new Date('2025-01-01'), collectionUpdatedAt: new Date('2025-01-01'),
     publisherId: 1, publisherAnonymous: false, publisherDisplayName: 'Publisher', publisherAvatarUrl: null,
@@ -105,21 +106,37 @@ describe('marketplace-service', () => {
           }),
         }),
       } as any)
-      vi.mocked(db.select).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          innerJoin: vi.fn().mockReturnValue({
-            innerJoin: vi.fn().mockReturnValue({
+      let selectCall = 0
+      vi.mocked(db.select).mockImplementation(() => {
+        selectCall++
+        if (selectCall === 1) {
+          // First call: fetch collection title/description for pre-fill
+          return {
+            from: vi.fn().mockReturnValue({
               where: vi.fn().mockReturnValue({
-                limit: vi.fn().mockResolvedValue([mockListingRow]),
+                limit: vi.fn().mockResolvedValue([{ title: 'Test Collection', description: null }]),
+              }),
+            }),
+          } as any
+        }
+        // Second call: baseQuery for listing DTO
+        return {
+          from: vi.fn().mockReturnValue({
+            innerJoin: vi.fn().mockReturnValue({
+              innerJoin: vi.fn().mockReturnValue({
+                where: vi.fn().mockReturnValue({
+                  limit: vi.fn().mockResolvedValue([mockListingRow]),
+                }),
               }),
             }),
           }),
-        }),
-      } as any)
+        } as any
+      })
 
       const result = await ms.publish(1, 1, false)
       expect(result).toBeDefined()
-      expect(result.collection.title).toBe('Test Collection')
+      expect(result.title).toBe('Test Listing Title')
+      expect(result.description).toBe('Test Listing Description')
     })
 
     it('reactivates an inactive listing if it exists', async () => {
@@ -145,21 +162,38 @@ describe('marketplace-service', () => {
           }),
         } as any
       })
-      vi.mocked(db.select).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          innerJoin: vi.fn().mockReturnValue({
-            innerJoin: vi.fn().mockReturnValue({
+      let selectCall2 = 0
+      vi.mocked(db.select).mockImplementation(() => {
+        selectCall2++
+        if (selectCall2 === 1) {
+          // First call: fetch collection title/description for pre-fill
+          return {
+            from: vi.fn().mockReturnValue({
               where: vi.fn().mockReturnValue({
-                limit: vi.fn().mockResolvedValue([mockListingRow]),
+                limit: vi.fn().mockResolvedValue([{ title: 'Test Collection', description: null }]),
+              }),
+            }),
+          } as any
+        }
+        // Second call: baseQuery for listing DTO
+        return {
+          from: vi.fn().mockReturnValue({
+            innerJoin: vi.fn().mockReturnValue({
+              innerJoin: vi.fn().mockReturnValue({
+                where: vi.fn().mockReturnValue({
+                  limit: vi.fn().mockResolvedValue([mockListingRow]),
+                }),
               }),
             }),
           }),
-        }),
-      } as any)
+        } as any
+      })
 
       const result = await ms.publish(1, 1, false)
       expect(result).toBeDefined()
-      expect(result.collection.title).toBe('Test Collection')
+      // Title/description should be preserved from the existing listing, not from collection
+      expect(result.title).toBe('Test Listing Title')
+      expect(result.description).toBe('Test Listing Description')
     })
   })
 
