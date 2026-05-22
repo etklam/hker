@@ -41,6 +41,11 @@ yarn-error.log*
 next-env.d.ts
 .gstack/
 
+# Agent & skill artifacts
+.agents/
+.claude/skills/
+skills-lock.json
+
 # Test reports
 playwright-report/
 test-results/
