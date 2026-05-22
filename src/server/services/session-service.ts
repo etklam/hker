@@ -62,6 +62,9 @@ export async function validateSession(token: string) {
   const user = await userService.findById(session.userId)
   if (!user) return null
 
+  // Block banned users from authenticating
+  if (user.banned) return null
+
   return { session, user }
 }
 

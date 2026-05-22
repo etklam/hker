@@ -89,7 +89,6 @@ A client-side only utility (no backend, no auth). Instant use, no persistence. C
 ## Open Questions
 
 - **Publisher demotion edge case:** If an Editor publishes a Collection to the Marketplace and is later demoted to Viewer or removed, the `publisherId` on the Listing still references them. Need to decide: does unpublish require `publisherId` match, or any editor/owner? What happens to the Listing if the publisher loses access?
-- **Admin capabilities to implement:** Admin can edit/delete any user's collections, ban/delete users, pin/unpin marketplace listings. None of these are implemented yet — only dashboard stats and user listing exist.
 - **Rate limiting migration:** `rateLimitEntries` and `loginFailures` tables exist in schema but are not yet used — rate limiting and login lockout are still in-memory. Plan: migrate to DB-based first, then switch to Redis when available.
 
 ## Resolved Decisions
@@ -97,4 +96,5 @@ A client-side only utility (no backend, no auth). Instant use, no persistence. C
 - **superadmin role added to user_role enum:** Homepage featured content now sources from superadmin's public collections with admin fallback.
 - **Visibility downgrade auto-unpublishes:** If a published Collection's visibility is changed from `public` to `private` or `unlisted`, the associated Marketplace Listing is automatically unpublished. Subscription and Fork records are preserved.
 - **Space invite default role:** New Space members join as `member`. Owner and admin can change roles. Future: add `role` field to Space invite links.
+- **Admin capabilities implemented:** Admin+ can ban/unban users (except superadmin or self), delete any collection, update any collection (title, description, icon), and pin/unpin marketplace listings. Superadmin only can delete users (except self) and change user roles. Banned users are blocked from auth at session validation.
 - **Space naming:** "Family Todo Space" renamed to "Space" throughout. Code refactor pending.

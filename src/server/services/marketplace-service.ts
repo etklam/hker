@@ -22,6 +22,8 @@ function maskPublisher(row: {
 
 interface ListingRow {
   listingId: number
+  listingTitle: string
+  listingDescription: string | null
   collectionId: number
   collectionTitle: string
   collectionDescription: string | null
@@ -43,6 +45,8 @@ interface ListingRow {
 function toListingDto(row: ListingRow): MarketplaceListing {
   return {
     id: row.listingId,
+    title: row.listingTitle,
+    description: row.listingDescription,
     collection: {
       id: row.collectionId,
       title: row.collectionTitle,
@@ -64,6 +68,8 @@ function toListingDto(row: ListingRow): MarketplaceListing {
 
 const listingSelect = {
   listingId: marketplaceListings.id,
+  listingTitle: marketplaceListings.title,
+  listingDescription: marketplaceListings.description,
   collectionId: collections.id,
   collectionTitle: collections.title,
   collectionDescription: collections.description,
@@ -104,8 +110,8 @@ export async function listListings(
 ): Promise<PageResponse<MarketplaceListing>> {
   const orderBy =
     sort === 'most_subscribed'
-      ? [desc(marketplaceListings.subscriberCount), desc(marketplaceListings.publishedAt)]
-      : [desc(marketplaceListings.publishedAt)]
+      ? [desc(marketplaceListings.pinned), desc(marketplaceListings.subscriberCount), desc(marketplaceListings.publishedAt)]
+      : [desc(marketplaceListings.pinned), desc(marketplaceListings.publishedAt)]
 
   const [rows, [{ total }]] = await Promise.all([
     baseQuery()
@@ -135,8 +141,8 @@ export async function searchListings(
   const whereClause = and(
     eq(marketplaceListings.active, true),
     or(
-      ilike(collections.title, pattern),
-      ilike(collections.description, pattern),
+      ilike(marketplaceListings.title, pattern),
+      ilike(marketplaceListings.description, pattern),
     ),
   )
 
@@ -203,6 +209,19 @@ export async function publish(
     .set({ visibility: 'public', updatedAt: new Date() })
     .where(eq(collections.id, collectionId))
 
+  // Fetch collection to pre-fill title and description
+  const collection = await db
+    .select({ title: collections.title, description: collections.description })
+    .from(collections)
+    .where(eq(collections.id, collectionId))
+    .limit(1)
+
+  if (!collection[0]) {
+    throw new AppError('NOT_FOUND', 'Collection not found')
+  }
+
+  const { title, description } = collection[0]
+
   // Try to reactivate an existing inactive listing first
   const reactivated = await reactivate(collectionId)
 
@@ -210,6 +229,7 @@ export async function publish(
 
   if (reactivated) {
     // Update the reactivated listing with new publisher settings
+    // Do NOT reset title/description from collection on re-publish
     const [updated] = await db
       .update(marketplaceListings)
       .set({
@@ -226,6 +246,8 @@ export async function publish(
       .values({
         collectionId,
         publisherId,
+        title,
+        description,
         publisherAnonymous: anonymous,
         active: true,
       })
@@ -288,4 +310,41 @@ export async function reactivate(collectionId: number): Promise<boolean> {
     .returning()
 
   return !!updated
+}
+
+/**
+ * Update a marketplace listing's independent title and/or description.
+ * Only the provided fields are updated; null/undefined values are ignored.
+ */
+export async function updateListing(
+  listingId: number,
+  data: { title?: string; description?: string },
+): Promise<MarketplaceListing> {
+  const set: Record<string, unknown> = {}
+  if (data.title !== undefined) set.title = data.title
+  if (data.description !== undefined) set.description = data.description
+
+  if (Object.keys(set).length === 0) {
+    throw new AppError('INVALID_REQUEST', 'No fields to update')
+  }
+
+  const [updated] = await db
+    .update(marketplaceListings)
+    .set(set)
+    .where(eq(marketplaceListings.id, listingId))
+    .returning({ id: marketplaceListings.id })
+
+  if (!updated) {
+    throw new AppError('NOT_FOUND', 'Listing not found')
+  }
+
+  const rows = await baseQuery()
+    .where(and(eq(marketplaceListings.id, updated.id), eq(marketplaceListings.active, true)))
+    .limit(1)
+
+  if (rows.length === 0) {
+    throw new AppError('NOT_FOUND', 'Listing not found')
+  }
+
+  return toListingDto(rows[0])
 }

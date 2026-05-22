@@ -8,6 +8,20 @@
       "when": 1779048850459,
       "tag": "0000_real_wendigo",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1779477754143,
+      "tag": "0001_add_listing_title_description",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1779528000000,
+      "tag": "0002_admin_moderation",
+      "breakpoints": true
     }
   ]
 }

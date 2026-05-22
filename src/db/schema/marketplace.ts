@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, boolean, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
+import { pgTable, serial, integer, boolean, timestamp, uniqueIndex, text } from 'drizzle-orm/pg-core'
 import { users } from './users'
 import { collections } from './collections'
 
@@ -6,11 +6,15 @@ export const marketplaceListings = pgTable('marketplace_listings', {
   id: serial('id').primaryKey(),
   collectionId: integer('collection_id').notNull().unique().references(() => collections.id, { onDelete: 'cascade' }),
   publisherId: integer('publisher_id').notNull().references(() => users.id),
+  title: text('title').notNull(),
+  description: text('description'),
   publishedAt: timestamp('published_at', { withTimezone: true }).notNull().defaultNow(),
   subscriberCount: integer('subscriber_count').notNull().default(0),
   forkCount: integer('fork_count').notNull().default(0),
   publisherAnonymous: boolean('publisher_anonymous').notNull().default(false),
   active: boolean('active').notNull().default(true),
+  pinned: boolean('pinned').notNull().default(false),
+  pinnedAt: timestamp('pinned_at', { withTimezone: true }),
 })
 
 export const subscriptions = pgTable('subscriptions', {
