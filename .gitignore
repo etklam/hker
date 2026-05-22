@@ -45,6 +45,7 @@ next-env.d.ts
 .agents/
 .claude/skills/
 skills-lock.json
+k8s/
 
 # Test reports
 playwright-report/
