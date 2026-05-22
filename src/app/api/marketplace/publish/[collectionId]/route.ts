@@ -16,7 +16,7 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
 
   const access = await getCollectionAccess(user.id, collectionId)
   try {
-    requireAtLeast(access, 'owner')
+    requireAtLeast(access, 'edit')
   } catch (e) {
     if (e instanceof AppError) return apiError(e.code, e.message)
     throw e

@@ -37,7 +37,7 @@ A URL entry inside a Collection. Has title, description, favicon, and sort order
 A User who has been invited into a Collection. Roles: `viewer` or `editor`. The owner is not stored as a member row — ownership is on the Collection itself.
 
 ### Marketplace Listing
-A published projection of a public Collection. One-to-one with a Collection. The `publisherId` may differ from the Collection's `ownerId` because editors can publish on behalf of the owner. Currently inherits title/description from the Collection, but the intent is for Listings to have their own title and description in the future. Tracks subscriber count, fork count, and whether the publisher is anonymous. Unpublishing removes the Listing but preserves Subscription and Fork records — subscribers simply can no longer see it, and forked copies are independent.
+A published projection of a public Collection. One-to-one with a Collection. Has its own `title` and `description`, pre-filled from the Collection at publish time but independently editable afterward. The `publisherId` may differ from the Collection's `ownerId` because editors can publish on behalf of the owner. Tracks subscriber count, fork count, pin status, and whether the publisher is anonymous. Unpublishing soft-deletes the Listing (active=false) but preserves Subscription and Fork records — subscribers simply can no longer see it, and forked copies are independent. Re-publishing reactivates the existing Listing, preserving custom title/description.
 
 ### Subscription
 A User's follow relationship with a Marketplace Listing. Currently acts as a bookmark — no notification or update mechanism. Future enhancements planned.
@@ -88,12 +88,13 @@ A client-side only utility (no backend, no auth). Instant use, no persistence. C
 
 ## Open Questions
 
-- **Publisher demotion edge case:** If an Editor publishes a Collection to the Marketplace and is later demoted to Viewer or removed, the `publisherId` on the Listing still references them. Need to decide: does unpublish require `publisherId` match, or any editor/owner? What happens to the Listing if the publisher loses access?
 - **Rate limiting migration:** `rateLimitEntries` and `loginFailures` tables exist in schema but are not yet used — rate limiting and login lockout are still in-memory. Plan: migrate to DB-based first, then switch to Redis when available.
 
 ## Resolved Decisions
 
 - **superadmin role added to user_role enum:** Homepage featured content now sources from superadmin's public collections with admin fallback.
+- **Publisher demotion edge case:** Editors can publish to Marketplace and unpublish. If a publisher is demoted to Viewer or removed, the Listing remains active. The original publisher retains the ability to unpublish the Listing they created (via `publisherId` match). Owner and current editors can also unpublish at any time.
+- **Listing title/description independence:** Marketplace Listings have their own `title` and `description` columns, pre-filled from the Collection at publish time but independently editable. Search and display use listing-level fields. Re-publishing preserves custom values.
 - **Visibility downgrade auto-unpublishes:** If a published Collection's visibility is changed from `public` to `private` or `unlisted`, the associated Marketplace Listing is automatically unpublished. Subscription and Fork records are preserved.
 - **Space invite default role:** New Space members join as `member`. Owner and admin can change roles. Future: add `role` field to Space invite links.
 - **Admin capabilities implemented:** Admin+ can ban/unban users (except superadmin or self), delete any collection, update any collection (title, description, icon), and pin/unpin marketplace listings. Superadmin only can delete users (except self) and change user roles. Banned users are blocked from auth at session validation.
