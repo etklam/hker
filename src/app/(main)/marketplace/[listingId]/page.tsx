@@ -12,6 +12,8 @@ import { MarketplaceDetailClient } from './MarketplaceDetailClient'
 
 const listingSelect = {
   listingId: marketplaceListings.id,
+  listingTitle: marketplaceListings.title,
+  listingDescription: marketplaceListings.description,
   collectionId: collections.id,
   collectionTitle: collections.title,
   collectionDescription: collections.description,
@@ -40,6 +42,8 @@ function baseQuery() {
 
 interface ListingRow {
   listingId: number
+  listingTitle: string
+  listingDescription: string | null
   collectionId: number
   collectionTitle: string
   collectionDescription: string | null
@@ -61,6 +65,8 @@ interface ListingRow {
 function toListingDto(row: ListingRow): MarketplaceListing {
   return {
     id: row.listingId,
+    title: row.listingTitle,
+    description: row.listingDescription,
     collection: {
       id: row.collectionId,
       title: row.collectionTitle,
@@ -117,9 +123,9 @@ export async function generateMetadata({
   const listing = await fetchListing(Number(listingId))
   if (!listing) return { title: 'Not Found — HKER' }
 
-  const title = `${listing.collection.title} — HKER Marketplace`
+  const title = `${listing.title} — HKER Marketplace`
   const description =
-    listing.collection.description || 'Explore this collection on HKER Marketplace.'
+    listing.description || 'Explore this collection on HKER Marketplace.'
 
   return {
     title,
@@ -152,12 +158,12 @@ export default async function MarketplaceDetailPage({
             <span className="text-5xl leading-none">{listing.collection.icon}</span>
           ) : (
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-accent-soft text-2xl font-bold text-accent">
-              {listing.collection.title.trim().charAt(0).toUpperCase() || '?'}
+              {listing.title.trim().charAt(0).toUpperCase() || '?'}
             </div>
           )}
           <div className="min-w-0 flex-1">
             <h1 className="font-[family-name:var(--font-heading)] text-3xl font-extrabold tracking-tight text-text sm:text-4xl">
-              {listing.collection.title}
+              {listing.title}
             </h1>
             <p className="mt-1 text-sm text-muted">
               {listing.publisher?.displayName || 'Anonymous'} ·{' '}
@@ -165,9 +171,9 @@ export default async function MarketplaceDetailPage({
             </p>
           </div>
         </div>
-        {listing.collection.description && (
+        {listing.description && (
           <p className="mt-4 text-muted leading-relaxed">
-            {listing.collection.description}
+            {listing.description}
           </p>
         )}
       </section>

@@ -4,7 +4,7 @@
 
 ## Status
 
-Proposed — not yet implemented.
+Accepted — implemented.
 
 ## Context
 

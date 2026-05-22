@@ -11,7 +11,7 @@ interface Props {
 }
 
 export function MarketplaceCard({ listing }: Props) {
-  const { collection, publisher, subscriberCount, forkCount } = listing
+  const { title, description, collection, publisher, subscriberCount, forkCount } = listing
 
   return (
     <Link
@@ -23,11 +23,11 @@ export function MarketplaceCard({ listing }: Props) {
         {collection.icon ? (
           <span className="text-3xl leading-none">{collection.icon}</span>
         ) : (
-          <CollectionAvatar title={collection.title} className="h-12 w-12 text-xl" />
+          <CollectionAvatar title={title} className="h-12 w-12 text-xl" />
         )}
         <div className="min-w-0 flex-1">
           <h3 className="truncate font-[family-name:var(--font-heading)] text-xl font-bold text-text">
-            {collection.title}
+            {title}
           </h3>
           <p className="mt-1 text-sm text-muted">
             {publisher?.displayName || 'Anonymous'}
@@ -36,9 +36,9 @@ export function MarketplaceCard({ listing }: Props) {
       </div>
 
       {/* Description */}
-      {collection.description && (
+      {description && (
         <p className="line-clamp-2 text-sm leading-relaxed text-muted">
-          {collection.description}
+          {description}
         </p>
       )}
 

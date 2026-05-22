@@ -10,6 +10,8 @@ vi.mock('next/link', () => {
 
 const baseListing: MarketplaceListing = {
   id: 1,
+  title: 'Public Collection',
+  description: 'A great collection',
   collection: {
     id: 1,
     title: 'Public Collection',

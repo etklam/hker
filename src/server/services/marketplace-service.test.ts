@@ -342,4 +342,53 @@ describe('marketplace-service', () => {
       expect(result).toBe(false)
     })
   })
+
+  describe('updateListing', () => {
+    it('updates listing title and description', async () => {
+      vi.mocked(db.update).mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([{ id: 1 }]),
+          }),
+        }),
+      } as any)
+
+      vi.mocked(db.select).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          innerJoin: vi.fn().mockReturnValue({
+            innerJoin: vi.fn().mockReturnValue({
+              where: vi.fn().mockReturnValue({
+                limit: vi.fn().mockResolvedValue([{
+                  ...mockListingRow,
+                  listingTitle: 'New Title',
+                  listingDescription: 'New Description',
+                }]),
+              }),
+            }),
+          }),
+        }),
+      } as any)
+
+      const result = await ms.updateListing(1, { title: 'New Title', description: 'New Description' })
+      expect(result).toBeDefined()
+      expect(result.title).toBe('New Title')
+      expect(result.description).toBe('New Description')
+    })
+
+    it('throws NOT_FOUND for missing listing', async () => {
+      vi.mocked(db.update).mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([]),
+          }),
+        }),
+      } as any)
+
+      await expect(ms.updateListing(999, { title: 'X' })).rejects.toThrow('Listing not found')
+    })
+
+    it('throws INVALID_REQUEST when no fields provided', async () => {
+      await expect(ms.updateListing(1, {})).rejects.toThrow('No fields to update')
+    })
+  })
 })

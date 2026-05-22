@@ -75,6 +75,8 @@ export const mockMarketplaceListing = {
   id: 1,
   collectionId: 1,
   publisherId: 1,
+  title: 'Test Collection',
+  description: null,
   publishedAt: new Date('2025-01-01'),
   subscriberCount: 5,
   forkCount: 2,

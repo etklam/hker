@@ -9,6 +9,8 @@ import { MarketplaceClientView } from './MarketplaceClientView'
 
 const listingSelect = {
   listingId: marketplaceListings.id,
+  listingTitle: marketplaceListings.title,
+  listingDescription: marketplaceListings.description,
   collectionId: collections.id,
   collectionTitle: collections.title,
   collectionDescription: collections.description,
@@ -37,6 +39,8 @@ function baseQuery() {
 
 interface ListingRow {
   listingId: number
+  listingTitle: string
+  listingDescription: string | null
   collectionId: number
   collectionTitle: string
   collectionDescription: string | null
@@ -58,6 +62,8 @@ interface ListingRow {
 function toListingDto(row: ListingRow): MarketplaceListing {
   return {
     id: row.listingId,
+    title: row.listingTitle,
+    description: row.listingDescription,
     collection: {
       id: row.collectionId,
       title: row.collectionTitle,
@@ -105,8 +111,8 @@ export default async function MarketplacePage({
   if (q) {
     const pattern = `%${q}%`
     const whereClause = or(
-      ilike(collections.title, pattern),
-      ilike(collections.description, pattern),
+      ilike(marketplaceListings.title, pattern),
+      ilike(marketplaceListings.description, pattern),
     )
 
     const [dataRows, countResult] = await Promise.all([

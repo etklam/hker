@@ -56,6 +56,8 @@ export async function listUserSubscriptions(userId: number): Promise<Marketplace
   const rows = await db
     .select({
       listingId: marketplaceListings.id,
+      listingTitle: marketplaceListings.title,
+      listingDescription: marketplaceListings.description,
       collectionId: collections.id,
       collectionTitle: collections.title,
       collectionDescription: collections.description,
@@ -82,6 +84,8 @@ export async function listUserSubscriptions(userId: number): Promise<Marketplace
 
   return rows.map((r) => ({
     id: r.listingId,
+    title: r.listingTitle,
+    description: r.listingDescription,
     collection: {
       id: r.collectionId,
       title: r.collectionTitle,

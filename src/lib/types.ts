@@ -44,6 +44,8 @@ export interface PublisherInfo {
 
 export interface MarketplaceListing {
   id: number
+  title: string
+  description: string | null
   collection: Collection
   publisher: PublisherInfo | null
   publishedAt: string
