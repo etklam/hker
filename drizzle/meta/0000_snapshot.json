@@ -1,5 +1,5 @@
 {
-  "id": "7bcfd4cf-145f-4b72-8867-1a771b01acc1",
+  "id": "d88266e7-a672-4860-aca3-f5868e4a788a",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -574,488 +574,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.family_todo_invite_links": {
-      "name": "family_todo_invite_links",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "space_id": {
-          "name": "space_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "token": {
-          "name": "token",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "max_uses": {
-          "name": "max_uses",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "use_count": {
-          "name": "use_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "family_todo_invite_links_space_id_family_todo_spaces_id_fk": {
-          "name": "family_todo_invite_links_space_id_family_todo_spaces_id_fk",
-          "tableFrom": "family_todo_invite_links",
-          "tableTo": "family_todo_spaces",
-          "columnsFrom": [
-            "space_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "family_todo_invite_links_created_by_users_id_fk": {
-          "name": "family_todo_invite_links_created_by_users_id_fk",
-          "tableFrom": "family_todo_invite_links",
-          "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "family_todo_invite_links_token_unique": {
-          "name": "family_todo_invite_links_token_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "token"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.family_todo_lists": {
-      "name": "family_todo_lists",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "space_id": {
-          "name": "space_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "title": {
-          "name": "title",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "sort_order": {
-          "name": "sort_order",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "family_todo_lists_space_id_family_todo_spaces_id_fk": {
-          "name": "family_todo_lists_space_id_family_todo_spaces_id_fk",
-          "tableFrom": "family_todo_lists",
-          "tableTo": "family_todo_spaces",
-          "columnsFrom": [
-            "space_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.family_todo_space_members": {
-      "name": "family_todo_space_members",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "space_id": {
-          "name": "space_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "role": {
-          "name": "role",
-          "type": "family_todo_space_role",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "joined_at": {
-          "name": "joined_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "space_members_space_user_unique": {
-          "name": "space_members_space_user_unique",
-          "columns": [
-            {
-              "expression": "space_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "family_todo_space_members_space_id_family_todo_spaces_id_fk": {
-          "name": "family_todo_space_members_space_id_family_todo_spaces_id_fk",
-          "tableFrom": "family_todo_space_members",
-          "tableTo": "family_todo_spaces",
-          "columnsFrom": [
-            "space_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "family_todo_space_members_user_id_users_id_fk": {
-          "name": "family_todo_space_members_user_id_users_id_fk",
-          "tableFrom": "family_todo_space_members",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.family_todo_spaces": {
-      "name": "family_todo_spaces",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "owner_id": {
-          "name": "owner_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "family_todo_spaces_owner_id_users_id_fk": {
-          "name": "family_todo_spaces_owner_id_users_id_fk",
-          "tableFrom": "family_todo_spaces",
-          "tableTo": "users",
-          "columnsFrom": [
-            "owner_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.family_todos": {
-      "name": "family_todos",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "list_id": {
-          "name": "list_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "title": {
-          "name": "title",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "assigned_to": {
-          "name": "assigned_to",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "priority": {
-          "name": "priority",
-          "type": "todo_priority",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'medium'"
-        },
-        "due_date": {
-          "name": "due_date",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "completed": {
-          "name": "completed",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "completed_at": {
-          "name": "completed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "completed_by": {
-          "name": "completed_by",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "sort_order": {
-          "name": "sort_order",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "family_todos_list_id_idx": {
-          "name": "family_todos_list_id_idx",
-          "columns": [
-            {
-              "expression": "list_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "family_todos_list_id_family_todo_lists_id_fk": {
-          "name": "family_todos_list_id_family_todo_lists_id_fk",
-          "tableFrom": "family_todos",
-          "tableTo": "family_todo_lists",
-          "columnsFrom": [
-            "list_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "family_todos_assigned_to_users_id_fk": {
-          "name": "family_todos_assigned_to_users_id_fk",
-          "tableFrom": "family_todos",
-          "tableTo": "users",
-          "columnsFrom": [
-            "assigned_to"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "family_todos_completed_by_users_id_fk": {
-          "name": "family_todos_completed_by_users_id_fk",
-          "tableFrom": "family_todos",
-          "tableTo": "users",
-          "columnsFrom": [
-            "completed_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "family_todos_created_by_users_id_fk": {
-          "name": "family_todos_created_by_users_id_fk",
-          "tableFrom": "family_todos",
-          "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.forks": {
       "name": "forks",
       "schema": "",
@@ -1184,6 +702,18 @@
           "primaryKey": false,
           "notNull": true
         },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "published_at": {
           "name": "published_at",
           "type": "timestamp with time zone",
@@ -1211,6 +741,26 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "pinned": {
+          "name": "pinned",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "pinned_at": {
+          "name": "pinned_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},
@@ -1658,10 +1208,10 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "monthly_bill_lists_shared_space_id_family_todo_spaces_id_fk": {
-          "name": "monthly_bill_lists_shared_space_id_family_todo_spaces_id_fk",
+        "monthly_bill_lists_shared_space_id_spaces_id_fk": {
+          "name": "monthly_bill_lists_shared_space_id_spaces_id_fk",
           "tableFrom": "monthly_bill_lists",
-          "tableTo": "family_todo_spaces",
+          "tableTo": "spaces",
           "columnsFrom": [
             "shared_space_id"
           ],
@@ -1802,6 +1352,488 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.space_invite_links": {
+      "name": "space_invite_links",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "space_id": {
+          "name": "space_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token": {
+          "name": "token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "max_uses": {
+          "name": "max_uses",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "use_count": {
+          "name": "use_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "space_invite_links_space_id_spaces_id_fk": {
+          "name": "space_invite_links_space_id_spaces_id_fk",
+          "tableFrom": "space_invite_links",
+          "tableTo": "spaces",
+          "columnsFrom": [
+            "space_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "space_invite_links_created_by_users_id_fk": {
+          "name": "space_invite_links_created_by_users_id_fk",
+          "tableFrom": "space_invite_links",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "space_invite_links_token_unique": {
+          "name": "space_invite_links_token_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "token"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.space_lists": {
+      "name": "space_lists",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "space_id": {
+          "name": "space_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "space_lists_space_id_spaces_id_fk": {
+          "name": "space_lists_space_id_spaces_id_fk",
+          "tableFrom": "space_lists",
+          "tableTo": "spaces",
+          "columnsFrom": [
+            "space_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.space_members": {
+      "name": "space_members",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "space_id": {
+          "name": "space_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "space_role",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "joined_at": {
+          "name": "joined_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "space_members_space_user_unique": {
+          "name": "space_members_space_user_unique",
+          "columns": [
+            {
+              "expression": "space_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "space_members_space_id_spaces_id_fk": {
+          "name": "space_members_space_id_spaces_id_fk",
+          "tableFrom": "space_members",
+          "tableTo": "spaces",
+          "columnsFrom": [
+            "space_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "space_members_user_id_users_id_fk": {
+          "name": "space_members_user_id_users_id_fk",
+          "tableFrom": "space_members",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.space_todos": {
+      "name": "space_todos",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "list_id": {
+          "name": "list_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "assigned_to": {
+          "name": "assigned_to",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "priority": {
+          "name": "priority",
+          "type": "space_todo_priority",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'medium'"
+        },
+        "due_date": {
+          "name": "due_date",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "completed": {
+          "name": "completed",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "completed_by": {
+          "name": "completed_by",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "space_todos_list_id_idx": {
+          "name": "space_todos_list_id_idx",
+          "columns": [
+            {
+              "expression": "list_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "space_todos_list_id_space_lists_id_fk": {
+          "name": "space_todos_list_id_space_lists_id_fk",
+          "tableFrom": "space_todos",
+          "tableTo": "space_lists",
+          "columnsFrom": [
+            "list_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "space_todos_assigned_to_users_id_fk": {
+          "name": "space_todos_assigned_to_users_id_fk",
+          "tableFrom": "space_todos",
+          "tableTo": "users",
+          "columnsFrom": [
+            "assigned_to"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "space_todos_completed_by_users_id_fk": {
+          "name": "space_todos_completed_by_users_id_fk",
+          "tableFrom": "space_todos",
+          "tableTo": "users",
+          "columnsFrom": [
+            "completed_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "space_todos_created_by_users_id_fk": {
+          "name": "space_todos_created_by_users_id_fk",
+          "tableFrom": "space_todos",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.spaces": {
+      "name": "spaces",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "spaces_owner_id_users_id_fk": {
+          "name": "spaces_owner_id_users_id_fk",
+          "tableFrom": "spaces",
+          "tableTo": "users",
+          "columnsFrom": [
+            "owner_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.users": {
       "name": "users",
       "schema": "",
@@ -1837,6 +1869,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'user'"
+        },
+        "banned": {
+          "name": "banned",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "created_at": {
           "name": "created_at",
@@ -1896,8 +1935,8 @@
         "public"
       ]
     },
-    "public.family_todo_space_role": {
-      "name": "family_todo_space_role",
+    "public.space_role": {
+      "name": "space_role",
       "schema": "public",
       "values": [
         "owner",
@@ -1905,8 +1944,8 @@
         "member"
       ]
     },
-    "public.todo_priority": {
-      "name": "todo_priority",
+    "public.space_todo_priority": {
+      "name": "space_todo_priority",
       "schema": "public",
       "values": [
         "low",
