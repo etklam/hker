@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { AppError } from '@/lib/errors'
 
 vi.mock('@/server/api-helpers', () => ({
   withAuth: (handler: any) => handler,
@@ -45,5 +46,21 @@ describe('/api/monthly-bills/items/[itemId]/check', () => {
 
     expect(res.status).toBe(400)
     expect(service.setItemChecked).not.toHaveBeenCalled()
+  })
+
+  it('returns 403 when user lacks view access', async () => {
+    service.setItemChecked.mockRejectedValue(new AppError('FORBIDDEN', 'No access'))
+
+    const res = await PATCH(makeReq({ year: 2026, month: 4, checked: true }), { user })
+
+    expect(res.status).toBe(403)
+  })
+
+  it('returns 404 when item missing', async () => {
+    service.setItemChecked.mockRejectedValue(new AppError('NOT_FOUND', 'Missing'))
+
+    const res = await PATCH(makeReq({ year: 2026, month: 4, checked: true }), { user })
+
+    expect(res.status).toBe(404)
   })
 })
