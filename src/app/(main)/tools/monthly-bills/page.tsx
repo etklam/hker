@@ -139,7 +139,7 @@ export default function MonthlyBillsPage() {
 
   useEffect(() => {
     if (!user) return
-    api<Space[]>('/api/spaces/spaces')
+    api<Space[]>('/api/spaces')
       .then(setSpaces)
       .catch(() => setSpaces([]))
   }, [user])
