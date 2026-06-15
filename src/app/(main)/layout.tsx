@@ -29,12 +29,17 @@ const themeIcons: Record<Theme, React.ReactNode> = {
   eye: <Leaf size={18} strokeWidth={2.5} />,
 }
 
-const NAV_ITEMS = [
+const NAV_ITEMS: ReadonlyArray<{
+  href: string
+  labelKey: string
+  icon: typeof Home
+  beta?: boolean
+}> = [
   { href: '/', labelKey: 'home.brand', icon: Home },
   { href: '/me/collections', labelKey: 'nav.myCollections', icon: Bookmark },
-  { href: '/marketplace', labelKey: 'nav.marketplace', icon: Store },
+  { href: '/marketplace', labelKey: 'nav.marketplace', icon: Store, beta: true },
   { href: '/spaces', labelKey: 'nav.spaces', icon: CheckSquare },
-] as const
+]
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -74,7 +79,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
           {/* Desktop nav links */}
           <nav className="hidden md:flex items-center gap-1">
-            {NAV_ITEMS.map(({ href, labelKey, icon: Icon }) => (
+            {NAV_ITEMS.map(({ href, labelKey, icon: Icon, beta }) => (
               <Link
                 key={href}
                 href={href}
@@ -86,6 +91,11 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
               >
                 <Icon size={16} strokeWidth={2.5} />
                 {href === '/' ? 'HKER' : t(labelKey)}
+                {beta && (
+                  <span className="ml-0.5 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-600">
+                    Beta
+                  </span>
+                )}
               </Link>
             ))}
             {user?.role === 'admin' && (
@@ -161,7 +171,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         {mobileOpen && (
           <div className="md:hidden border-t border-border bg-surface backdrop-blur-xl">
             <nav className="flex flex-col gap-1 px-4 py-3">
-              {NAV_ITEMS.map(({ href, labelKey, icon: Icon }) => (
+              {NAV_ITEMS.map(({ href, labelKey, icon: Icon, beta }) => (
                 <Link
                   key={href}
                   href={href}
@@ -174,6 +184,11 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                 >
                   <Icon size={18} strokeWidth={2.5} />
                   {href === '/' ? 'HKER' : t(labelKey)}
+                  {beta && (
+                    <span className="ml-auto rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-600">
+                      Beta
+                    </span>
+                  )}
                 </Link>
               ))}
               {user?.role === 'admin' && (
