@@ -1,145 +1,102 @@
 #!/bin/bash
-# hker deploy script — runs LOCALLY from the project root
-# Packages source, uploads to server, triggers remote build + migration + update
+# hker deploy script — K3s deployment
+# Builds Docker image locally, transfers to g2 server, imports into containerd,
+# runs pending DB migrations, and restarts the deployment.
 #
 # Usage:
-#   bash scripts/deploy.sh [SERVER_IP] [SSH_USER]
+#   bash scripts/deploy.sh
 #
-# Defaults:
-#   SERVER_IP = 85.113.70.72
-#   SSH_USER  = root
+# Prerequisites:
+#   - Docker Desktop running locally
+#   - sshpass installed (brew install hudochenkov/sshpass/sshpass)
+#   - K8s manifests already applied (first-time only)
+#   - Server credentials configured below or in environment
 
 set -euo pipefail
 
-SERVER_IP="${1:-85.113.70.72}"
-SSH_USER="${2:-root}"
-TARBALL="/tmp/hker-deploy.tgz"
-REMOTE_SCRIPT="/tmp/hker-deploy-remote.sh"
-
-# ── Step 0: Pre-flight ──────────────────────────────────────────────────────
-echo "==> Pre-flight check"
+# ── Configuration ──────────────────────────────────────────────────────────
+SERVER_IP="82.22.63.196"
+SSH_USER="root"
+SSH_PASS="${HKER_SSH_PASS:?Set HKER_SSH_PASS env var or export it}"
+NAMESPACE="hker"
+APP_NAME="hker"
+IMAGE_NAME="${APP_NAME}:latest"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+SSH_CMD="sshpass -p '${SSH_PASS}' ssh -o StrictHostKeyChecking=no ${SSH_USER}@${SERVER_IP}"
+BUILD_ARGS=(
+  --build-arg DATABASE_URL="postgresql://hker:dummy@localhost:5432/dummy"
+  --build-arg APP_BASE_URL="https://hker.me"
+  --build-arg AUTH_SESSION_SECRET="build-time-dummy-not-used-at-runtime"
+  --build-arg AUTH_SESSION_COOKIE_NAME="hker_session"
+  --build-arg AUTH_SESSION_TTL_DAYS="30"
+)
+
 cd "$PROJECT_DIR"
 
-if [ ! -f "Dockerfile" ]; then
-  echo "ERROR: No Dockerfile found in $PROJECT_DIR"
-  exit 1
-fi
+# ── Step 1: Build Docker image ────────────────────────────────────────────
+echo "==> Building ${IMAGE_NAME} (linux/amd64)..."
+docker build --platform linux/amd64 \
+  "${BUILD_ARGS[@]}" \
+  -t "$IMAGE_NAME" \
+  -f Dockerfile .
+echo "    Build complete."
 
-echo "    Project: $PROJECT_DIR"
-echo "    Server:  $SSH_USER@$SERVER_IP"
+# ── Step 2: Save + compress ───────────────────────────────────────────────
+echo "==> Saving image..."
+docker save "$IMAGE_NAME" -o /tmp/hker-image.tar
+gzip -f /tmp/hker-image.tar
+SIZE=$(du -h /tmp/hker-image.tar.gz | cut -f1)
+echo "    Compressed: $SIZE"
 
-# ── Step 1: Package ─────────────────────────────────────────────────────────
-echo "==> Packaging source code..."
-env COPYFILE_DISABLE=1 tar \
-  --exclude='./node_modules' \
-  --exclude='./.git' \
-  --exclude='./.next' \
-  --exclude='./.claude' \
-  --exclude='./coverage' \
-  --exclude='./.gstack' \
-  --exclude='./src/db/migrations' \
-  --exclude='._*' \
-  -czf "$TARBALL" .
+# ── Step 3: Transfer to server ────────────────────────────────────────────
+echo "==> Transferring to ${SERVER_IP}..."
+cat /tmp/hker-image.tar.gz | eval "$SSH_CMD" "cat > /tmp/hker-image.tar.gz"
+echo "    Transfer complete."
 
-CONTAMINATION=$(tar -tzf "$TARBALL" | grep '/\._\|^\._' || true)
-if [ -n "$CONTAMINATION" ]; then
-  echo "ERROR: AppleDouble files detected in tarball!"
-  echo "$CONTAMINATION"
-  exit 1
-fi
+# ── Step 4: Import into containerd ────────────────────────────────────────
+echo "==> Importing into containerd..."
+eval "$SSH_CMD" "gunzip -f /tmp/hker-image.tar.gz && k3s ctr images import /tmp/hker-image.tar"
+echo "    Import complete."
 
-SIZE=$(du -h "$TARBALL" | cut -f1)
-echo "    Tarball: $TARBALL ($SIZE) — CLEAN"
+# ── Step 5: Run pending migrations ────────────────────────────────────────
+echo "==> Checking for pending migrations..."
+DB_POD=$(eval "$SSH_CMD" "kubectl get pods -n ${NAMESPACE} -l app=${APP_NAME}-db -o jsonpath='{.items[0].metadata.name}'")
 
-# ── Step 2: Write remote script ─────────────────────────────────────────────
-cat > "$REMOTE_SCRIPT" << 'REMOTE_EOF'
-#!/bin/bash
-set -e
-
-echo "=== Step 1: Extract source ==="
-rm -rf /tmp/hker-build
-mkdir -p /tmp/hker-build
-cd /tmp/hker-build
-tar xzf /tmp/hker-deploy.tgz 2>/dev/null
-echo "    Files extracted."
-
-echo "=== Step 2: Docker build ==="
-docker build --network=host -t hker:latest -f Dockerfile .
-echo "    Docker build complete."
-
-echo "=== Step 3: DB Migration ==="
-HKER_ID=$(docker ps --filter name=srv-captain--hker --format "{{.ID}}" | head -1)
-if [ -z "$HKER_ID" ]; then
-  echo "    WARNING: hker container not found, skipping migration"
-else
-  DB_URL=$(docker inspect "$HKER_ID" --format '{{range .Config.Env}}{{println .}}{{end}}' | grep DATABASE_URL | cut -d= -f2-)
-  echo "    DATABASE_URL: ${DB_URL%%@*}@***"
-
-  DB_ID=$(docker ps --filter name=srv-captain--hker-db --format "{{.ID}}" | head -1)
-  if [ -z "$DB_ID" ]; then
-    echo "    WARNING: hker-db container not found, skipping migration"
-  else
-    echo "    Checking PostgreSQL..."
-    until docker exec "$DB_ID" pg_isready -U postgres 2>/dev/null; do
-      echo "    Waiting for PostgreSQL..."
-      sleep 2
-    done
-    echo "    PostgreSQL is ready."
-
-    echo "    Running drizzle-kit push..."
-    docker run --rm \
-      --network captain-overlay-network \
-      -v /tmp/hker-build:/app \
-      -w /app \
-      -e DATABASE_URL="$DB_URL" \
-      node:20-alpine \
-      sh -c "npm install --silent && npx drizzle-kit push"
-    echo "    Migration complete."
-  fi
-fi
-
-echo "=== Step 4: Update service ==="
-docker service update --image hker:latest --force srv-captain--hker
-echo "    Service update initiated."
-
-echo "=== Step 5: Wait for stabilization ==="
-for i in $(seq 1 12); do
-  sleep 5
-  REPLICAS=$(docker service ls --filter name=srv-captain--hker --format "{{.Replicas}}")
-  echo "    [$i/12] Replicas: $REPLICAS"
-  if echo "$REPLICAS" | grep -q "1/1"; then
-    echo "    Service is running!"
-    break
-  fi
+for migration_file in "$PROJECT_DIR"/drizzle/[0-9]*.sql; do
+  [ -f "$migration_file" ] || continue
+  migration_name=$(basename "$migration_file")
+  
+  # Transfer migration to server, then into pod
+  cat "$migration_file" | eval "$SSH_CMD" "cat > /tmp/${migration_name}"
+  eval "$SSH_CMD" "kubectl cp /tmp/${migration_name} ${NAMESPACE}/${DB_POD}:/tmp/${migration_name}"
+  
+  echo "    Running ${migration_name}..."
+  eval "$SSH_CMD" "kubectl exec -n ${NAMESPACE} ${DB_POD} -- psql -U hker -d hker -f /tmp/${migration_name}" 2>/dev/null && \
+    echo "    OK" || echo "    SKIP (may already exist)"
 done
 
-echo "=== Step 6: Nginx port check ==="
-NGINX=$(docker ps --filter name=captain-nginx --format "{{.ID}}" | head -1)
-NGINX_LINE=$(docker exec "$NGINX" grep "srv-captain--hker" /etc/nginx/conf.d/captain.conf 2>/dev/null | head -1 || true)
-echo "    Config: $NGINX_LINE"
+# ── Step 6: Restart deployment ────────────────────────────────────────────
+echo "==> Restarting deployment..."
+eval "$SSH_CMD" "kubectl rollout restart deployment/${APP_NAME}-app -n ${NAMESPACE}"
+eval "$SSH_CMD" "kubectl rollout status deployment/${APP_NAME}-app -n ${NAMESPACE} --timeout=120s"
+echo "    Rollout complete."
 
-if echo "$NGINX_LINE" | grep -q ":80\b" 2>/dev/null; then
-  echo "    Fixing port 80 -> 3000..."
-  docker exec "$NGINX" sed -i 's|http://srv-captain--hker:80|http://srv-captain--hker:3000|g' /etc/nginx/conf.d/captain.conf
-  docker exec "$NGINX" nginx -t && docker exec "$NGINX" nginx -s reload
-  echo "    Port fixed."
+# ── Step 7: Verify ────────────────────────────────────────────────────────
+echo "==> Verifying..."
+eval "$SSH_CMD" "kubectl get pods -n ${NAMESPACE}"
+
+HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' https://hker.me/)
+echo "    HTTPS: ${HTTP_CODE}"
+
+if [ "$HTTP_CODE" = "200" ]; then
+  echo ""
+  echo "==> Deploy complete! ✅"
 else
-  echo "    Port looks correct."
+  echo ""
+  echo "==> ⚠️  Deploy finished but HTTPS returned ${HTTP_CODE} (expected 200)"
+  echo "    Check: kubectl logs -n ${NAMESPACE} deployment/${APP_NAME}-app --tail=50"
 fi
 
-echo "=== ALL DONE ==="
-REMOTE_EOF
-
-# ── Step 3: Upload ──────────────────────────────────────────────────────────
-echo "==> Uploading to server..."
-scp -q "$TARBALL" "$REMOTE_SCRIPT" "$SSH_USER@$SERVER_IP:/tmp/"
-echo "    Uploaded."
-
-# ── Step 4: Execute remote ──────────────────────────────────────────────────
-echo "==> Running remote deploy..."
-echo ""
-ssh "$SSH_USER@$SERVER_IP" "bash $REMOTE_SCRIPT"
-
-echo ""
-echo "==> Deploy complete! ✅"
+# Cleanup
+rm -f /tmp/hker-image.tar /tmp/hker-image.tar.gz

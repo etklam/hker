@@ -1,60 +1,68 @@
 # HKER
 
-HKER is a Next.js 15 app for personal knowledge curation and lightweight collaboration. It combines three product surfaces in one codebase:
+HKER is a Next.js 15 app that serves as a family and personal operations hub. It combines three product surfaces in one codebase:
 
-- personal link collections
-- a public marketplace for sharing and forking collections
-- a family-style kanban todo board
+- **Monthly Bills** (flagship) - bill checklists you can share with a space, monthly check and uncheck, paid and overdue summary
+- **Spaces** with a todo board - kanban-style todos with owner, admin, and member roles, plus invite links
+- **Link Collections** - personal and unlisted CRUD for keeping links organized
 
-The current implementation is not a scaffold. The repo contains 13 app pages, 45 API route handlers, 13 service modules, and 17 React components across auth, collections, marketplace, family todo, featured content, and admin tooling.
+The current implementation is not a scaffold. The repo contains the full App Router page tree, API route handlers, Drizzle schema, Zod validation schemas, domain services, and React components across bills, spaces, collections, and admin tooling.
+
+The **Marketplace** is present but marked BETA. The API routes remain intact, and the UI surfaces a "Beta" badge to set expectations. Marketplace features are not part of the current MVP scope.
 
 ## What The App Does
 
 ### Auth and app shell
 
 - Email/password registration and login
-- Cookie-backed sessions with HMAC-hashed session tokens
+- Cookie-backed sessions with HMAC-hashed session tokens stored in the `auth_sessions` table, 30-day TTL by default
 - Theme switching: `light`, `dark`, `eye`
-- Built-in `zh-HK` and `en` UI localization
+- Built-in `zh-HK` and `en` UI localization via `react-i18next`
 - Admin role gate for dashboard pages and admin APIs
 
-### Link collections
+### Monthly Bills
 
-- Create, edit, and delete collections
-- Set visibility to `private`, `unlisted`, or `public`
-- Add, edit, delete, and reorder links inside a collection
-- Invite collaborators as `viewer` or `editor`
-- Manage collection members and roles
-- Share invite links and join collections via public invite pages
+- Create bill checklists and share them with a space
+- Mark bills as paid or unpaid each month
+- Paid and overdue summary at a glance
 
-### Marketplace
-
-- Publish a collection to the marketplace
-- Optional anonymous publishing
-- Browse marketplace listings with pagination
-- Search by title and description
-- Sort by newest or most subscribed
-- View listing detail pages rendered on the server
-- Subscribe to other users' listings
-- Fork a listing into a private copy in your own workspace
-- View your current subscriptions
-- Show featured public collections on the homepage
-
-### Family Todo
+### Spaces with todo board
 
 - Create and rename todo spaces
-- Owner / admin / member role model
+- Owner, admin, and member role model
 - Invite people into a space with shareable invite links
 - Create, edit, delete, reorder, and move kanban lists
 - Create, edit, delete, reorder, move, and complete todos
 - Track assignee, priority, due date, creator, and completer
 - Render full board data through a dedicated board endpoint
+- Uses `@dnd-kit` for board interactions
+
+### Link Collections
+
+- Create, edit, and delete collections
+- Set visibility to `private` or `unlisted`
+- Add, edit, delete, and reorder links inside a collection
+- Manage collection members and roles
+- Share invite links and join collections via invite pages
+
+Public visibility and collaborator roles exist in the schema and API, but are outside the current MVP scope.
+
+### Marketplace (Beta)
+
+- Publish a collection to the marketplace
+- Optional anonymous publishing
+- Browse, search, sort, and view listings
+- Subscribe to other users' listings
+- Fork a listing into a private copy
+- View current subscriptions
+
+The marketplace UI is marked Beta and is not part of the MVP surface. The API routes are kept intact for future iteration.
 
 ### Admin
 
 - Dashboard with counts for users, collections, and links
 - Paginated user list
-- Homepage curation via the admin user's public collections
+- Homepage curation via the first admin user's public collections
 
 ## Stack
 
@@ -75,12 +83,14 @@ src/
   components/           UI and feature components
   db/schema/            Drizzle schema definitions
   lib/                  Client helpers, auth context, theme, shared types
+  schemas/              Zod validation schemas
   server/services/      Domain services and permission logic
+drizzle/                Committed Drizzle migrations
+e2e/                    Playwright end-to-end tests
 docs/
   design.md             UI design system
-  caprover-deploy.md    CapRover deployment runbook
   dev-plan.md           Original product / engineering planning document
-  implementation-plan.md Initial implementation breakdown
+  k3s-deploy.md         k3s deployment runbook
   project-review.md     Current feature and maintainability review
 ```
 
@@ -120,15 +130,24 @@ Using Docker:
 docker compose up -d db
 ```
 
-### 4. Bootstrap the schema
+### 4. Apply migrations
 
-This repo currently ships Drizzle schema files and config, but does not check in generated `drizzle/` migration SQL yet. For local development, the simplest path is:
+This repo ships committed Drizzle migrations in `drizzle/`. The single migration `0000_initial_schema.sql` covers all current tables. The fresh clone path is:
+
+```bash
+docker compose up -d db
+npm ci
+cp .env.example .env
+npm run db:migrate
+```
+
+For local schema iteration during development, you can push the schema directly:
 
 ```bash
 npm run db:push
 ```
 
-If you want migration files, generate them first:
+Or generate a new migration after editing the Drizzle schema:
 
 ```bash
 npm run db:generate
@@ -145,23 +164,34 @@ Open `http://localhost:3000`.
 ## Scripts
 
 ```bash
-npm run dev
-npm run build
-npm run start
-npm run lint
-npm run db:generate
-npm run db:migrate
-npm run db:push
-npm run db:studio
+npm run dev          # dev server with Turbopack
+npm run build        # production build
+npm run start        # run production build
+npm run typecheck    # tsc --noEmit
+npm run lint         # eslint . (flat config)
+npm run test         # vitest unit/integration tests
+npm run test:watch
+npm run test:coverage
+npm run test:e2e     # Playwright end-to-end tests
+npm run db:generate  # generate Drizzle migration from schema
+npm run db:migrate   # apply migrations
+npm run db:push      # push schema directly (dev only)
+npm run db:studio    # Drizzle Studio
 ```
+
+## Rate Limiting
+
+Rate limiting is DB-backed and durable across restarts and multiple app instances. A sliding window implementation uses the `rate_limit_entries` table, and account lockout state is tracked in `login_failures`.
 
 ## Current Verification Status
 
-Verified against the current workspace on 2026-04-21:
+Verified against the current workspace on 2026-06-15:
 
-- `npm run build` passes when the required env vars are set
-- `npm run lint` runs, but the script still uses deprecated `next lint`
-- `npx tsc --noEmit` is not currently clean because `tsconfig.json` includes generated `.next/types` paths that may not exist in a fresh or stale workspace
+- `npm run typecheck` is clean
+- `npm run lint` reports 0 errors (20 pre-existing warnings)
+- `npm run test` is all green (101 test files, 488 tests)
+- `npm run build` succeeds
+- `npm run test:e2e` requires a running PostgreSQL instance
 
 The detailed review is in [docs/project-review.md](docs/project-review.md).
 
@@ -169,13 +199,12 @@ The detailed review is in [docs/project-review.md](docs/project-review.md).
 
 - Admin pages require `users.role = 'admin'`
 - Homepage featured content comes from the first admin user's public collections
-- The build path touches server modules, so missing env vars can fail builds even before runtime
-- Rate limiting and login lockouts are currently in-memory, which is acceptable for a single instance but not durable across restarts or multiple app instances
+- Rate limiting is DB-backed: sliding window in `rate_limit_entries`, login lockouts in `login_failures`
+- Session cookies are HMAC-hashed, stored in the `auth_sessions` table, with a 30-day TTL by default
 
 ## Documentation
 
-- [Current project review](docs/project-review.md)
-- [CapRover deployment runbook](docs/caprover-deploy.md)
 - [Design system](docs/design.md)
 - [Original dev plan](docs/dev-plan.md)
-- [Initial implementation plan](docs/implementation-plan.md)
+- [k3s deployment runbook](docs/k3s-deploy.md)
+- [Current project review](docs/project-review.md)
