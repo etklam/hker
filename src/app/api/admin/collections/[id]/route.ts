@@ -44,7 +44,7 @@ export const PUT = withAdmin(async (
     return Response.json({ error: 'Nothing to update' }, { status: 400 })
   }
 
-  let existing = await collectionService.getById(targetId)
+  const existing = await collectionService.getById(targetId)
   if (!existing) {
     return Response.json({ error: 'Collection not found' }, { status: 404 })
   }
