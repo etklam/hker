@@ -1,21 +1,21 @@
 # HKER Project Review
 
-Date: 2026-04-21
+Date: 2026-06-18
 
 ## Executive Summary
 
-HKER is already a real product-shaped application, not a starter repo. The implemented surface area is meaningful:
+HKER is a real product-shaped application, not a starter repo. The implemented surface area is meaningful:
 
-- 13 app pages
-- 45 API route handlers
-- 13 server-side service modules
-- 17 React components
+- App pages across the App Router tree covering Monthly Bills (flagship), Spaces, Collections, Marketplace (Beta), Admin, and a Tools hub
+- API route handlers for auth, collections, marketplace, spaces, monthly bills, admin, and telegram webhook
+- Server-side service modules grouped by domain
+- React components for collections, marketplace, links, members, invites, todos, bills, and shared UI primitives
 
-The product scope is coherent. Collections, marketplace, family todo, invite flows, admin tooling, theme switching, and localization all exist in the current codebase.
+The product scope is coherent. Monthly Bills is the flagship MVP surface. Spaces and Collections support it. Marketplace is present but Beta. Everyday Tools (mortgage, resignation, cheque amount) are short-term, client-side utilities.
 
-Maintainability is decent but not yet disciplined. The biggest issues are missing automated tests, a broken standalone TypeScript check, a deprecated lint script, and a few patterns that will become painful once traffic or team size grows.
+Maintainability has improved since the last review: automated tests are wired up, a standalone typecheck script exists, and the lint script no longer relies on the deprecated `next lint` path.
 
-Current maintainability score: `6.5 / 10`
+Current maintainability score: `7.5 / 10`
 
 ## Functional Coverage
 
@@ -36,7 +36,41 @@ Key files:
 - `src/server/services/auth-service.ts`
 - `src/server/services/session-service.ts`
 
-### 2. Link collections
+### 2. Monthly Bills (flagship)
+
+- Bill list CRUD (private or shared with a Space)
+- Bill item CRUD (name, due day, amount, note)
+- Monthly check / uncheck with paid-by tracking
+- Paid / overdue / due today / upcoming status derivation
+- Family-space access model (owner / admin / member)
+- Summary tiles: month, paid count, unpaid amount, overdue count
+
+Key files:
+
+- `src/app/(main)/bills/page.tsx`
+- `src/app/api/monthly-bills/**`
+- `src/server/services/monthly-bill-service.ts`
+- `src/lib/tools/monthly-bills.ts`
+
+The `/tools/monthly-bills` path now 301-redirects to `/bills`. Nav and homepage both point at `/bills`.
+
+### 3. Spaces with todo board
+
+- Space CRUD and rename
+- Owner, admin, and member role model with invite links
+- List CRUD and reorder
+- Todo CRUD, reorder, move, and complete
+- `@dnd-kit` for board interactions
+
+Key files:
+
+- `src/app/(main)/spaces/*`
+- `src/app/api/spaces/**`
+- `src/server/services/space-service.ts`
+- `src/server/services/family-todo-service.ts`
+- `src/server/services/family-todo-board-service.ts`
+
+### 4. Link Collections
 
 - Collection CRUD
 - Visibility updates
@@ -53,7 +87,7 @@ Key files:
 - `src/server/services/member-service.ts`
 - `src/server/services/invite-service.ts`
 
-### 3. Marketplace
+### 5. Marketplace (Beta)
 
 - Publish and unpublish collections
 - Browse, search, and sort listings
@@ -71,110 +105,99 @@ Key files:
 - `src/server/services/marketplace-service.ts`
 - `src/server/services/subscription-service.ts`
 
-### 4. Family Todo
-
-- Space CRUD
-- Space membership and invite flow
-- Board fetch endpoint
-- List CRUD and reorder
-- Todo CRUD, reorder, move, and complete
-
-Key files:
-
-- `src/app/(main)/family-todo/*`
-- `src/app/api/family-todo/**`
-- `src/server/services/family-todo-space-service.ts`
-- `src/server/services/family-todo-service.ts`
-- `src/server/services/family-todo-board-service.ts`
-
-### 5. Admin
+### 6. Admin
 
 - Dashboard stats
 - Paginated user listing
+- User ban / unban and role management (admin+)
+- Collection management
+- Marketplace pin / unpin
 
 Key files:
 
 - `src/app/(main)/admin/*`
 - `src/app/api/admin/*`
 
+### 7. Everyday Tools
+
+- Mortgage calculator (down-payment → monthly, or monthly → down payment)
+- Resignation Last Day calculator
+- Cheque amount converter (HKD to Chinese / English cheque format)
+
+All three are client-side only. Monthly Bills used to live under `/tools` and has been promoted to its own top-level route.
+
+Key files:
+
+- `src/app/(main)/tools/page.tsx` (hub)
+- `src/app/(main)/tools/{mortgage,resignation-last-day,cheque-amount}/page.tsx`
+- `src/lib/tools/{mortgage,resignation-last-day,cheque-amount}.ts`
+
 ## What Is Good
 
 ### Clear domain separation
 
-The service layer is sensibly split by domain. Auth, collections, marketplace, membership, invites, and family todo each have their own service file. That keeps route handlers thin and makes the product easier to reason about.
+The service layer is split by domain. Auth, collections, marketplace, membership, invites, family todo, and monthly bills each have their own service file. Route handlers stay thin.
 
 ### Permission checks are centralized
 
-Collection and space access levels are handled in one place through `src/server/services/permission-service.ts`. That is the right shape for a growing API surface.
+Collection and space access levels are handled in one place through `src/server/services/permission-service.ts`.
 
 ### Security basics are present
 
-There is concrete work here, not just intention:
-
 - password hashing with `scrypt`
-- HMAC-hashed session tokens
+- HMAC-hashed session tokens stored in the `auth_sessions` table
 - CSRF origin / referer checks for non-GET routes
-- per-endpoint rate limiting
-- login lockout after repeated failures
+- DB-backed sliding-window rate limiting (`rate_limit_entries`)
+- DB-backed login lockout (`login_failures`)
 - URL validation against private IP targets for stored links
+- Security headers applied at the edge in `src/middleware.ts`
 
-### The product model is coherent
+### Testable product model
 
-Collections feed the marketplace. Marketplace feeds subscriptions and forks. Admin public collections feed the homepage. Family todo is separate but follows the same invite-and-membership pattern. This is good product architecture.
+Collections feed the marketplace. Marketplace feeds subscriptions and forks. Spaces expose a board endpoint that bundles lists and todos. Monthly bills share access via Spaces. Domain boundaries make each surface testable in isolation.
+
+### Automated verification baseline
+
+`package.json` now ships scripts for typecheck, lint, unit/integration tests, coverage, and end-to-end tests:
+
+```json
+{
+  "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
+  "lint": "eslint .",
+  "test": "vitest run",
+  "test:watch": "vitest",
+  "test:coverage": "vitest run --coverage",
+  "test:e2e": "playwright test"
+}
+```
 
 ## Findings
 
-### 1. Standalone TypeScript verification is currently broken
+### 1. Standalone TypeScript verification is in place
 
-Severity: High
+Status: Resolved
 
-Evidence:
+`npm run typecheck` runs `tsc --noEmit` against `tsconfig.typecheck.json`, which avoids the generated `.next/types/**/*.ts` includes that previously made the standalone check flaky.
 
-- `tsconfig.json:31-37` includes `.next/types/**/*.ts` and `.next/dev/types/**/*.ts`
-- running `npx tsc --noEmit` fails with many `TS6053` missing-file errors when those generated files are absent or stale
+### 2. Automated test harness is in place
 
-Why it matters:
+Status: Resolved
 
-The repo does not currently have a stable CI-friendly typecheck command outside `next build`. That slows down local feedback and makes tooling brittle.
+`npm run test` runs Vitest. The repo has 488 passing tests across 101 files covering locale parity, lib helpers, API routes, middleware, and React component behaviour. Coverage is collected via `@vitest/coverage-v8`.
 
-### 2. There is no automated test harness in the repo
+Playwright end-to-end tests live in `e2e/` and are wired up via `npm run test:e2e`. Existing specs cover homepage, auth, monthly bills MVP smoke, marketplace, spaces, tools, and API shapes.
 
-Severity: High
+### 3. Lint script uses ESLint CLI directly
 
-Evidence:
+Status: Resolved
 
-- `package.json:5-13` contains no `test` script
-- there is no `test/` or `tests/` tree
+`npm run lint` invokes `eslint .` against the flat config in `eslint.config.mjs`. The deprecated `next lint` path is no longer used.
 
-Why it matters:
+### 4. Rate limiting and login lockout are DB-backed
 
-This app has a lot of stateful behavior: auth, invites, permission gates, subscriptions, fork logic, and kanban moves. Without tests, regressions will show up in flows users actually care about.
+Status: Resolved
 
-### 3. The lint script is on a deprecated path
-
-Severity: Medium
-
-Evidence:
-
-- `package.json:9` uses `next lint`
-- `npm run lint` reports that `next lint` is deprecated and will be removed in Next.js 16
-
-Why it matters:
-
-This is the kind of issue that quietly becomes upgrade friction. Not fatal today, annoying later.
-
-### 4. Rate limiting and login lockout are instance-local only
-
-Severity: Medium
-
-Evidence:
-
-- `src/server/api-helpers.ts:12`
-- `src/server/api-helpers.ts:103`
-
-Why it matters:
-
-The current approach resets on restart and does not coordinate across multiple app instances. Fine for a single container, weak for scaled deployments.
+Sliding-window rate limiting lives in `rate_limit_entries` and login lockout in `login_failures`. Both are durable across restarts and work across multiple app instances. A future move to Redis would make sense only if sub-millisecond accounting becomes necessary.
 
 ### 5. Reorder operations are implemented as N sequential updates
 
@@ -182,28 +205,18 @@ Severity: Medium
 
 Evidence:
 
-- `src/server/services/link-service.ts:114-120`
-- `src/server/services/family-todo-service.ts:45-52`
-- `src/server/services/family-todo-service.ts:175-180`
+- `src/server/services/link-service.ts`
+- `src/server/services/family-todo-service.ts`
 
 Why it matters:
 
 This works, but it does not scale well with bigger boards or collections. A batch update or transaction-based bulk reorder would age better.
 
-### 6. Marketplace query shaping is duplicated in three places
+### 6. Marketplace query shaping is duplicated
 
-Severity: Medium
+Severity: Low
 
-Evidence:
-
-- `src/server/services/marketplace-service.ts:23`
-- `src/server/services/marketplace-service.ts:65`
-- `src/app/(main)/marketplace/page.tsx:10`
-- `src/app/(main)/marketplace/[listingId]/page.tsx:12`
-
-Why it matters:
-
-`listingSelect`, `baseQuery`, and DTO shaping logic are duplicated between the service layer and server component pages. That creates drift risk the next time marketplace fields change.
+`listingSelect`, `baseQuery`, and DTO shaping logic are split between the service layer and the server-component pages. Consolidating these into one shared server-side module would reduce drift risk the next time marketplace fields change.
 
 ### 7. Build passes, but the codebase is carrying warning debt
 
@@ -223,34 +236,31 @@ This is not a ship blocker, but it is how a clean codebase becomes noisy and har
 ### Commands run
 
 ```bash
-npx tsc --noEmit
+npm run typecheck
 npm run lint
-AUTH_SESSION_SECRET=dev-secret \
-DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/app \
-APP_BASE_URL=http://localhost:3000 \
+npm run test
 npm run build
 ```
 
 ### Results
 
-- `npx tsc --noEmit`: failed because generated `.next/types` entries referenced by `tsconfig.json` were missing
-- `npm run lint`: completed, but flagged deprecated `next lint`
-- `npm run build`: passed and generated all app routes successfully
+- `npm run typecheck`: clean (deterministic standalone typecheck via `tsconfig.typecheck.json`)
+- `npm run lint`: 0 errors, ~20 pre-existing warnings
+- `npm run test`: green across 101 test files / 488 tests
+- `npm run build`: succeeds and emits all app routes
+- `npm run test:e2e`: requires a running PostgreSQL instance
 
 ## Recommended Next Steps
 
-1. Add a stable verification baseline:
-   - replace `next lint` with ESLint CLI
-   - make standalone typecheck deterministic
+1. Add high-leverage tests for the remaining stateful flows:
+   - collection visibility downgrade → marketplace auto-unpublish
+   - space member role change (admin demotion)
+   - admin user ban / unban lifecycle
 
-2. Add high-value tests first:
-   - auth login / register / logout
-   - collection invite join
-   - family todo invite join
-   - marketplace subscribe / fork
+2. Consolidate duplicated marketplace query shaping into one shared server-side module.
 
-3. Consolidate duplicated marketplace query shaping into one shared server-side module.
+3. Replace sequential reorder loops with a transaction-backed bulk update pattern before boards and collections grow.
 
-4. Move rate limiting and lockout storage to Redis or another shared store if this app will run on more than one instance.
+4. Move raw `<img>` usages to `next/image` where it matters (favicons in featured collections, marketplace cards) to silence build warnings and improve loading.
 
-5. Replace sequential reorder loops with a transaction-backed bulk update pattern before boards and collections grow.
+5. Watch for opportunity to surface Monthly Bills reminders (e.g. upcoming-due notification) without introducing a notification backend too early.

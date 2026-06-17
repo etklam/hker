@@ -20,54 +20,71 @@ const TOOLS = [
     href: '/tools/cheque-amount',
     icon: FileText,
   },
-  {
-    key: 'monthlyBills',
-    href: '/tools/monthly-bills',
-    icon: ReceiptText,
-  },
 ] as const
 
 export default function ToolsHubPage() {
   const { t } = useTranslation()
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-12 sm:py-20">
-      {/* Hero */}
-      <section className="relative mb-16 text-center">
-        {/* Decorative blobs */}
-        <div className="pointer-events-none absolute -top-24 left-1/2 -z-10 h-72 w-72 -translate-x-1/2 rounded-full bg-accent/20 blur-3xl" />
-        <h1 className="font-[family-name:var(--font-heading)] text-4xl font-extrabold tracking-tight text-accent sm:text-5xl">
-          {t('tools.title')}
-        </h1>
-        <p className="mx-auto mt-4 max-w-lg text-lg text-muted">
-          {t('tools.subtitle')}
-        </p>
+    <div className="mx-auto max-w-5xl px-4 py-12 sm:py-16">
+      {/* Flagship pointer */}
+      <section className="mb-12 mochi-card flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-accent-soft text-accent">
+            <ReceiptText size={24} strokeWidth={2.4} />
+          </div>
+          <div>
+            <h2 className="font-[family-name:var(--font-heading)] text-xl font-bold text-text">
+              {t('home.features.monthlyBills.title')}
+            </h2>
+            <p className="mt-1 max-w-xl text-sm text-muted">
+              {t('home.features.monthlyBills.description')}
+            </p>
+          </div>
+        </div>
+        <Link
+          href="/bills"
+          className="mochi-spring inline-flex shrink-0 items-center gap-2 rounded-2xl bg-cta px-5 py-3 text-sm font-bold text-white hover:bg-cta-hover"
+        >
+          {t('home.features.monthlyBills.cta')}
+          <ArrowRight size={16} />
+        </Link>
       </section>
 
-      {/* Tool Cards Grid */}
-      <section className="mb-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {TOOLS.map(({ key, href, icon: Icon }) => (
-          <Link key={key} href={href} className="group">
-            <div className="mochi-card mochi-spring flex h-full flex-col p-8 hover:-translate-y-2">
-              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-accent-soft text-accent">
-                <Icon size={24} strokeWidth={2} />
+      {/* Quick tools */}
+      <section className="mb-12">
+        <div className="mb-6 text-center">
+          <h1 className="font-[family-name:var(--font-heading)] text-3xl font-extrabold tracking-tight text-accent sm:text-4xl">
+            {t('home.tools.title')}
+          </h1>
+          <p className="mx-auto mt-2 max-w-lg text-sm text-muted">
+            {t('home.tools.subtitle')}
+          </p>
+        </div>
+
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {TOOLS.map(({ key, href, icon: Icon }) => (
+            <Link key={key} href={href} className="group">
+              <div className="mochi-card mochi-spring flex h-full flex-col p-6 hover:-translate-y-1">
+                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-accent-soft text-accent">
+                  <Icon size={22} strokeWidth={2} />
+                </div>
+                <h3 className="mb-1.5 font-bold text-text">
+                  {t(`tools.${key}.title`)}
+                </h3>
+                <p className="flex-1 text-sm leading-relaxed text-muted">
+                  {t(`tools.${key}.description`)}
+                </p>
+                <span className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-accent group-hover:gap-2 mochi-spring">
+                  {t('tools.useNow')}
+                  <ArrowRight size={14} />
+                </span>
               </div>
-              <h3 className="mb-2 text-lg font-bold text-text">
-                {t(`tools.${key}.title`)}
-              </h3>
-              <p className="flex-1 text-sm text-muted">
-                {t(`tools.${key}.description`)}
-              </p>
-              <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-accent group-hover:gap-2 mochi-spring">
-                {t('tools.useNow')}
-                <ArrowRight size={14} />
-              </span>
-            </div>
-          </Link>
-        ))}
+            </Link>
+          ))}
+        </div>
       </section>
 
-      {/* More coming soon hint */}
       <p className="text-center text-sm text-muted">
         {t('tools.moreComingSoon')}
       </p>

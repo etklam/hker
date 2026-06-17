@@ -2,7 +2,8 @@
   "nav": {
     "myCollections": "我的收藏",
     "marketplace": "市集",
-    "spaces": "Spaces"
+    "spaces": "空間",
+    "monthlyBills": "月費清單"
   },
   "collections": {
     "title": "我的收藏",
@@ -55,9 +56,9 @@
     "search": "搜尋收藏...",
     "subscribe": "訂閱",
     "unsubscribe": "取消訂閱",
-    "fork": "複製到我的收藏",
+    "fork": "複製一份",
     "fork_confirm": "確定要複製這個收藏嗎？",
-    "description": "探索公開收藏，訂閱更新或 Fork 你的版本。",
+    "description": "探索公開收藏，訂閱更新或複製一份自己的版本。",
     "empty": "目前沒有符合的收藏",
     "notFound": "找不到該收藏",
     "errors": {
@@ -69,21 +70,21 @@
     }
   },
   "spaces": {
-    "spacesCount": "{{count}} 個 spaces",
-    "createSpace": "新增 Space",
-    "editSpace": "編輯 Space",
-    "newSpace": "新增 Space",
+    "spacesCount": "{{count}} 個空間",
+    "createSpace": "新增空間",
+    "editSpace": "編輯空間",
+    "newSpace": "新增空間",
     "spaceName": "名稱",
-    "empty": "尚未有 space，立即建立一個！",
+    "empty": "尚未有看板空間，立即建立一個！",
     "role": "角色：{{role}}",
     "enterBoard": "進入看板 →",
-    "backSpaces": "← 返回 spaces",
-    "invalidSpaceId": "無效的 space id",
-    "deleteSpaceConfirm": "確定要刪除此 space？",
+    "backSpaces": "← 返回空間",
+    "invalidSpaceId": "無效的空間 ID",
+    "deleteSpaceConfirm": "確定要刪除此空間？",
     "errors": {
-      "saveSpace": "儲存 space 失敗",
+      "saveSpace": "儲存空間失敗",
       "deleteSpace": "刪除失敗",
-      "loadSpaces": "載入 space 失敗"
+      "loadSpaces": "載入空間失敗"
     }
   },
   "todo": {
@@ -107,7 +108,7 @@
       "description": "描述",
       "priority": "優先度",
       "dueDate": "到期日",
-      "assignTo": "指派給（User ID）",
+      "assignTo": "指派給成員",
       "save": "儲存",
       "cancel": "取消",
       "delete": "刪除"
@@ -162,7 +163,7 @@
   "home": {
     "brand": "HKER",
     "title": "系統主題切換器",
-    "tagline": "你的個人生產力中心 — 收集、整理、分享。",
+    "tagline": "你的家庭與個人事務中心 — 月費、看板與日常工具。",
     "greeting": "歡迎回來，{{name}} 👋",
     "getStarted": "立即開始",
     "madeWith": "用心製作於香港",
@@ -173,8 +174,29 @@
       "subtitle": "由管理員精心策展 — 為你挑選的最佳資源。",
       "more": "更多連結"
     },
+    "dashboard": {
+      "heading": "你的事務一覽",
+      "subtitle": "月費清單是你的主要工具 — 其他功能環繞於此。",
+      "billsWidget": {
+        "title": "月費清單",
+        "paid": "已付 {{paid}}/{{total}}",
+        "unpaidAmount": "未付 {{amount}}",
+        "overdue": "{{count}} 項逾期",
+        "dueToday": "{{count}} 項今日到期",
+        "nextDue": "下一筆：{{name}} · {{date}}",
+        "noBills": "本月未有帳單，先新增一項。",
+        "noList": "建立清單後即可開始記低每月帳單。",
+        "openBills": "打開月費清單",
+        "loginPrompt": "登入後可以跨裝置保存月費清單。"
+      }
+    },
     "features": {
       "heading": "主要功能",
+      "monthlyBills": {
+        "title": "月費清單",
+        "description": "記低每月帳單、到期日同付款狀態，可以分享到空間，每月快速剔付款。",
+        "cta": "記低帳單"
+      },
       "collections": {
         "title": "收藏",
         "description": "將你喜歡的連結整理成精美的收藏集，輕鬆分享。",
@@ -188,11 +210,11 @@
       },
       "marketplace": {
         "title": "市集",
-        "description": "探索公開收藏，訂閱更新或 Fork 你的版本。",
+        "description": "探索公開收藏，訂閱更新或複製一份自己的版本。",
         "cta": "探索市集"
       },
       "spaces": {
-        "title": "Spaces",
+        "title": "看板空間",
         "description": "與家人或團隊協作的任務看板 — 支援優先級、到期日等功能。",
         "cta": "開啟看板"
       }
@@ -201,8 +223,8 @@
       "loadHealth": "載入健康檢查失敗"
     },
     "tools": {
-      "title": "常用工具",
-      "subtitle": "幫你快速處理生活上常見的小計算與轉換。",
+      "title": "快速工具",
+      "subtitle": "香港生活常用的小幫手，即開即用。",
       "useNow": "立即使用"
     }
   },
@@ -232,20 +254,20 @@
     "maxUsesPlaceholder": "不限",
     "expiresLabel": "有效時數",
     "expiresPlaceholder": "永不過期",
-    "create": "建立 Invite Link",
+    "create": "建立邀請連結",
     "loading": "載入中...",
-    "empty": "目前沒有 invite links",
+    "empty": "目前沒有邀請連結",
     "unlimited": "∞",
     "usage": "{{role}} · 使用 {{useCount}}/{{maxUses}}",
     "copy": "複製",
     "delete": "刪除",
-    "confirmDelete": "確定要刪除此 invite link？",
-    "copySuccess": "Invite link 已複製。",
+    "confirmDelete": "確定要刪除此邀請連結？",
+    "copySuccess": "已複製邀請連結。",
     "errors": {
-      "load": "載入 invite links 失敗",
-      "create": "建立 invite link 失敗",
-      "delete": "刪除 invite link 失敗",
-      "copy": "複製 invite link 失敗",
+      "load": "載入邀請連結失敗",
+      "create": "建立邀請連結失敗",
+      "delete": "刪除邀請連結失敗",
+      "copy": "複製邀請連結失敗",
       "maxUses": "最大使用次數需在 1 至 10000 之間",
       "expires": "有效時數需在 1 至 8760 之間"
     }
@@ -278,17 +300,17 @@
     }
   },
   "spaceInviteJoin": {
-    "title": "加入 Space 邀請",
-    "subtitle": "你被邀請加入 space：{{title}}",
-    "invalid": "此 space 邀請連結無效或已超過使用次數上限。",
-    "joinNow": "立即加入 space",
+    "title": "加入空間邀請",
+    "subtitle": "你被邀請加入空間：{{title}}",
+    "invalid": "此空間邀請連結無效或已超過使用次數上限。",
+    "joinNow": "立即加入空間",
     "loginToJoin": "登入以加入",
     "loading": "載入中...",
     "notFound": "找不到邀請連結",
     "errors": {
-      "load": "載入 space 邀請失敗",
-      "join": "加入 space 失敗",
-      "forbidden": "你沒有權限加入此 space 邀請"
+      "load": "載入空間邀請失敗",
+      "join": "加入空間失敗",
+      "forbidden": "你沒有權限加入此空間邀請"
     }
   },
   "auth": {
@@ -418,20 +440,23 @@
       "title": "月費付款清單",
       "cta": "記低帳單",
       "description": "記低每月帳單、到期日及付款狀態。",
-      "loginRequired": "登入後可以跨裝置保存月費清單，亦可以分享到 Family Space。",
+      "loginRequired": "登入後可以跨裝置保存月費清單，亦可以分享到空間。",
       "month": "月份",
       "previousMonth": "上一個月",
       "nextMonth": "下一個月",
       "lists": "清單",
-      "createList": "新增清單",
+      "newList": "新增清單",
+      "createList": "建立清單",
+      "listSettings": "清單設定",
+      "openSettings": "開啟清單設定",
       "privateList": "私人清單",
       "shareTo": "分享到 {{name}}",
       "sharedWith": "已分享至 {{name}}",
-      "sharedMemberHint": "此清單由 Family Space 分享，你可以標記付款狀態。",
+      "sharedMemberHint": "此清單由空間分享，你可以標記付款狀態。",
       "addBill": "新增帳單",
       "editBill": "編輯帳單",
       "empty": "尚未有每月帳單，先新增一項。",
-      "emptyLists": "尚未有月費清單，先建立一個私人或 Family 清單。",
+      "emptyLists": "尚未有月費清單，先建立一個私人或空間清單。",
       "markPaid": "標記為已付款",
       "markUnpaid": "標記為未付款",
       "confirmDelete": "確定要刪除「{{name}}」？",
@@ -439,8 +464,8 @@
       "checkedBy": "{{name}} 已付款",
       "access": {
         "owner": "擁有者",
-        "admin": "Family 管理",
-        "member": "Family 成員"
+        "admin": "空間管理",
+        "member": "空間成員"
       },
       "fields": {
         "listName": "清單名稱",

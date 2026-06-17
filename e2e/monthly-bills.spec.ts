@@ -152,8 +152,8 @@ test.describe.serial('Monthly Bills MVP smoke', () => {
 
     // --- Verify UI shows paid state ---
     const pageA = await contextA.newPage();
-    await pageA.goto(`/tools/monthly-bills?listId=${listId}`);
-    await expect(pageA).toHaveURL(/\/tools\/monthly-bills/);
+    await pageA.goto(`/bills?listId=${listId}`);
+    await expect(pageA).toHaveURL(/\/bills/);
 
     // Summary tile shows 1/1 paid (locale-agnostic)
     await expect(pageA.locator('text=1/1')).toBeVisible({ timeout: 10_000 });

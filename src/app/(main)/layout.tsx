@@ -11,6 +11,7 @@ import {
   Bookmark,
   Store,
   CheckSquare,
+  ReceiptText,
   Sun,
   Moon,
   Leaf,
@@ -36,9 +37,10 @@ const NAV_ITEMS: ReadonlyArray<{
   beta?: boolean
 }> = [
   { href: '/', labelKey: 'home.brand', icon: Home },
+  { href: '/bills', labelKey: 'nav.monthlyBills', icon: ReceiptText },
+  { href: '/spaces', labelKey: 'nav.spaces', icon: CheckSquare },
   { href: '/me/collections', labelKey: 'nav.myCollections', icon: Bookmark },
   { href: '/marketplace', labelKey: 'nav.marketplace', icon: Store, beta: true },
-  { href: '/spaces', labelKey: 'nav.spaces', icon: CheckSquare },
 ]
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {

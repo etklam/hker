@@ -1,8 +1,9 @@
 {
   "nav": {
-    "myCollections": "My Collections",
+    "myCollections": "Collections",
     "marketplace": "Marketplace",
-    "spaces": "Spaces"
+    "spaces": "Spaces",
+    "monthlyBills": "Monthly Bills"
   },
   "collections": {
     "title": "My Collections",
@@ -162,7 +163,7 @@
   "home": {
     "brand": "HKER",
     "title": "Theme Switcher",
-    "tagline": "Your personal productivity hub — collect, organise, share.",
+    "tagline": "Your family and personal operations hub — bills, spaces, and everyday tools.",
     "greeting": "Welcome back, {{name}} 👋",
     "getStarted": "Get Started",
     "madeWith": "Made with care in HK",
@@ -173,8 +174,29 @@
       "subtitle": "Curated by our team — the best resources, handpicked for you.",
       "more": "more links"
     },
+    "dashboard": {
+      "heading": "Your operations at a glance",
+      "subtitle": "Monthly Bills is your flagship surface — everything else lives alongside it.",
+      "billsWidget": {
+        "title": "Monthly Bills",
+        "paid": "Paid {{paid}}/{{total}}",
+        "unpaidAmount": "Unpaid {{amount}}",
+        "overdue": "{{count}} overdue",
+        "dueToday": "{{count}} due today",
+        "nextDue": "Next due: {{name}} · {{date}}",
+        "noBills": "No bills tracked this month. Add your first bill to get started.",
+        "noList": "Create a bill list to start tracking monthly payments.",
+        "openBills": "Open Monthly Bills",
+        "loginPrompt": "Log in to track monthly bills across devices."
+      }
+    },
     "features": {
       "heading": "Features",
+      "monthlyBills": {
+        "title": "Monthly Bills",
+        "description": "Track recurring bills, due dates, and payment status. Share a list with your space and check off paid bills each month.",
+        "cta": "Track bills"
+      },
       "collections": {
         "title": "Collections",
         "description": "Organise your favourite links into beautiful, shareable collections.",
@@ -201,8 +223,8 @@
       "loadHealth": "Failed to load health check"
     },
     "tools": {
-      "title": "Everyday Tools",
-      "subtitle": "Quick calculations and conversions for everyday life in Hong Kong.",
+      "title": "Quick Tools",
+      "subtitle": "Fast client-side helpers for everyday Hong Kong life.",
       "useNow": "Use Now"
     }
   },
@@ -418,16 +440,19 @@
       "title": "Monthly Bill Checklist",
       "cta": "Track Bills",
       "description": "Track monthly bills, due dates, and payment status.",
-      "loginRequired": "Log in to save monthly bill lists across devices and share them with a Family Space.",
+      "loginRequired": "Log in to save monthly bill lists across devices and share them with a space.",
       "month": "Month",
       "previousMonth": "Previous month",
       "nextMonth": "Next month",
       "lists": "Lists",
+      "newList": "New List",
       "createList": "Create List",
+      "listSettings": "List Settings",
+      "openSettings": "Open list settings",
       "privateList": "Private list",
       "shareTo": "Share to {{name}}",
       "sharedWith": "Shared with {{name}}",
-      "sharedMemberHint": "This list is shared from a Family Space. You can update payment status.",
+      "sharedMemberHint": "This list is shared from a space. You can update payment status.",
       "addBill": "Add Bill",
       "editBill": "Edit Bill",
       "empty": "No monthly bills yet. Add one to get started.",
