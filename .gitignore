@@ -50,3 +50,6 @@ k8s/
 # Test reports
 playwright-report/
 test-results/
+
+# Local visual verification captures
+.impeccable/review/

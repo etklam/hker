@@ -12,6 +12,8 @@ const jsonTypeOids = ['114', '3802']
 const booleanTypeOids = ['16']
 
 export function serializeJsonDriverValue(value: unknown): string {
+  // Drizzle's JSON columns already encode values before invoking the driver.
+  if (typeof value === 'string') return value
   return JSON.stringify(value) ?? 'null'
 }
 

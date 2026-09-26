@@ -1,37 +1,12 @@
-'use client'
-
-import { useTranslation } from 'react-i18next'
-import { AlertTriangle, RotateCcw } from 'lucide-react'
-
-export default function Error({
-  error,
-  reset,
-}: {
-  error: Error & { digest?: string }
-  reset: () => void
-}) {
-  const { t } = useTranslation()
-
+"use client";
+export default function ErrorPage({ reset }: { reset: () => void }) {
   return (
-    <div className="flex flex-col items-center justify-center py-24 gap-6">
-      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-500/10">
-        <AlertTriangle size={32} className="text-red-500" />
-      </div>
-      <div className="text-center">
-        <h2 className="text-lg font-bold text-text mb-2">
-          {t('common.errorTitle', 'Something went wrong')}
-        </h2>
-        <p className="text-sm text-muted max-w-md">
-          {t('common.errorDescription', 'An unexpected error occurred. Please try again.')}
-        </p>
-      </div>
-      <button
-        onClick={reset}
-        className="mochi-spring flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-accent-hover active:scale-[0.98]"
-      >
-        <RotateCcw size={16} />
-        {t('common.tryAgain', 'Try again')}
+    <div className="container page-heading">
+      <h1>暫時無法載入目錄</h1>
+      <p>請稍後重試。如問題持續，請聯絡管理員。</p>
+      <button className="button" onClick={reset}>
+        重試
       </button>
     </div>
-  )
+  );
 }

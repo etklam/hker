@@ -1,10 +1,7 @@
-import { PageHeaderSkeleton, CardGridSkeleton } from '@/components/ui/Skeletons'
-
-export default function MainLoading() {
+export default function Loading() {
   return (
-    <>
-      <PageHeaderSkeleton />
-      <CardGridSkeleton />
-    </>
-  )
+    <div className="container loading" role="status">
+      正在載入目錄…
+    </div>
+  );
 }

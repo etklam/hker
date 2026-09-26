@@ -1,6 +1,7 @@
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 
+import * as directorySchema from '@/db/schema/directory'
 import * as usersSchema from '@/db/schema/users'
 import * as authSchema from '@/db/schema/auth'
 import * as collectionsSchema from '@/db/schema/collections'
@@ -19,6 +20,7 @@ const client = postgres(connectionString, { max: 20, idle_timeout: 30 })
 export const db = drizzle(client, {
   schema: {
     ...usersSchema,
+    ...directorySchema,
     ...authSchema,
     ...collectionsSchema,
     ...marketplaceSchema,

@@ -8,6 +8,11 @@ import {
 } from './postgres-serializers'
 
 describe('postgres serializer guards', () => {
+  it('preserves JSON text already encoded by Drizzle', () => {
+    expect(serializeJsonDriverValue('{"hours":"10-18"}')).toBe('{"hours":"10-18"}')
+    expect(serializeJsonDriverValue('[1,2]')).toBe('[1,2]')
+    expect(serializeJsonDriverValue('"text"')).toBe('"text"')
+  })
   it('serializes typed JSON scalar values before Postgres.js writes them', () => {
     expect(serializeJsonDriverValue(1)).toBe('1')
     expect(serializeJsonDriverValue(true)).toBe('true')

@@ -1,0 +1,3 @@
+ALTER TABLE "directory_listings" ALTER COLUMN "enabled" SET DEFAULT false;--> statement-breakpoint
+CREATE INDEX "directory_links_listing" ON "directory_listing_links" USING btree ("listing_id","enabled","sort_order");--> statement-breakpoint
+CREATE INDEX "directory_listing_search" ON "directory_listings" USING gin (to_tsvector('simple', "name" || ' ' || "short_description" || ' ' || "description"));

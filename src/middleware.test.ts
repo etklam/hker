@@ -11,6 +11,9 @@ function createMockRequest(pathname: string) {
 }
 
 describe('middleware', () => {
+  it('retires old product surfaces without dropping data', () => {
+    for(const path of ['/marketplace', '/api/me/collections', '/api/auth/register', '/bills']) expect(middleware(createMockRequest(path)).status).toBe(410)
+  })
   afterEach(() => {
     vi.unstubAllEnvs()
   })
@@ -48,7 +51,7 @@ describe('middleware', () => {
 
   it('adds Cache-Control no-store for admin routes', () => {
     vi.stubEnv('NODE_ENV', 'development')
-    const req = createMockRequest('/api/admin/users')
+    const req = createMockRequest('/api/admin/catalog')
     const response = middleware(req)
 
     expect(response.headers.get('Cache-Control')).toBe('no-store')

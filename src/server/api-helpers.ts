@@ -62,6 +62,7 @@ interface RateLimitConfig {
 const RATE_LIMIT_CONFIGS: Record<string, RateLimitConfig> = {
   'POST:/api/auth/login': { limit: 20, windowMs: 60_000 },
   'POST:/api/auth/register': { limit: 10, windowMs: 60_000 },
+  'GET:/api/catalog': { limit: 60, windowMs: 60_000 },
   'GET:/api/marketplace/search': { limit: 60, windowMs: 60_000 },
   'GET:/api/marketplace': { limit: 90, windowMs: 60_000 },
 }

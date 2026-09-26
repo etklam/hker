@@ -240,3 +240,7 @@ Key changes:
 - Manual SSL → cert-manager with Cloudflare DNS-01
 - Manual DNS → ExternalDNS auto-provisioning
 - `drizzle-kit push` → explicit SQL migration files via `kubectl cp` + `psql`
+
+## Directory rebuild deployment
+
+The current product is the directory described in README.md. Before applying new migrations, reconcile the previously squashed migration ledger on a staging clone. Preserve existing legacy tables. Configure `TELEGRAM_BOT_TOKEN` and `TELEGRAM_WEBHOOK_SECRET` in the application Secret; register the webhook with the matching `secret_token`. Do not expose these values in client bundles. Verify `/api/health`, admin sign-in, draft visibility and webhook authentication after rollout.

@@ -15,7 +15,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "admin:create": "esbuild scripts/create-admin.ts --bundle --platform=node --packages=external --outfile=.next/admin-bootstrap.cjs && node .next/admin-bootstrap.cjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

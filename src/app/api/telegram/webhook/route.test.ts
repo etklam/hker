@@ -1,91 +1,60 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
-
-import { parseTelegramCommand } from '@/server/telegram-bot'
-import { POST } from './route'
-
-const originalToken = process.env.TELEGRAM_BOT_TOKEN
-
-function telegramRequest(body: unknown) {
-  return new Request('http://localhost/api/telegram/webhook', {
-    method: 'POST',
+import { afterEach, describe, it, expect, vi } from "vitest";
+vi.mock("@/server/catalog/bot", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/server/catalog/bot")>();
+  return { ...actual, handleCatalogUpdate: vi.fn() };
+});
+import { POST } from "./route";
+import {
+  handleCatalogUpdate,
+  parseCallback,
+  toggleTag,
+} from "@/server/catalog/bot";
+const request = (body: unknown, secret?: string) =>
+  new Request("http://localhost/api/telegram/webhook", {
+    method: "POST",
+    headers: secret ? { "x-telegram-bot-api-secret-token": secret } : {},
     body: JSON.stringify(body),
-  })
-}
-
-describe('Telegram webhook', () => {
-  afterEach(() => {
-    vi.restoreAllMocks()
-    if (originalToken === undefined) {
-      delete process.env.TELEGRAM_BOT_TOKEN
-    } else {
-      process.env.TELEGRAM_BOT_TOKEN = originalToken
-    }
-  })
-
-  it('parses commands with optional bot username', () => {
-    expect(parseTelegramCommand('/start')).toBe('start')
-    expect(parseTelegramCommand('/help@HKERBot')).toBe('help')
-    expect(parseTelegramCommand('hello')).toBeNull()
-  })
-
-  it('replies to /start', async () => {
-    process.env.TELEGRAM_BOT_TOKEN = 'test-token'
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'))
-
-    const res = await POST(telegramRequest({
-      message: {
-        text: '/start',
-        chat: { id: 123 },
+  });
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.clearAllMocks();
+});
+describe("directory Telegram webhook", () => {
+  it("fails closed without a configured or matching secret", async () => {
+    expect((await POST(request({}))).status).toBe(401);
+    vi.stubEnv("TELEGRAM_WEBHOOK_SECRET", "secret");
+    expect((await POST(request({}, "wrong"))).status).toBe(401);
+    expect(handleCatalogUpdate).not.toHaveBeenCalled();
+  });
+  it("validates updates before handling them", async () => {
+    vi.stubEnv("TELEGRAM_WEBHOOK_SECRET", "secret");
+    expect((await POST(request({}, "secret"))).status).toBe(400);
+    expect(handleCatalogUpdate).not.toHaveBeenCalled();
+  });
+  it("accepts authenticated callback updates", async () => {
+    vi.stubEnv("TELEGRAM_WEBHOOK_SECRET", "secret");
+    const update = {
+      update_id: 1,
+      callback_query: {
+        id: "cb",
+        from: { id: 5 },
+        message: { chat: { id: 5 } },
+        data: "d:1234abcd:tag:2",
       },
-    }))
-
-    expect(res.status).toBe(200)
-    expect(fetchMock).toHaveBeenCalledWith(
-      'https://api.telegram.org/bottest-token/sendMessage',
-      expect.objectContaining({
-        method: 'POST',
-        body: expect.stringContaining('"chat_id":123'),
-      }),
-    )
-    expect(fetchMock.mock.calls[0][1]?.body).toEqual(expect.stringContaining('Welcome to HKER'))
-  })
-
-  it('replies to /help', async () => {
-    process.env.TELEGRAM_BOT_TOKEN = 'test-token'
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'))
-
-    const res = await POST(telegramRequest({
-      message: {
-        text: '/help',
-        chat: { id: 'chat-id' },
-      },
-    }))
-
-    expect(res.status).toBe(200)
-    expect(fetchMock.mock.calls[0][1]?.body).toEqual(expect.stringContaining('/start - Start using the bot'))
-    expect(fetchMock.mock.calls[0][1]?.body).toEqual(expect.stringContaining('/help - Show this help message'))
-  })
-
-  it('ignores unsupported updates without calling Telegram', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'))
-
-    const res = await POST(telegramRequest({
-      message: {
-        text: '/unknown',
-        chat: { id: 123 },
-      },
-    }))
-
-    expect(res.status).toBe(200)
-    expect(fetchMock).not.toHaveBeenCalled()
-  })
-
-  it('returns 400 for invalid JSON', async () => {
-    const res = await POST(new Request('http://localhost/api/telegram/webhook', {
-      method: 'POST',
-      body: '{',
-    }))
-
-    expect(res.status).toBe(400)
-  })
-})
+    };
+    expect((await POST(request(update, "secret"))).status).toBe(200);
+    expect(handleCatalogUpdate).toHaveBeenCalledWith(update);
+  });
+  it("parses only bounded known callback actions", () => {
+    expect(parseCallback("d:1234abcd:tag:2")).toMatchObject({
+      action: "tag",
+      id: 2,
+    });
+    expect(parseCallback("d:1234abcd:sql:2")).toBeNull();
+    expect(parseCallback("d:1234abcd:tag:-1")).toBeNull();
+  });
+  it("toggles tags without clearing previous selections", () => {
+    expect(toggleTag([1], 2)).toEqual([1, 2]);
+    expect(toggleTag([1, 2], 1)).toEqual([2]);
+  });
+});

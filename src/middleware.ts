@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export function middleware(request: NextRequest) {
+  const legacy = ['/bills', '/spaces', '/me', '/marketplace', '/tools', '/invite', '/register', '/admin/users', '/api/me', '/api/admin/stats', '/api/admin/collections', '/api/monthly-bills', '/api/spaces', '/api/collections', '/api/links', '/api/invites', '/api/marketplace', '/api/subscriptions', '/api/featured', '/api/auth/register', '/api/admin/users', '/api/admin/marketplace']
+  if (legacy.some(path => request.nextUrl.pathname === path || request.nextUrl.pathname.startsWith(`${path}/`))) {
+    return new NextResponse('This legacy feature is no longer available.', { status: 410 })
+  }
   const response = NextResponse.next()
   
   response.headers.set('X-Content-Type-Options', 'nosniff')
