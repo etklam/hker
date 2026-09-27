@@ -31,6 +31,12 @@ async function update(id: number) {
 beforeEach(async () => {
   vi.restoreAllMocks();
   await cleanupFixture();
+  // Global queue counts require an isolated queue, including repeated suite runs.
+  // integration/safety.ts guards the disposable database; files run sequentially.
+  await db.delete(botUpdates);
+  await db.delete(botSessions);
+  await db.delete(botChatLeases);
+  await db.delete(botRunnerState);
 });
 afterAll(cleanupFixture);
 

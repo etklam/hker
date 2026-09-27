@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/server/db";
 import { catalogEventDays, catalogEventReceipts } from "@/db/schema/directoryOperations";
 import { previewImport, confirmImport } from "@/server/catalog/import";
@@ -93,18 +93,47 @@ describe("directory import and analytics acceptance", () => {
     expect(report.rows.some(row => row.key.includes("@"))).toBe(false);
     expect(privateQueryKey("電話 91234567")).toBeNull();
   });
-  it("bounds concurrent daily cardinality and retains active data during cleanup", async () => {
-    // Three bounded rows already exist: eligible search, suppressed-search total and tag.
-    await db.execute(sql`insert into directory_event_days(day,source,kind,key,count,zero_count) select current_date,'web','search','seed-' || n,1,0 from generate_series(1,1997) n on conflict do nothing`);
-    await Promise.all(Array.from({ length: 20 }, (_, index) => recordCatalogEvent({ kind: "search", source: "web", key: `獨特搜尋${String.fromCharCode(65 + index)}`, actionId: `cap-${index}` })));
-    const [{ count }] = await db.select({ count: sql<number>`count(*)::int` }).from(catalogEventDays);
-    expect(count).toBeLessThanOrEqual(2001);
-    await db.insert(catalogEventDays).values({ day: "2000-01-01", source: "web", kind: "search", key: "expired", count: 1 });
+  it.each(["UTC", "Asia/Hong_Kong"])("bounds each reporting day independently with database timezone %s", async (timezone) => {
+    await db.delete(catalogEventReceipts);
+    await db.delete(catalogEventDays);
+    const clocks = [new Date("2026-01-15T15:59:59.999Z"), new Date("2026-01-15T16:00:00.000Z")];
+    for (const [index, now] of clocks.entries()) {
+      const day = index === 0 ? "2026-01-15" : "2026-01-16";
+      await db.transaction(async tx => {
+        await tx.execute(sql`select set_config('TimeZone',${timezone},true)`);
+        await tx.execute(sql`insert into directory_event_days(day,source,kind,key,count,zero_count) select ${day}::date,'web','search','seed-' || n,1,0 from generate_series(1,1999) n`);
+        expect(await recordCatalogEvent({ kind: "search", source: "web", key: "基準搜尋", actionId: `${timezone}-${day}-baseline` }, tx, { now })).toBe("recorded");
+      });
+      const results = [];
+      // Bound contention below the collector's intentional short lock budget.
+      for (let start = 0; start < 20; start += 4) {
+        results.push(...await Promise.all(Array.from({ length: 4 }, (_, offset) => {
+          const n = start + offset;
+          return recordCatalogEvent({ kind: "search", source: "web", key: `獨特搜尋${String.fromCharCode(65 + n)}`, actionId: `${timezone}-${day}-${n}` }, db, { now });
+        })));
+      }
+      expect(results).toEqual(Array(20).fill("recorded"));
+      const rows = await db.select().from(catalogEventDays).where(eq(catalogEventDays.day, day));
+      expect(rows).toHaveLength(2001);
+      expect(rows.find(row => row.key === "[其他]")).toMatchObject({ count: 20 });
+      const repeat = { kind: "search", source: "web", key: "基準搜尋", actionId: `${timezone}-${day}-repeat` } as const;
+      expect((await Promise.all([recordCatalogEvent(repeat, db, { now }), recordCatalogEvent(repeat, db, { now })])).sort()).toEqual(["ignored", "recorded"]);
+      expect(await db.select().from(catalogEventDays).where(and(eq(catalogEventDays.day, day), eq(catalogEventDays.key, "基準搜尋")))).toMatchObject([{ count: 2 }]);
+    }
+    expect(await db.select().from(catalogEventDays)).toHaveLength(4002);
+  });
+  it("retains independently seeded active data during bounded cleanup", async () => {
+    await db.delete(catalogEventReceipts);
+    await db.delete(catalogEventDays);
+    const now = new Date("2026-01-16T00:00:00Z");
+    await db.insert(catalogEventDays).values([
+      { day: "2000-01-01", source: "web", kind: "search", key: "expired", count: 1 },
+      { day: "2026-01-16", source: "web", kind: "search", key: "active", count: 1 },
+    ]);
     await db.insert(catalogEventReceipts).values({ id: "expired", createdAt: new Date("2000-01-01") });
-    await cleanupAnalytics();
+    await cleanupAnalytics(db, { now });
     expect(await db.select().from(catalogEventReceipts).where(eq(catalogEventReceipts.id, "expired"))).toHaveLength(0);
-    expect(await db.select().from(catalogEventDays).where(eq(catalogEventDays.key, "expired"))).toHaveLength(0);
-    expect(await db.select().from(catalogEventDays).where(eq(catalogEventDays.key, "維修"))).toHaveLength(1);
+    expect(await db.select().from(catalogEventDays)).toMatchObject([{ key: "active" }]);
   });
   it("rolls back failed metric savepoints without aborting discovery transactions", async () => {
     const warning = vi.spyOn(console, "warn").mockImplementation(() => {});

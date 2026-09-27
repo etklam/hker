@@ -1,3 +1,4 @@
+import { evidenceFilename } from "./evidence-filename.mjs";
 import { spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createHash, randomBytes } from "node:crypto";
@@ -130,11 +131,13 @@ for (const args of [
   });
   const output = sanitize(`${result.stdout ?? ""}${result.stderr ?? ""}`);
   process.stdout.write(output);
-  const log = `${manifest.stages.length + 1}-${args[0] === "run" ? args[1] : args[0]}.log`;
+  const log = evidenceFilename(manifest.stages.length + 1, args.join(" "));
   writeFileSync(`${evidence}/${log}`, output);
   manifest.stages.push({
     command: `npm ${args.join(" ")}`,
     exitCode: result.status ?? 1,
+    signal: result.signal,
+    error: result.error ? sanitize(result.error.message) : undefined,
     durationMs: Date.now() - started,
     log,
   });

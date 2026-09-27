@@ -1,3 +1,4 @@
+import { evidenceFilename } from "./evidence-filename.mjs";
 import { createHash, randomBytes } from "node:crypto";
 import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { spawn, spawnSync } from "node:child_process";
@@ -119,7 +120,7 @@ function command(program, args, { allowFailure = false, timeout = 120_000, label
   });
 }
 async function recordLog(name, result) {
-  await writeFile(join(artifactDir, name), `${result.stdout}${result.stderr ? `\n${result.stderr}` : ""}`, { mode: 0o600 });
+  await writeFile(join(artifactDir, evidenceFilename(stages.length, name)), `${result.stdout}${result.stderr ? `\n${result.stderr}` : ""}`, { mode: 0o600 });
 }
 async function compose(name, envFile, profile, args, options = {}) {
   const envFiles = options.envFiles ?? [];

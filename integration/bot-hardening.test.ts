@@ -1,5 +1,8 @@
 import { afterAll, beforeAll, afterEach, describe, expect, it, vi } from "vitest";
 import { execFile, spawn } from "node:child_process";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { promisify } from "node:util";
 import { eq, sql } from "drizzle-orm";
 import { createDatabase, db } from "@/server/db";
@@ -348,13 +351,31 @@ describe("Telegram durable navigation", () => {
         const restarted = await execFileAsync(process.execPath, [".ops/bot-runner.cjs", "--limit", "100"], { cwd: process.cwd(), env: { ...process.env, TELEGRAM_DELIVERY_MODE: "mock" }, timeout: 30000 });
         expect(JSON.parse(restarted.stdout.trim()).completed).toBeGreaterThanOrEqual(1);
         expect((await job(8321)).status).toBe("complete");
-        const watching = spawn(process.execPath, [".ops/bot-runner.cjs", "--watch", "--interval-ms", "10000"], { cwd: process.cwd(), env: { ...process.env, TELEGRAM_DELIVERY_MODE: "mock" }, stdio: ["ignore", "pipe", "pipe"] });
-        let output = "";
-        watching.stdout.on("data", (chunk) => { output += String(chunk); });
-        await new Promise((resolve) => setTimeout(resolve, 150));
-        watching.kill("SIGTERM");
-        const exitCode = await new Promise<number | null>((resolve) => watching.once("exit", resolve));
-        expect(exitCode).toBe(0);
-        expect(JSON.parse(output.trim())).toMatchObject({ stopped: true });
+        const directory = await mkdtemp(join(tmpdir(), "hker-runner-test-"));
+        const healthFile = join(directory, "health.json");
+        const watching = spawn(process.execPath, [".ops/bot-runner.cjs", "--watch", "--interval-ms", "10000"], { cwd: process.cwd(), env: { ...process.env, TELEGRAM_DELIVERY_MODE: "mock", BOT_HEALTH_FILE: healthFile }, stdio: ["ignore", "pipe", "pipe"] });
+        let output = "", stderr = "";
+        watching.stdout.on("data", chunk => { output += String(chunk); });
+        watching.stderr.on("data", chunk => { stderr += String(chunk).replace(/postgres(?:ql)?:\/\/[^\s"']+/gi, "[REDACTED_DATABASE_URL]"); });
+        const closed = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolve, reject) => {
+            watching.once("error", reject);
+            watching.once("close", (code, signal) => resolve({ code, signal }));
+        });
+        // The unique file cannot be a heartbeat left by a previous runner.
+        const deadline = setTimeout(() => watching.kill("SIGKILL"), 15000);
+        try {
+            await vi.waitFor(async () => {
+                if (watching.exitCode !== null || watching.signalCode !== null) throw new Error(`Runner exited before readiness: ${stderr}`);
+                expect(JSON.parse(await readFile(healthFile, "utf8"))).toMatchObject({ pid: watching.pid, runnerId: expect.any(String) });
+            }, { timeout: 10000, interval: 25 });
+            watching.kill("SIGTERM");
+            expect(await closed, stderr).toEqual({ code: 0, signal: null });
+            expect(JSON.parse(output.trim())).toMatchObject({ stopped: true });
+        } finally {
+            if (watching.exitCode === null && watching.signalCode === null) watching.kill("SIGKILL");
+            await closed;
+            clearTimeout(deadline);
+            await rm(directory, { recursive: true, force: true });
+        }
     }, 70000);
 });

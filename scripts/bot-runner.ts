@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
-import { writeFileSync } from "node:fs";
+import { renameSync, writeFileSync } from "node:fs";
 import { closeDatabase } from "../src/server/db";
 import { cleanupBotState, getBotDeliveryStatus, recordBotRunnerHeartbeat, runBotDelivery } from "../src/server/catalog/bot-delivery";
 import { assertDirectorySchema } from "../src/server/catalog/schema-contract";
@@ -28,7 +28,11 @@ const wait = (ms: number) => new Promise<void>((resolve) => {
 });
 const writeProcessHealth = (runnerId: string, completed: number) => {
     const path = process.env.BOT_HEALTH_FILE;
-    if (path) writeFileSync(path, JSON.stringify({ runnerId, at: new Date().toISOString(), completed }));
+    if (path) {
+        const temporary = `${path}.${process.pid}.tmp`;
+        writeFileSync(temporary, JSON.stringify({ pid: process.pid, runnerId, at: new Date().toISOString(), completed }));
+        renameSync(temporary, path);
+    }
 };
 
 async function main() {

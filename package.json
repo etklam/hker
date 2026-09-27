@@ -12,7 +12,7 @@
     "db:migrate": "npm run db:migrate:safe",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "test": "vitest run",
+    "test": "node --test scripts/evidence-filename.test.mjs && vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
