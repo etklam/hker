@@ -112,8 +112,10 @@ describe("Telegram durable navigation", () => {
         expect((await session(814)).search).toMatchObject({ query: "茶餐廳", sort: "newest" });
         await handleCatalogUpdate(message(8142, "/latest", 814), small.db);
         const current = await session(814);
-        const [preset] = await db.select({ id: navigationPresets.id }).from(navigationPresets).limit(1);
+        const [category] = await db.select({ id: categories.id }).from(categories).where(eq(categories.slug, "bot-category-0")).limit(1);
+        const [preset] = await db.insert(navigationPresets).values({ label: "有效排序捷徑", categoryId: category.id }).returning({ id: navigationPresets.id });
         await handleCatalogUpdate(callback(8143, current.nonce, `preset:${preset.id}`, 814, 814), small.db);
+        expect((await session(814)).sortExplicit).toBe(false);
         await handleCatalogUpdate(message(8144, "港式奶茶", 814), small.db);
         expect((await session(814)).search).toMatchObject({ query: "港式奶茶", sort: "relevance" });
         await handleCatalogUpdate(message(8145, "/prices 1 2", 814), small.db);

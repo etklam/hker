@@ -11,10 +11,16 @@ import {
   deleteStoredQuery,
   hongKongDay,
   issueCatalogEventReceipt,
+  issueCatalogSearchObservation,
   recordCatalogEvent,
   verifyCatalogEventReceipt,
+  verifyCatalogSearchObservation,
 } from "@/server/catalog/analytics";
-import { saveTaxonomy } from "@/server/catalog/service";
+import {
+  CatalogSearchService,
+  saveListing,
+  saveTaxonomy,
+} from "@/server/catalog/service";
 
 if (!process.env.DATABASE_URL?.endsWith("/hker_directory_test"))
   throw new Error("Use isolated hker_directory_test only");
@@ -44,9 +50,15 @@ describe("Phase 8 discovery analytics", () => {
   it("uses Hong Kong days, keeps sensitive queries only in totals, and expires actions", async () => {
     expect(hongKongDay(at)).toBe("2026-09-28");
     const receipt = issueCatalogEventReceipt(at)!;
-    expect(verifyCatalogEventReceipt(receipt)).toBe(true);
+    expect(verifyCatalogEventReceipt(receipt, at)).toBe(true);
     expect(
-      verifyCatalogEventReceipt({ ...receipt, occurredAt: new Date(at.getTime() + 1000).toISOString() }),
+      verifyCatalogEventReceipt(
+        {
+          ...receipt,
+          occurredAt: new Date(at.getTime() + 1000).toISOString(),
+        },
+        at,
+      ),
     ).toBe(false);
     const sensitive = {
       kind: "search",
@@ -56,11 +68,19 @@ describe("Phase 8 discovery analytics", () => {
       occurredAt: at,
       zeroResult: true,
     } as const;
-    expect(await recordCatalogEvent(sensitive, db, { now: at })).toBe("recorded");
-    expect(await recordCatalogEvent(sensitive, db, { now: at })).toBe("recorded");
+    expect(await recordCatalogEvent(sensitive, db, { now: at })).toBe(
+      "recorded",
+    );
+    expect(await recordCatalogEvent(sensitive, db, { now: at })).toBe(
+      "ignored",
+    );
     expect(
       await recordCatalogEvent(
-        { ...sensitive, actionId: receipt.actionId, occurredAt: receipt.occurredAt },
+        {
+          ...sensitive,
+          actionId: receipt.actionId,
+          occurredAt: receipt.occurredAt,
+        },
         db,
         { now: new Date(at.getTime() + 8 * 86400000) },
       ),
@@ -81,6 +101,98 @@ describe("Phase 8 discovery analytics", () => {
     expect(receipts[0].id).not.toContain("private-action");
   });
 
+  it("records the authoritative observation across later publication changes and replays", async () => {
+    const suffix = Date.now()
+      .toString(36)
+      .replace(/\d/g, (digit) => String.fromCharCode(97 + Number(digit)));
+    const zeroInput = { query: `觀測前零結果${suffix}`, pageSize: 1 };
+    const zeroResult = await CatalogSearchService.search(zeroInput);
+    expect(zeroResult.total).toBe(0);
+    const zeroObservation = issueCatalogSearchObservation(
+      "search",
+      zeroInput.query,
+      zeroInput,
+      zeroResult.total,
+      at,
+    )!;
+    await saveListing({
+      name: zeroInput.query,
+      slug: `rc-observation-published-${suffix}`,
+      enabled: true,
+    });
+    expect((await CatalogSearchService.search(zeroInput)).total).toBe(1);
+    expect(
+      verifyCatalogSearchObservation(
+        zeroObservation,
+        "search",
+        zeroInput.query,
+        zeroInput,
+        at,
+      ),
+    ).toBe(true);
+
+    const replayStatuses = await Promise.all(
+      Array.from({ length: 10 }, () =>
+        recordCatalogEvent(
+          {
+            kind: "search",
+            source: "web",
+            key: zeroInput.query,
+            actionId: zeroObservation.actionId,
+            occurredAt: zeroObservation.observedAt,
+            zeroResult: zeroObservation.resultCount === 0,
+          },
+          db,
+          { now: at },
+        ),
+      ),
+    );
+    expect(
+      replayStatuses.filter((status) => status === "recorded"),
+    ).toHaveLength(1);
+
+    const present = await saveListing({
+      name: `觀測前已有結果${suffix}`,
+      slug: `rc-observation-disabled-${suffix}`,
+      enabled: true,
+    });
+    const presentInput = { query: `觀測前已有結果${suffix}`, pageSize: 1 };
+    const presentResult = await CatalogSearchService.search(presentInput);
+    expect(presentResult.total).toBe(1);
+    const presentObservation = issueCatalogSearchObservation(
+      "search",
+      presentInput.query,
+      presentInput,
+      presentResult.total,
+      at,
+    )!;
+    await saveListing({ ...present, enabled: false }, present.id);
+    expect((await CatalogSearchService.search(presentInput)).total).toBe(0);
+    await recordCatalogEvent(
+      {
+        kind: "search",
+        source: "web",
+        key: presentInput.query,
+        actionId: presentObservation.actionId,
+        occurredAt: presentObservation.observedAt,
+        zeroResult: presentObservation.resultCount === 0,
+      },
+      db,
+      { now: at },
+    );
+
+    const report = await analyticsReport("2026-09-28", "2026-09-28", "web");
+    expect(
+      report.rows.find((row) => row.key === zeroInput.query),
+    ).toMatchObject({
+      count: 1,
+      zeroCount: 1,
+    });
+    expect(
+      report.rows.find((row) => row.key === presentInput.query),
+    ).toMatchObject({ count: 1, zeroCount: 0 });
+  });
+
   it("counts one bounded filter dimension and rejects nonexistent entity dimensions", async () => {
     const tag = await saveTaxonomy("tags", {
       name: `統計標籤 ${Date.now()}`,
@@ -88,28 +200,48 @@ describe("Phase 8 discovery analytics", () => {
     });
     expect(
       await recordCatalogEvent(
-        { kind: "filter", source: "web", key: "client-controlled", actionId: "filter", occurredAt: at },
+        {
+          kind: "filter",
+          source: "web",
+          key: "client-controlled",
+          actionId: "filter",
+          occurredAt: at,
+        },
         db,
         { now: at },
       ),
     ).toBe("recorded");
     expect(
       await recordCatalogEvent(
-        { kind: "tag", source: "web", key: String(tag.id), actionId: "valid-tag", occurredAt: at },
+        {
+          kind: "tag",
+          source: "web",
+          key: String(tag.id),
+          actionId: "valid-tag",
+          occurredAt: at,
+        },
         db,
         { now: at },
       ),
     ).toBe("recorded");
     expect(
       await recordCatalogEvent(
-        { kind: "tag", source: "web", key: "2147483647", actionId: "forged-tag", occurredAt: at },
+        {
+          kind: "tag",
+          source: "web",
+          key: "2147483647",
+          actionId: "forged-tag",
+          occurredAt: at,
+        },
         db,
         { now: at },
       ),
     ).toBe("ignored");
     const report = await analyticsReport("2026-09-28", "2026-09-28", "web");
     expect(report.summary.filteredDiscoveries).toBe(1);
-    expect(report.rows.find((row) => row.kind === "filter")?.key).toBe("applied");
+    expect(report.rows.find((row) => row.kind === "filter")?.key).toBe(
+      "applied",
+    );
     expect(report.rows.some((row) => row.key === "2147483647")).toBe(false);
   });
 
@@ -156,7 +288,13 @@ describe("Phase 8 discovery analytics", () => {
 
   it("lets an administrator service delete an eligible stored query label", async () => {
     await recordCatalogEvent(
-      { kind: "search", source: "web", key: "需要移除", actionId: "remove-me", occurredAt: at },
+      {
+        kind: "search",
+        source: "web",
+        key: "需要移除",
+        actionId: "remove-me",
+        occurredAt: at,
+      },
       db,
       { now: at },
     );
@@ -174,17 +312,37 @@ describe("Phase 8 discovery analytics", () => {
     process.env.DIRECTORY_ANALYTICS_ENABLED = "false";
     expect(
       await recordCatalogEvent(
-        { kind: "search", source: "web", key: "維修", actionId: "disabled", occurredAt: at },
+        {
+          kind: "search",
+          source: "web",
+          key: "維修",
+          actionId: "disabled",
+          occurredAt: at,
+        },
         db,
         { now: at },
       ),
     ).toBe("disabled");
-    expect((await analyticsReport("2026-01-01", "2026-12-31")).collection.status).toBe("disabled");
+    expect(
+      (await analyticsReport("2026-01-01", "2026-12-31")).collection.status,
+    ).toBe("disabled");
     process.env.DIRECTORY_ANALYTICS_ENABLED = "true";
 
     await db.insert(catalogEventDays).values([
-      { day: "2000-01-01", source: "web", kind: "search", key: "old-a", count: 1 },
-      { day: "2000-01-02", source: "web", kind: "search", key: "old-b", count: 1 },
+      {
+        day: "2000-01-01",
+        source: "web",
+        kind: "search",
+        key: "old-a",
+        count: 1,
+      },
+      {
+        day: "2000-01-02",
+        source: "web",
+        kind: "search",
+        key: "old-b",
+        count: 1,
+      },
     ]);
     await db.insert(catalogEventReceipts).values([
       { id: "old-a", createdAt: new Date("2000-01-01") },
@@ -194,7 +352,12 @@ describe("Phase 8 discovery analytics", () => {
       aggregates: 1,
       receipts: 1,
     });
-    expect(await db.select().from(catalogEventDays).where(eq(catalogEventDays.day, "2000-01-01"))).toHaveLength(0);
+    expect(
+      await db
+        .select()
+        .from(catalogEventDays)
+        .where(eq(catalogEventDays.day, "2000-01-01")),
+    ).toHaveLength(0);
     expect(await db.select().from(catalogEventDays)).toHaveLength(1);
     expect(await db.select().from(catalogEventReceipts)).toHaveLength(1);
   });

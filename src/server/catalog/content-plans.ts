@@ -1,9 +1,8 @@
 import { commitTaxonomyImport, taxonomyImportPreview } from "./taxonomy-import";
-import { parseImportSource } from "./native-format";
 import { createHash, randomUUID } from "node:crypto";
 import { and, asc, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
-import { db } from "@/server/db";
+import { db, type DB } from "@/server/db";
 import { catalogPlans } from "@/db/schema/directoryOperations";
 import { listings, categories, areas, tags } from "@/db/schema/directory";
 import {
@@ -14,6 +13,7 @@ import {
 import { AppError } from "@/lib/errors";
 import {
   CatalogSearchService,
+  readCatalogBatch,
   configureCatalogTransaction,
   getTaxonomy,
   saveListingInTransaction,
@@ -21,7 +21,7 @@ import {
   type Taxonomy,
 } from "./service";
 import { previewImport } from "./import";
-import { normalizeImportRow } from "./import-format";
+import type { RowInterpretation } from "./import-format";
 import { contentDiff } from "./history";
 
 export const importSettingsSchema = z.object({
@@ -58,6 +58,7 @@ export const importSettingsSchema = z.object({
 });
 type Settings = z.infer<typeof importSettingsSchema>;
 type PlanRow = {
+  interpretation?: RowInterpretation;
   summary?: { category: string; area: string; tags: string[] };
   row: number;
   name: string;
@@ -99,122 +100,122 @@ async function buildImportRows(
 ): Promise<PlanRow[]> {
   const preview = await previewImport(source, tx, settings);
   if (settings.mode === "create") return preview.items;
-  const sourceRows = parseImportSource(source, settings.columns);
+  const existing = await readCatalogBatch(
+    {
+      slugs: [
+        ...new Set(
+          preview.items
+            .map((item) => item.interpretation.fields.slug?.trim())
+            .filter((slug): slug is string => Boolean(slug)),
+        ),
+      ],
+    },
+    "admin",
+    tx,
+  );
+  const bySlug = new Map(existing.map((row) => [row.slug, row]));
   const targets = new Set<number>();
-  return Promise.all(
-    preview.items.map(async (item, index) => {
-      const raw = normalizeImportRow(sourceRows[index]);
-      if (!raw.slug?.trim())
-        return { ...item, errors: ["更新必須指定既有精確 slug"] };
-      const target = await CatalogSearchService.detail(
-        raw.slug.trim(),
-        "admin",
-        tx,
-      );
-      if (!target || target.slug !== raw.slug.trim())
-        return {
-          ...item,
-          errors: ["找不到既有精確 slug；不會模糊配對或建立新項目"],
-        };
-      const errors = item.errors.filter((error) => error !== "網址代稱已存在");
-      if (targets.has(target.id)) errors.push("同批不可重複更新相同項目");
-      targets.add(target.id);
-      const before = asListingInput(target);
-      const next: Record<string, unknown> = { ...before };
-      for (const key of [
-        "name",
-        "shortDescription",
-        "description",
-        "priceMin",
-        "priceMax",
-        "priceCurrency",
-      ])
-        if (raw[key]?.trim())
-          next[key] =
-            key.startsWith("price") && key !== "priceCurrency"
-              ? Number(raw[key])
-              : raw[key];
-      for (const [key, columns] of [
-        ["categoryId", ["categoryId", "category"]],
-        ["areaId", ["areaId", "area"]],
-      ] as const)
-        if (columns.some((column) => raw[column]?.trim()))
-          next[key] = item.data?.[key];
-      for (const key of ["attrs", "aliases"] as const)
-        if (raw[key]?.trim()) next[key] = JSON.parse(raw[key]);
-      const hasLinks = [
-        "links",
-        "linksJson",
-        "website",
-        "telegram",
-        "instagram",
-      ].some((key) => sourceRows[index][key]?.trim());
-      const hasTags = ["tags", "tagSlugs", "tagIds"].some((key) =>
-        sourceRows[index][key]?.trim(),
-      );
-      if (hasLinks && item.data) {
-        const links = item.data.links.map((link) => {
-          if (link.id && !before.links.some((old) => old.id === link.id))
-            errors.push("外部連結 ID 不屬於此項目");
-          const matches = before.links.filter(
-            (old) => old.type === link.type && old.url === link.url,
-          );
-          if (!link.id && matches.length > 1)
-            errors.push("相同類型及 URL 有多個既有連結；請指定該收錄的連結 ID");
-          return {
-            ...link,
-            id: link.id ?? (matches.length === 1 ? matches[0].id : undefined),
-          };
-        });
-        const retained = links.flatMap((link) => (link.id ? [link.id] : []));
-        if (new Set(retained).size !== retained.length)
-          errors.push("重複指定同一連結 ID");
-        next.links =
-          settings.linksMode === "replace"
-            ? links
-            : [
-                ...before.links.map(
-                  (old) => links.find((link) => link.id === old.id) ?? old,
-                ),
-                ...links.filter((link) => !link.id),
-              ];
-      }
-      if (hasTags && item.data)
-        next.tagIds =
-          settings.tagsMode === "replace"
-            ? item.data.tagIds
-            : [...new Set([...before.tagIds, ...item.data.tagIds])];
-      for (const field of settings.clear)
-        next[field] =
-          field === "aliases"
-            ? []
-            : field === "attrs"
-              ? {}
-              : ["shortDescription", "description"].includes(field)
-                ? ""
-                : null;
-      const parsed = listingSchema.safeParse(next);
-      if (!parsed.success)
-        errors.push(
-          ...parsed.error.issues.map(
-            (issue) => `${issue.path.join(".")}: ${issue.message}`,
-          ),
-        );
+  return preview.items.map((item) => {
+    const interpretation = item.interpretation;
+    const raw = interpretation.fields;
+    if (!raw.slug?.trim())
+      return { ...item, errors: ["更新必須指定既有精確 slug"] };
+    const target = bySlug.get(raw.slug.trim());
+    if (!target || target.slug !== raw.slug.trim())
       return {
         ...item,
-        id: target.id,
-        before,
-        data: parsed.success ? parsed.data : null,
-        errors,
-        warnings: item.candidates.some(
-          (candidate) => candidate.id !== target.id,
-        )
-          ? item.warnings
-          : item.warnings.filter((warning) => warning.includes("此收錄含")),
-        diff: parsed.success ? contentDiff(before, parsed.data) : {},
+        errors: ["找不到既有精確 slug；不會模糊配對或建立新項目"],
       };
-    }),
-  );
+    if (interpretation.status === "invalid") return item;
+    const errors = item.errors.filter((error) => error !== "網址代稱已存在");
+    if (targets.has(target.id)) errors.push("同批不可重複更新相同項目");
+    targets.add(target.id);
+    const before = asListingInput(target);
+    const next: Record<string, unknown> = { ...before };
+    for (const key of [
+      "name",
+      "shortDescription",
+      "description",
+      "priceMin",
+      "priceMax",
+      "priceCurrency",
+    ])
+      if (interpretation.present.includes(key))
+        next[key] =
+          interpretation.values[key as keyof typeof interpretation.values];
+    for (const [key, columns] of [
+      ["categoryId", ["categoryId", "category"]],
+      ["areaId", ["areaId", "area"]],
+    ] as const)
+      if (columns.some((column) => raw[column]?.trim()))
+        next[key] = item.data?.[key];
+    for (const key of ["attrs", "aliases"] as const)
+      if (interpretation.present.includes(key))
+        next[key] = interpretation.values[key];
+    const hasLinks = interpretation.present.includes("links");
+    const hasTags = ["tags", "tagIds"].some((key) =>
+      interpretation.present.includes(key),
+    );
+    if (hasLinks && item.data) {
+      const links = item.data.links.map((link) => {
+        if (link.id && !before.links.some((old) => old.id === link.id))
+          errors.push("外部連結 ID 不屬於此項目");
+        const matches = before.links.filter(
+          (old) => old.type === link.type && old.url === link.url,
+        );
+        if (!link.id && matches.length > 1)
+          errors.push("相同類型及 URL 有多個既有連結；請指定該收錄的連結 ID");
+        return {
+          ...link,
+          id: link.id ?? (matches.length === 1 ? matches[0].id : undefined),
+        };
+      });
+      const retained = links.flatMap((link) => (link.id ? [link.id] : []));
+      if (new Set(retained).size !== retained.length)
+        errors.push("重複指定同一連結 ID");
+      next.links =
+        settings.linksMode === "replace"
+          ? links
+          : [
+              ...before.links.map(
+                (old) => links.find((link) => link.id === old.id) ?? old,
+              ),
+              ...links.filter((link) => !link.id),
+            ];
+    }
+    if (hasTags && item.data)
+      next.tagIds =
+        settings.tagsMode === "replace"
+          ? item.data.tagIds
+          : [...new Set([...before.tagIds, ...item.data.tagIds])];
+    for (const field of settings.clear)
+      next[field] =
+        field === "aliases"
+          ? []
+          : field === "attrs"
+            ? {}
+            : ["shortDescription", "description"].includes(field)
+              ? ""
+              : null;
+    const parsed = listingSchema.safeParse(next);
+    if (!parsed.success)
+      errors.push(
+        ...parsed.error.issues.map(
+          (issue) => `${issue.path.join(".")}: ${issue.message}`,
+        ),
+      );
+    return {
+      ...item,
+      id: target.id,
+      before,
+      data: parsed.success ? parsed.data : null,
+      errors,
+      warnings: item.candidates.some((candidate) => candidate.id !== target.id)
+        ? item.warnings
+        : item.warnings.filter((warning) => warning.includes("此收錄含")),
+      diff: parsed.success ? contentDiff(before, parsed.data) : {},
+    };
+  });
 }
 const summarize = (data: ListingInput | null, taxonomy: Taxonomy) => ({
   category:
@@ -242,10 +243,11 @@ async function storePlan(
   actorId: number,
   kind: string,
   payload: Record<string, unknown>,
+  executor: CatalogExecutor = db,
 ) {
   const id = randomUUID(),
     digest = digestOf(payload);
-  const [plan] = await db
+  const [plan] = await executor
     .insert(catalogPlans)
     .values({
       id,
@@ -276,20 +278,15 @@ export async function prepareImport(
       )
     )
       throw new AppError("INVALID_REQUEST", "Invalid row decision");
-    const sourceRows = parseImportSource(source, settings.columns);
     const mappingEffects = settings.mappings.map((mapping) => ({
       ...mapping,
-      affected: sourceRows.filter((sourceRow) => {
-        try {
-          const row = normalizeImportRow(sourceRow);
-          return mapping.kind === "tag"
-            ? row.tags
-                ?.split("|")
-                .some((value) => value.trim() === mapping.value)
-            : row[mapping.kind]?.trim() === mapping.value;
-        } catch {
-          return false;
-        }
+      affected: rows.filter((item) => {
+        const fields = item.interpretation?.fields;
+        return mapping.kind === "tag"
+          ? fields?.tags
+              ?.split("|")
+              .some((value) => value.trim() === mapping.value)
+          : fields?.[mapping.kind]?.trim() === mapping.value;
       }).length,
     }));
     const payload = { source, settings, rows, mappingEffects };
@@ -334,43 +331,49 @@ export const bulkSchema = z.object({
 export async function prepareBulk(
   input: z.infer<typeof bulkSchema>,
   actorId: number,
+  database: DB = db,
 ) {
   if (new Set(input.entries.map((e) => e.id)).size !== input.entries.length)
     throw new AppError("INVALID_REQUEST", "Duplicate target");
-  const rows: PlanRow[] = [];
-  const taxonomy = await getTaxonomy("admin");
-  for (const entry of [...input.entries].sort((a, b) => a.id - b.id)) {
-    const [identity] = await db
-      .select({ slug: listings.slug })
-      .from(listings)
-      .where(eq(listings.id, entry.id));
-    const target =
-      identity && (await CatalogSearchService.detail(identity.slug, "admin"));
-    if (!target || target.revision !== entry.revision)
-      throw new AppError("CONFLICT", "選取項目已變更，請重新載入後預覽");
-    const before = asListingInput(target);
-    const { addTags, removeTags, ...patch } = input.patch;
-    const data = listingSchema.parse({
-      ...before,
-      ...patch,
-      tagIds: [...new Set([...before.tagIds, ...addTags])].filter(
-        (id) => !removeTags.includes(id),
-      ),
-    });
-    rows.push({
-      row: rows.length + 1,
-      id: target.id,
-      name: target.name,
-      slug: target.slug,
-      before,
-      data,
-      summary: summarize(data, taxonomy),
-      errors: [],
-      warnings: [],
-      diff: contentDiff(before, data),
-    });
-  }
-  return storePlan(actorId, "bulk", { rows });
+  return database.transaction(async (tx) => {
+    await tx.execute(sql`set transaction isolation level repeatable read`);
+    await configureCatalogTransaction(tx);
+    const rows: PlanRow[] = [];
+    const taxonomy = await getTaxonomy("admin", tx);
+    const targets = await readCatalogBatch(
+      { ids: input.entries.map((entry) => entry.id) },
+      "admin",
+      tx,
+    );
+    const byId = new Map(targets.map((row) => [row.id, row]));
+    for (const entry of [...input.entries].sort((a, b) => a.id - b.id)) {
+      const target = byId.get(entry.id);
+      if (!target || target.revision !== entry.revision)
+        throw new AppError("CONFLICT", "選取項目已變更，請重新載入後預覽");
+      const before = asListingInput(target);
+      const { addTags, removeTags, ...patch } = input.patch;
+      const data = listingSchema.parse({
+        ...before,
+        ...patch,
+        tagIds: [...new Set([...before.tagIds, ...addTags])].filter(
+          (id) => !removeTags.includes(id),
+        ),
+      });
+      rows.push({
+        row: rows.length + 1,
+        id: target.id,
+        name: target.name,
+        slug: target.slug,
+        before,
+        data,
+        summary: summarize(data, taxonomy),
+        errors: [],
+        warnings: [],
+        diff: contentDiff(before, data),
+      });
+    }
+    return storePlan(actorId, "bulk", { rows }, tx);
+  });
 }
 export async function getContentPlan(
   id: string,

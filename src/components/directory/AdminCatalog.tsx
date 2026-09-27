@@ -56,6 +56,7 @@ export function AdminCatalog({ section }: { section: Section }) {
     [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<SelectedListing[]>([]);
   const [unavailableOnly, setUnavailableOnly] = useState(false);
+  const editorTrigger = useRef<HTMLElement | null>(null);
   const selectionScope = JSON.stringify({ query, filters, section });
   const selectionScopeRef = useRef(selectionScope);
   if (selectionScopeRef.current !== selectionScope) {
@@ -116,7 +117,8 @@ export function AdminCatalog({ section }: { section: Section }) {
     void load();
     return () => activeRequest.current?.abort();
   }, [load]);
-  const start = (row?: EditorValue) =>
+  const start = (row?: EditorValue, trigger?: HTMLElement) => {
+    editorTrigger.current = trigger ?? null;
     setEditing(
       row
         ? {
@@ -161,6 +163,7 @@ export function AdminCatalog({ section }: { section: Section }) {
             allowBroad: section === "navigation",
           },
     );
+  };
   const remove = async (id: number) => {
     if (!window.confirm("確定永久刪除此項目？你亦可改為停用以保留資料。"))
       return;
@@ -168,7 +171,7 @@ export function AdminCatalog({ section }: { section: Section }) {
       const res = await fetch("/api/admin/catalog", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind: section, id }),
+        body: JSON.stringify({ kind: section, id, revision: section === "listings" ? items.find(item => item.id === id)?.revision : undefined }),
       });
       const data = await res.json();
       if (!res.ok)
@@ -242,7 +245,10 @@ export function AdminCatalog({ section }: { section: Section }) {
       <div className="section-heading">
         <h1>{labels[section]}</h1>
         {manageable && (
-          <button className="button primary" onClick={() => start()}>
+          <button
+            className="button primary"
+            onClick={(event) => start(undefined, event.currentTarget)}
+          >
             新增{section === "listings" ? "收錄" : "項目"}
           </button>
         )}
@@ -576,7 +582,12 @@ export function AdminCatalog({ section }: { section: Section }) {
                         {section === "listings" && <HistoryPanel id={r.id} />}
                         <button
                           className="button"
-                          onClick={() => start(row as unknown as EditorValue)}
+                          onClick={(event) =>
+                            start(
+                              row as unknown as EditorValue,
+                              event.currentTarget,
+                            )
+                          }
                         >
                           編輯
                         </button>{" "}
@@ -719,6 +730,7 @@ export function AdminCatalog({ section }: { section: Section }) {
           kind={section}
           initial={editing}
           taxonomy={taxonomy}
+          returnFocus={editorTrigger.current}
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);

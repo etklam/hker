@@ -19,6 +19,10 @@ export async function configureCatalogTransaction(executor: CatalogExecutor) {
   await executor.execute(sql`set local lock_timeout = '2s'`);
   await executor.execute(sql`set local statement_timeout = '10s'`);
 }
+export async function lockAreaHierarchy(executor: CatalogExecutor) {
+  // Lock order: content-plan 724111, then this lock, then area rows. All area mutations serialize here; other taxonomy kinds use row/FK locks only.
+  await executor.execute(sql`select pg_advisory_xact_lock(724110)`);
+}
 export type Audience = "public" | "bot" | "admin";
 export const publicVisibility = () => eq(s.listings.enabled, true);
 const tables = {
@@ -199,6 +203,21 @@ async function hydrate(
   return rows.map(row => ({ ...row, category: categoryMap.get(row.categoryId!) ?? null, area: areaMap.get(row.areaId!) ?? null, links: linkMap.get(row.id) ?? [], tags: tagMap.get(row.id) ?? [] }));
 }
 export type CatalogListing = Awaited<ReturnType<typeof hydrate>>[number];
+// Internal exact-identity reads share bounded hydration and the caller's transaction snapshot.
+export async function readCatalogBatch(
+  selection: { ids: number[] } | { slugs: string[] },
+  audience: Audience,
+  executor: CatalogExecutor,
+) {
+  const values = "ids" in selection ? selection.ids : selection.slugs;
+  if (values.length > 200) throw new AppError("INVALID_REQUEST", "Batch exceeds 200 listings");
+  if (!values.length) return [];
+  const rows = await executor.select().from(s.listings).where(and(
+    "ids" in selection ? inArray(s.listings.id, selection.ids) : inArray(s.listings.slug, selection.slugs),
+    audience === "admin" ? undefined : publicVisibility(),
+  )).orderBy(asc(s.listings.id));
+  return hydrate(rows, audience, executor);
+}
 export const CatalogSearchService = {
   async search(raw: SearchInput = {}, audience: Audience = "public", executor: CatalogExecutor = db) {
     const input = parseBody(raw, searchSchema);
@@ -302,12 +321,19 @@ export async function saveListingInTransaction(tx: CatalogExecutor, raw: unknown
 export async function saveListing(raw: unknown, id?: number, context: MutationContext = {}) {
   return db.transaction(tx => saveListingInTransaction(tx, raw, id, context));
 }
-export async function deleteListing(id: number) {
-  const rows = await db
-    .delete(s.listings)
-    .where(eq(s.listings.id, id))
-    .returning({ id: s.listings.id });
-  if (!rows.length) throw new AppError("NOT_FOUND", "Listing not found");
+export async function deleteListing(id: number, revision: number, context: MutationContext = {}) {
+  if (!Number.isSafeInteger(revision) || revision <= 0) throw new AppError("CONFLICT", "請重新載入最新收錄");
+  return db.transaction(async tx => {
+    await configureCatalogTransaction(tx);
+    await tx.execute(sql`select pg_advisory_xact_lock(724111)`);
+    const [before] = await tx.select().from(s.listings).where(eq(s.listings.id, id)).for("update");
+    if (!before) throw new AppError("NOT_FOUND", "Listing not found");
+    if (before.revision !== revision) throw new AppError("CONFLICT", "收錄已更新，請重新載入後刪除");
+    const [snapshot] = await hydrate([before], "admin", tx);
+    const aliases = await tx.select({ slug: s.listingSlugAliases.slug }).from(s.listingSlugAliases).where(eq(s.listingSlugAliases.listingId, id)).orderBy(asc(s.listingSlugAliases.slug));
+    await recordContentChange(tx, "listing", id, { ...snapshot, slugAliases: aliases.map(alias => alias.slug) }, {}, context);
+    await tx.delete(s.listings).where(eq(s.listings.id, id));
+  });
 }
 export async function validateNavigationPresetForSave(
   tx: CatalogExecutor,
@@ -341,7 +367,7 @@ async function writeTaxonomy(
     // Serialize hierarchy edits to prevent concurrent cycle creation.
     return database.transaction(async (tx) => {
       await configureCatalogTransaction(tx);
-      await tx.execute(sql`select pg_advisory_xact_lock(724110)`);
+      await lockAreaHierarchy(tx);
       if (id && data.parentId) {
         const rows = await tx.select().from(s.areas);
         let parent: number | null = data.parentId;
@@ -441,6 +467,7 @@ async function writeTaxonomy(
 export async function saveTaxonomy(kind: TaxonomyKind, raw: unknown, id?: number, context: MutationContext = {}, database: CatalogExecutor = db) {
   return database.transaction(async tx => {
     await configureCatalogTransaction(tx);
+    if (kind === "areas") await lockAreaHierarchy(tx);
     const table = tables[kind];
     const [before] = id ? await tx.select().from(table).where(eq(table.id, id)).for("update") : [];
     const previous = before ? { ...before } as Record<string, unknown> : {};
@@ -471,12 +498,16 @@ export async function getTaxonomyImpact(kind: TaxonomyKind, id: number, executor
   ]);
   return { listings, presets, children, tags };
 }
-export async function deleteTaxonomy(kind: TaxonomyKind, id: number) {
+export async function deleteTaxonomy(kind: TaxonomyKind, id: number, context: MutationContext = {}) {
   return db.transaction(async tx => {
     await configureCatalogTransaction(tx);
+    if (kind === "areas") await lockAreaHierarchy(tx);
     const table = tables[kind];
-    const rows = await tx.select({ id: table.id }).from(table).where(eq(table.id, id)).for("update");
-    if (!rows.length) throw new AppError("NOT_FOUND", "Taxonomy not found");
+    const [before] = await tx.select().from(table).where(eq(table.id, id)).for("update");
+    if (!before) throw new AppError("NOT_FOUND", "Taxonomy not found");
+    const previous = { ...before } as Record<string, unknown>;
+    if (kind === "tags") previous.aliases = (await tx.select().from(s.tagAliases).where(eq(s.tagAliases.tagId, id))).map(row => row.alias);
+    if (kind === "navigation") previous.tagIds = (await tx.select().from(s.navigationPresetTags).where(eq(s.navigationPresetTags.presetId, id))).map(row => row.tagId);
     const impact = await getTaxonomyImpact(kind, id, tx);
     if (Object.values(impact).some(Boolean)) {
       const error = new AppError("CONFLICT", `仍有相依資料：${impact.listings} 個項目、${impact.presets} 個導覽、${impact.children} 個子地區、${impact.tags} 個標籤。請先停用或重新指派。`);
@@ -484,5 +515,6 @@ export async function deleteTaxonomy(kind: TaxonomyKind, id: number) {
       throw error;
     }
     await removeTaxonomy(kind, id, tx);
+    await recordContentChange(tx, kind, id, previous, {}, context);
   });
 }

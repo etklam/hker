@@ -1,4 +1,5 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import { searchSchema, type SearchInput } from "@/schemas/directory";
 import { and, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { db } from "@/server/db";
 import { catalogEventDays as days } from "@/db/schema/directoryOperations";
@@ -8,11 +9,7 @@ import {
   navigationPresets,
   tags,
 } from "@/db/schema/directory";
-import {
-  getTaxonomy,
-  publicVisibility,
-  type CatalogExecutor,
-} from "./service";
+import { getTaxonomy, publicVisibility, type CatalogExecutor } from "./service";
 
 const HONG_KONG_TIME_ZONE = "Asia/Hong_Kong";
 const ACTION_MAX_AGE_MS = 10 * 60 * 1000;
@@ -34,14 +31,36 @@ export type CatalogEvent = {
 
 export type AnalyticsSource = "all" | CatalogEvent["source"];
 export type AnalyticsWriteStatus =
-  | "recorded"
-  | "ignored"
-  | "disabled"
-  | "degraded";
+  "recorded" | "ignored" | "disabled" | "degraded";
 
-export type CatalogEventReceipt = {
+type ReceiptIdentity = {
   actionId: string;
   occurredAt: string;
+  signature: string;
+};
+
+export type CatalogEventReceipt = ReceiptIdentity &
+  (
+    | {
+        version: 1;
+        purpose: "catalog-navigation";
+        source: "web";
+      }
+    | {
+        version?: undefined;
+        purpose?: undefined;
+        source?: undefined;
+      }
+  );
+
+export type CatalogSearchObservation = {
+  version: 1;
+  purpose: "catalog-search-observation";
+  source: "web";
+  actionId: string;
+  observedAt: string;
+  criteriaDigest: string;
+  resultCount: number;
   signature: string;
 };
 
@@ -55,30 +74,144 @@ function analyticsSecret() {
   return process.env.ANALYTICS_ACTION_SECRET ?? process.env.AUTH_SESSION_SECRET;
 }
 
-function signReceipt(actionId: string, occurredAt: string) {
+function sign(value: string) {
   const secret = analyticsSecret();
   return secret
-    ? createHmac("sha256", secret)
-        .update(`${actionId}:${occurredAt}`)
-        .digest("hex")
+    ? createHmac("sha256", secret).update(value).digest("hex")
     : null;
+}
+
+function validAge(value: string, now: Date) {
+  const occurredAt = new Date(value);
+  const age = now.getTime() - occurredAt.getTime();
+  return (
+    Number.isFinite(occurredAt.getTime()) &&
+    age <= ACTION_MAX_AGE_MS &&
+    age >= -ACTION_FUTURE_SKEW_MS
+  );
+}
+
+function safeSignature(actual: string, expected: string | null) {
+  return Boolean(
+    expected &&
+    /^[a-f0-9]{64}$/.test(actual) &&
+    timingSafeEqual(Buffer.from(expected, "hex"), Buffer.from(actual, "hex")),
+  );
 }
 
 export function issueCatalogEventReceipt(
   now = new Date(),
 ): CatalogEventReceipt | null {
-  const actionId = randomUUID(), occurredAt = now.toISOString();
-  const signature = signReceipt(actionId, occurredAt);
-  return signature ? { actionId, occurredAt, signature } : null;
+  const actionId = randomUUID(),
+    occurredAt = now.toISOString();
+  const value = {
+    version: 1 as const,
+    purpose: "catalog-navigation" as const,
+    source: "web" as const,
+    actionId,
+    occurredAt,
+  };
+  const signature = sign(JSON.stringify(value));
+  return signature ? { ...value, signature } : null;
 }
 
-export function verifyCatalogEventReceipt(receipt: CatalogEventReceipt) {
-  const expected = signReceipt(receipt.actionId, receipt.occurredAt);
-  if (!expected || !/^[a-f0-9]{64}$/.test(receipt.signature)) return false;
-  return timingSafeEqual(
-    Buffer.from(expected, "hex"),
-    Buffer.from(receipt.signature, "hex"),
+export function verifyCatalogEventReceipt(
+  receipt: CatalogEventReceipt,
+  now = new Date(),
+) {
+  if (!validAge(receipt.occurredAt, now)) return false;
+  if (receipt.version === undefined)
+    return safeSignature(
+      receipt.signature,
+      sign(`${receipt.actionId}:${receipt.occurredAt}`),
+    );
+  if (
+    receipt.version !== 1 ||
+    receipt.purpose !== "catalog-navigation" ||
+    receipt.source !== "web"
+  )
+    return false;
+  const { signature, ...value } = receipt;
+  return safeSignature(signature, sign(JSON.stringify(value)));
+}
+
+function searchCriteria(
+  kind: "search" | "filter",
+  key: string,
+  input: SearchInput,
+) {
+  const parsed = searchSchema.parse({
+    ...input,
+    query: kind === "search" ? key : "",
+  });
+  return {
+    kind,
+    query: parsed.query,
+    categoryId: parsed.categoryId ?? null,
+    areaId: parsed.areaId ?? null,
+    tagIds: parsed.tagIds,
+    tagMatchMode: parsed.tagMatchMode,
+    priceMin: parsed.priceMin,
+    priceMax: parsed.priceMax,
+    featured: parsed.featured ?? null,
+    requestedSort: parsed.requestedSort,
+    status: parsed.status,
+  };
+}
+
+function criteriaDigest(
+  kind: "search" | "filter",
+  key: string,
+  input: SearchInput,
+) {
+  return sign(
+    `catalog-search-criteria:v1:${JSON.stringify(searchCriteria(kind, key, input))}`,
   );
+}
+
+export function issueCatalogSearchObservation(
+  kind: "search" | "filter",
+  key: string,
+  input: SearchInput,
+  resultCount: number,
+  now = new Date(),
+): CatalogSearchObservation | null {
+  if (!Number.isSafeInteger(resultCount) || resultCount < 0) return null;
+  const digest = criteriaDigest(kind, key, input);
+  if (!digest) return null;
+  const value = {
+    version: 1 as const,
+    purpose: "catalog-search-observation" as const,
+    source: "web" as const,
+    actionId: randomUUID(),
+    observedAt: now.toISOString(),
+    criteriaDigest: digest,
+    resultCount,
+  };
+  const signature = sign(JSON.stringify(value));
+  return signature ? { ...value, signature } : null;
+}
+
+export function verifyCatalogSearchObservation(
+  observation: CatalogSearchObservation,
+  kind: "search" | "filter",
+  key: string,
+  input: SearchInput,
+  now = new Date(),
+) {
+  if (
+    observation.version !== 1 ||
+    observation.purpose !== "catalog-search-observation" ||
+    observation.source !== "web" ||
+    !Number.isSafeInteger(observation.resultCount) ||
+    observation.resultCount < 0 ||
+    !validAge(observation.observedAt, now)
+  )
+    return false;
+  const digest = criteriaDigest(kind, key, input);
+  if (!digest || digest !== observation.criteriaDigest) return false;
+  const { signature, ...value } = observation;
+  return safeSignature(signature, sign(JSON.stringify(value)));
 }
 
 export function hongKongDay(date = new Date()) {
@@ -111,7 +244,10 @@ export function privateQueryKey(input: string): string | null {
   return value;
 }
 
-async function validEntityEvent(event: CatalogEvent, executor: CatalogExecutor) {
+async function validEntityEvent(
+  event: CatalogEvent,
+  executor: CatalogExecutor,
+) {
   if (event.kind === "search" || event.kind === "filter") return true;
   if (!/^\d{1,10}$/.test(event.key)) return false;
   const id = Number(event.key);
@@ -165,7 +301,7 @@ export async function recordCatalogEvent(
       event.kind === "search" ? privateQueryKey(event.key) : null;
     const key =
       event.kind === "search"
-        ? eligibleQuery ?? SUPPRESSED_QUERY
+        ? (eligibleQuery ?? SUPPRESSED_QUERY)
         : event.kind === "filter"
           ? FILTER_KEY
           : /^\d{1,10}$/.test(event.key)
@@ -177,6 +313,10 @@ export async function recordCatalogEvent(
       .update(`${event.source}:${event.actionId}`)
       .digest("hex");
     const write = async (tx: CatalogExecutor) => {
+      const claimed = await tx.execute<{ id: string }>(
+        sql`insert into directory_event_receipts(id,created_at) values(${id},${occurredAt}) on conflict do nothing returning id`,
+      );
+      if (!claimed.length) return false;
       if (!(await validEntityEvent(event, tx))) return false;
       const prior = await tx.execute<{
         statement_timeout: string;
@@ -190,12 +330,10 @@ export async function recordCatalogEvent(
       await tx.execute(
         sql`select pg_advisory_xact_lock(724112, ${Number(day.replaceAll("-", ""))})`,
       );
-      await tx.execute(sql`with receipt as (
-        insert into directory_event_receipts(id,created_at) values(${id},${occurredAt}) on conflict do nothing returning id
-      ), bounded as (
+      await tx.execute(sql`with bounded as (
         select case when (select count(*) from directory_event_days where day=${day}::date) < 2000
           or exists(select 1 from directory_event_days where day=${day}::date and source=${event.source} and kind=${event.kind} and key=${key})
-          then ${key} else ${OVERFLOW_KEY} end as key from receipt
+          then ${key} else ${OVERFLOW_KEY} end as key
       ) insert into directory_event_days(day,source,kind,key,count,zero_count)
         select ${day}::date,${event.source},${event.kind},key,1,${(event.kind === "search" || event.kind === "filter") && event.zeroResult ? 1 : 0} from bounded
         on conflict(day,source,kind,key) do update set count=directory_event_days.count+1,zero_count=directory_event_days.zero_count+excluded.zero_count`);
@@ -299,11 +437,17 @@ export async function analyticsReport(
       .map((row) => Number(row.key));
     const [tagLabels, presetLabels] = await Promise.all([
       tagIds.length
-        ? db.select({ id: tags.id, label: tags.name }).from(tags).where(inArray(tags.id, tagIds))
+        ? db
+            .select({ id: tags.id, label: tags.name })
+            .from(tags)
+            .where(inArray(tags.id, tagIds))
         : [],
       presetIds.length
         ? db
-            .select({ id: navigationPresets.id, label: navigationPresets.label })
+            .select({
+              id: navigationPresets.id,
+              label: navigationPresets.label,
+            })
             .from(navigationPresets)
             .where(inArray(navigationPresets.id, presetIds))
         : [],
@@ -333,9 +477,7 @@ export async function analyticsReport(
       })),
       summary: {
         ...totals,
-        zeroRate: totals.searches
-          ? totals.zeroResults / totals.searches
-          : null,
+        zeroRate: totals.searches ? totals.zeroResults / totals.searches : null,
       },
       collection: {
         status: "enabled" as const,
@@ -406,7 +548,14 @@ export async function enabledOutboundLink(
   if (!link) return null;
   try {
     const destination = new URL(link.url);
-    if (!["http:", "https:"].includes(destination.protocol) || destination.username || destination.password) return null;
-  } catch { return null; }
+    if (
+      !["http:", "https:"].includes(destination.protocol) ||
+      destination.username ||
+      destination.password
+    )
+      return null;
+  } catch {
+    return null;
+  }
   return link;
 }

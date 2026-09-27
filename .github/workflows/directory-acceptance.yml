@@ -27,11 +27,26 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run test:acceptance
-      - run: docker build -t hker:ci .
+      - run: npx playwright install --with-deps webkit
+        id: webkit_install
+        continue-on-error: true
+      - run: npm run test:e2e:webkit
+        if: steps.webkit_install.outcome == 'success'
+      - run: node -e "require('fs').writeFileSync('artifacts/release-candidate/webkit-blocked.json',JSON.stringify({status:'BLOCKED',reason:'Optional WebKit installation unavailable',skippedTests:'not executed'}))"
+        if: steps.webkit_install.outcome == 'failure'
+      - run: docker build --label "org.opencontainers.image.revision=$GITHUB_SHA" -t hker:ci . 2>&1 | tee artifacts/release-candidate/docker-build.log
+        shell: bash
+      - run: docker image inspect hker:ci --format '{{.Id}}' > artifacts/release-candidate/image-digest.txt
+      - run: node scripts/rc-runtime-rehearsal.mjs --image=hker:ci > artifacts/release-candidate/runtime-console.log 2>&1
+      - run: python3 scripts/sanitize-evidence.py
+        if: always()
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: acceptance-evidence
+          retention-days: 7
           path: |
+            artifacts/release-candidate
             test-results
             playwright-report
+            .impeccable/review

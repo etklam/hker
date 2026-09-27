@@ -16,11 +16,12 @@ import { installPostgresSerializerGuards } from '@/server/postgres-serializers'
 const connectionString = process.env.DATABASE_URL
 if (!connectionString && process.env.NEXT_PHASE !== 'phase-production-build') throw new Error('DATABASE_URL environment variable is required')
 
-export function createDatabase(url: string, options: {max?:number} = {}) {
+export function createDatabase(url: string, options: {max?:number; logger?: {logQuery(query: string, params: unknown[]): void}} = {}) {
 const max = options.max ?? Number(process.env.DATABASE_POOL_MAX ?? 20)
 if (!Number.isInteger(max) || max < 1 || max > 50) throw new Error('Invalid database pool size')
 const client = postgres(url, { max, idle_timeout: 30, connect_timeout: 10 })
 const database = drizzle(client, {
+  logger: options.logger,
   schema: {
     ...usersSchema,
     ...directorySchema,

@@ -9,7 +9,7 @@ export function contentDiff(
   after: Record<string, unknown>,
 ) {
   return Object.fromEntries(
-    Object.keys(after)
+    [...new Set([...Object.keys(before), ...Object.keys(after)])]
       .filter(
         (key) =>
           !["id", "createdAt", "updatedAt", "revision"].includes(key) &&
@@ -37,31 +37,31 @@ export async function recordContentChange(
     JSON.stringify(value).length > 2000
       ? { truncated: true, excerpt: JSON.stringify(value).slice(0, 2000) }
       : value;
-  await tx
-    .insert(catalogHistory)
-    .values({
-      id: randomUUID(),
-      actorId: context.actorId,
-      entity,
-      entityId,
-      action: !Object.keys(before).length
+  await tx.insert(catalogHistory).values({
+    id: randomUUID(),
+    actorId: context.actorId,
+    entity,
+    entityId,
+    action: !Object.keys(after).length
+      ? "delete"
+      : !Object.keys(before).length
         ? "create"
         : "enabled" in changes
           ? after.enabled
             ? "publish"
             : "unpublish"
           : "update",
-      beforeRevision:
-        typeof before.revision === "number" ? before.revision : null,
-      afterRevision: typeof after.revision === "number" ? after.revision : null,
-      operationId: context.operationId,
-      changes: Object.fromEntries(
-        Object.entries(changes).map(([key, change]) => [
-          key,
-          { before: bounded(change.before), after: bounded(change.after) },
-        ]),
-      ),
-    });
+    beforeRevision:
+      typeof before.revision === "number" ? before.revision : null,
+    afterRevision: typeof after.revision === "number" ? after.revision : null,
+    operationId: context.operationId,
+    changes: Object.fromEntries(
+      Object.entries(changes).map(([key, change]) => [
+        key,
+        { before: bounded(change.before), after: bounded(change.after) },
+      ]),
+    ),
+  });
 }
 export async function contentHistory(entityId?: number) {
   return db

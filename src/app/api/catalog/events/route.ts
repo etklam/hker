@@ -6,20 +6,30 @@ import {
   issueCatalogEventReceipt,
   recordCatalogEvent,
   verifyCatalogEventReceipt,
+  verifyCatalogSearchObservation,
 } from "@/server/catalog/analytics";
-import { CatalogSearchService } from "@/server/catalog/service";
 import { searchSchema } from "@/schemas/directory";
 import { AppError } from "@/lib/errors";
 
 export async function GET(req: Request) {
   if (!analyticsEnabled())
-    return Response.json({ status: "disabled" }, { headers: { "Cache-Control": "no-store" } });
-  if (!(await allowCatalogRequest(req.headers, "event-receipts", 60).catch(() => false)))
+    return Response.json(
+      { status: "disabled" },
+      { headers: { "Cache-Control": "no-store" } },
+    );
+  if (
+    !(await allowCatalogRequest(req.headers, "event-receipts", 60).catch(
+      () => false,
+    ))
+  )
     return new Response(null, { status: 429 });
   const receipt = issueCatalogEventReceipt();
   return receipt
     ? Response.json(receipt, { headers: { "Cache-Control": "no-store" } })
-    : Response.json({ status: "degraded" }, { status: 503, headers: { "Cache-Control": "no-store" } });
+    : Response.json(
+        { status: "degraded" },
+        { status: 503, headers: { "Cache-Control": "no-store" } },
+      );
 }
 
 export async function POST(req: Request) {
@@ -36,16 +46,40 @@ export async function POST(req: Request) {
         kind: z.enum(["search", "filter", "preset", "tag"]),
         key: z.string().max(200),
         source: z.literal("web"),
-        receipt: z.object({
-          actionId: z.uuid(),
-          occurredAt: z.iso.datetime({ offset: true }),
-          signature: z.string().regex(/^[a-f0-9]{64}$/),
-        }),
+        receipt: z
+          .union([
+            z.object({
+              version: z.literal(1),
+              purpose: z.literal("catalog-navigation"),
+              source: z.literal("web"),
+              actionId: z.uuid(),
+              occurredAt: z.iso.datetime({ offset: true }),
+              signature: z.string().regex(/^[a-f0-9]{64}$/),
+            }),
+            z.object({
+              actionId: z.uuid(),
+              occurredAt: z.iso.datetime({ offset: true }),
+              signature: z.string().regex(/^[a-f0-9]{64}$/),
+            }),
+          ])
+          .optional(),
+        observation: z
+          .object({
+            version: z.literal(1),
+            purpose: z.literal("catalog-search-observation"),
+            source: z.literal("web"),
+            actionId: z.uuid(),
+            observedAt: z.iso.datetime({ offset: true }),
+            criteriaDigest: z.string().regex(/^[a-f0-9]{64}$/),
+            resultCount: z.number().int().nonnegative(),
+            signature: z.string().regex(/^[a-f0-9]{64}$/),
+          })
+          .optional(),
         search: searchSchema.optional(),
       })
       .parse(await readJsonBody(req, 12000));
-    if (!verifyCatalogEventReceipt(body.receipt))
-      throw new AppError("INVALID_REQUEST", "量測收據無效或已被修改");
+    let actionId: string;
+    let occurredAt: string;
     let zeroResult = false;
     if (body.kind === "search" || body.kind === "filter") {
       const structured = body.search;
@@ -61,20 +95,31 @@ export async function POST(req: Request) {
               structured.featured === undefined)))
       )
         throw new AppError("INVALID_REQUEST", "無可量測的搜尋操作");
-      const result = await CatalogSearchService.search({
-        ...structured,
-        query: body.kind === "search" ? body.key : "",
-        page: 1,
-        pageSize: 1,
-      });
-      zeroResult = result.total === 0;
+      if (
+        !body.observation ||
+        !verifyCatalogSearchObservation(
+          body.observation,
+          body.kind,
+          body.key,
+          structured!,
+        )
+      )
+        throw new AppError("INVALID_REQUEST", "搜尋觀測無效、已過期或已被修改");
+      actionId = body.observation.actionId;
+      occurredAt = body.observation.observedAt;
+      zeroResult = body.observation.resultCount === 0;
+    } else {
+      if (!body.receipt || !verifyCatalogEventReceipt(body.receipt))
+        throw new AppError("INVALID_REQUEST", "量測收據無效或已被修改");
+      actionId = body.receipt.actionId;
+      occurredAt = body.receipt.occurredAt;
     }
     const status = await recordCatalogEvent({
       kind: body.kind,
       key: body.key,
       source: body.source,
-      actionId: body.receipt.actionId,
-      occurredAt: body.receipt.occurredAt,
+      actionId,
+      occurredAt,
       zeroResult,
     });
     return { ok: true, status };

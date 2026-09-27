@@ -12,7 +12,7 @@ import {
   navigationPresets,
   navigationPresetTags,
 } from "@/db/schema/directory";
-import { configureCatalogTransaction, validateNavigationPresetForSave } from "./service";
+import { configureCatalogTransaction, lockAreaHierarchy, validateNavigationPresetForSave } from "./service";
 import { AppError } from "@/lib/errors";
 import { generateListingSlug } from "@/lib/directory";
 
@@ -95,6 +95,7 @@ async function writePublication(
 export async function setPublication(kind: AdminKind, id: number, enabled: boolean, revision?: number, context: MutationContext = {}) {
   return db.transaction(async tx => {
     await configureCatalogTransaction(tx);
+    if (kind === "areas") await lockAreaHierarchy(tx);
     const table = tables[kind];
     const [before] = await tx.select().from(table).where(eq(table.id, id)).for("update");
     const result = await writePublication(kind, id, enabled, revision, tx);

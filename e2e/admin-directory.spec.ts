@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type APIRequestContext } from "@playwright/test";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 const statePath = resolve(
@@ -9,6 +9,30 @@ if (enabled && !existsSync(statePath))
   throw new Error(
     "Run scripts/e2e-fixture.ts against the isolated test database before acceptance E2E",
   );
+
+async function deleteListingByName(
+  request: APIRequestContext,
+  origin: string,
+  name: string,
+) {
+  const response = await request.get(
+    `/api/admin/catalog?q=${encodeURIComponent(name)}`,
+  );
+  expect(response.ok()).toBe(true);
+  const current = (await response.json()).items.find(
+    (item: { name: string }) => item.name === name,
+  );
+  if (!current) return;
+  const deletion = await request.delete("/api/admin/catalog", {
+    headers: { origin },
+    data: {
+      kind: "listings",
+      id: current.id,
+      revision: current.revision,
+    },
+  });
+  expect(deletion.ok()).toBe(true);
+}
 
 test.describe("directory admin acceptance", () => {
   test.skip(
@@ -78,16 +102,15 @@ test.describe("directory admin acceptance", () => {
       const unpublished = await request.get(`/listing/${updated.slug}`);
       expect(await unpublished.text()).not.toContain(name);
     } finally {
-      await request.delete("/api/admin/catalog", {
-        data: { kind: "listings", id: first.id },
-        headers: {
-          origin: new URL(
-            (testInfo.project.use.baseURL as string) ||
-              process.env.E2E_BASE_URL ||
-              "http://localhost:3000",
-          ).origin,
-        },
-      });
+      await deleteListingByName(
+        request,
+        new URL(
+          (testInfo.project.use.baseURL as string) ||
+            process.env.E2E_BASE_URL ||
+            "http://localhost:3000",
+        ).origin,
+        name,
+      );
     }
   });
 
@@ -145,7 +168,6 @@ test.describe("directory admin acceptance", () => {
       },
     });
     expect(createdResponse.ok()).toBe(true);
-    const created = await createdResponse.json();
     const second = await page.context().newPage();
     const openEditor = async (target: typeof page) => {
       await target.goto("/admin/listings");
@@ -180,10 +202,7 @@ test.describe("directory admin acceptance", () => {
       expect(latest.shortDescription).toBe("第一分頁已儲存");
     } finally {
       await second.close();
-      await request.delete("/api/admin/catalog", {
-        headers: { origin },
-        data: { kind: "listings", id: created.id },
-      });
+      await deleteListingByName(request, origin, name);
     }
   });
 
@@ -299,22 +318,19 @@ test.describe("directory admin acceptance", () => {
       expect(unseen.sortOrder).toBe(20);
     } finally {
       for (const row of rows)
-        await request.delete("/api/admin/catalog", {
-          headers: { origin },
-          data: { kind: "listings", id: row.id },
-        });
+        await deleteListingByName(request, origin, row.name);
     }
   });
 
   test("returns to the previous page after deleting its final item without clearing filters", async ({ page, request }) => {
     const origin = new URL(process.env.E2E_BASE_URL ?? "http://localhost:3000").origin;
     const prefix = `pagination-${Date.now()}`;
-    const ids: number[] = [];
+    const names: string[] = [];
     try {
       for (let index = 0; index < 21; index++) {
         const response = await request.post("/api/admin/catalog", { headers: { origin }, data: { kind: "listings", data: { name: `${prefix} ${index}`, slug: `${prefix}-${index}` } } });
         expect(response.ok()).toBe(true);
-        ids.push((await response.json()).id);
+        names.push(`${prefix} ${index}`);
       }
       await page.goto("/admin/listings");
       await page.getByRole("textbox", { name: "搜尋收錄", exact: true }).fill(prefix);
@@ -328,7 +344,8 @@ test.describe("directory admin acceptance", () => {
       await expect(page.getByRole("textbox", { name: "搜尋收錄", exact: true })).toHaveValue(prefix);
       await expect(page.getByRole("button", { name: "上一頁", exact: true })).toBeDisabled();
     } finally {
-      for (const id of ids) await request.delete("/api/admin/catalog", { headers: { origin }, data: { kind: "listings", id } });
+      for (const name of names)
+        await deleteListingByName(request, origin, name);
     }
   });
 
@@ -380,13 +397,11 @@ test.describe("directory admin acceptance", () => {
       expect(row.tags).toHaveLength(2);
       expect(row.attrs).toEqual({ 營業時間: "每天" });
     } finally {
-      await request.delete("/api/admin/catalog", {
-        headers: {
-          origin: new URL(process.env.E2E_BASE_URL ?? "http://localhost:3000")
-            .origin,
-        },
-        data: { kind: "listings", id: row.id },
-      });
+      await deleteListingByName(
+        request,
+        new URL(process.env.E2E_BASE_URL ?? "http://localhost:3000").origin,
+        name,
+      );
     }
   });
 });

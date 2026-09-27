@@ -166,7 +166,7 @@ describe("PostgreSQL directory domain", () => {
     );
     expect(await catalog.detail("temporary")).toBeNull();
     expect((await catalog.detail("temporary", "admin"))?.tags[0].id).toBe(tag2);
-    await deleteListing(row.id);
+    await deleteListing(row.id, (await catalog.detail(row.slug, "admin"))!.revision);
     expect(await catalog.detail("temporary", "admin")).toBeNull();
   });
   it("prevents area cycles and supports taxonomy CRUD", async () => {
@@ -201,7 +201,8 @@ describe("PostgreSQL directory domain", () => {
     expect(await catalog.detail("imported")).toBeNull();
     expect((await previewImport(csv)).valid).toBe(false);
     expect(await confirmImport(csv, preview.digest, options)).toMatchObject({ imported: 1, replayed: true });
-    await deleteListing((await catalog.detail("imported", "admin"))!.id);
+    const imported = (await catalog.detail("imported", "admin"))!;
+    await deleteListing(imported.id, imported.revision);
   });
   it("does not default database inserts to public", async () => {
     const [row] = await db
@@ -209,7 +210,7 @@ describe("PostgreSQL directory domain", () => {
       .values({ name: "Direct", slug: "direct" })
       .returning();
     expect(row.enabled).toBe(false);
-    await deleteListing(row.id);
+    await deleteListing(row.id, (await catalog.detail(row.slug, "admin"))!.revision);
   });
   it("rejects non-admin writes and permits admin create/delete", async () => {
     vi.stubEnv("APP_BASE_URL", "http://localhost");
@@ -249,7 +250,7 @@ describe("PostgreSQL directory domain", () => {
     expect(res.status).toBe(200);
     const row = await res.json();
     expect(
-      (await adminDelete(req("DELETE", { kind: "listings", id: row.id })))
+      (await adminDelete(req("DELETE", { kind: "listings", id: row.id, revision: row.revision })))
         .status,
     ).toBe(200);
     vi.unstubAllEnvs();
@@ -353,7 +354,7 @@ describe("PostgreSQL directory domain", () => {
     expect(journals[0].kind).toBe('array');
     const sessions = await db.execute(sql`select jsonb_typeof(state) as kind from directory_bot_sessions limit 1`);
     expect(sessions[0].kind).toBe('object');
-    await deleteListing(row.id);
+    await deleteListing(row.id, (await catalog.detail(row.slug, "admin"))!.revision);
   });
 
 });

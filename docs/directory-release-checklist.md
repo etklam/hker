@@ -1,8 +1,10 @@
+> Current release candidate: [Phase 9 evidence and supervised staging/beta checklist](directory-phase9-release-candidate.md). Phase 7/8 counts below are historical.
+
 > Latest extended Phase 7 evidence: [extended acceptance matrix](directory-phase7-extended.md) and [performance observations](directory-performance-observations.md). Earlier counts below are historical; the extended final aggregate passed 547 unit / 60 integration / 34 Chromium tests with zero skips. Staging/live gates remain open.
 
 # Directory release checklist
 
-Current Phase 7 rerun, scope boundaries and defect checklist: [Phase 7 acceptance](directory-phase7-checklist.md). Advanced import/behavioral analytics enhancements remain outside Phase 7, regardless of inherited experimental implementation.
+Historical Phase 7 rerun, scope boundaries and defect checklist: [Phase 7 acceptance](directory-phase7-checklist.md). Advanced import/behavioral analytics enhancements remain outside Phase 7, regardless of inherited experimental implementation.
 
 This is the current release procedure. The earlier phase completion notes in `directory-rebuild-plan.md` are historical, not evidence of production acceptance. No production deployment, credentials change or live Telegram call was performed for this release.
 
@@ -43,7 +45,7 @@ Admin bootstrap refuses existing email addresses; it does not silently promote o
 
 ## Migration safety and rehearsal
 
-Migrations 0000–0003 are unchanged. 0004 adds listing aliases/revisions, old-slug reservations, import receipts, aggregate analytics and durable Bot delivery fields; restrictive taxonomy FKs replace silent SET NULL/cascade broadening. 0005 adds delivery, retention and slug-alias lookup indexes. Existing journal rows lacking ownership are marked completed if fully delivered, otherwise failed with a restart explanation; no unknown user identity is invented.
+Migrations 0000–0003 are unchanged. Phase 8 migrations 0004–0008 remain intact; Phase 9 requires no new schema migration. The isolated rehearsal covers fresh, 0003 upgrade and reviewed 0008 schema compatibility, plus genuine backup/restore from the production image. 0004 adds listing aliases/revisions, old-slug reservations, import receipts, aggregate analytics and durable Bot delivery fields; restrictive taxonomy FKs replace silent SET NULL/cascade broadening. 0005 adds delivery, retention and slug-alias lookup indexes. Existing journal rows lacking ownership are marked completed if fully delivered, otherwise failed with a restart explanation; no unknown user identity is invented.
 
 Preflight checks every ledger hash and timestamp against the repository prefix before applying anything; concurrent migrators serialize with a session advisory lock. A pre-existing schema with no ledger, unknown historical rows or a checksum mismatch causes failure. The historical legacy-ledger mismatch is not automatically repaired. Restore a backup into an isolated rehearsal database, identify the exact schema/history, and create a reviewed reconciliation procedure before deployment. Never replay all SQL blindly, rewrite ledger hashes, run `db:push`, or treat SQL errors as already-applied success.
 

@@ -16,6 +16,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
+    "test:e2e:webkit": "node scripts/webkit-acceptance.mjs",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "admin:create": "esbuild scripts/create-admin.ts --bundle --platform=node --packages=external --outfile=.next/admin-bootstrap.cjs && node .next/admin-bootstrap.cjs",
     "ops:build": "esbuild scripts/migrate.ts scripts/create-admin.ts scripts/bot-runner.ts scripts/analytics-cleanup.ts --bundle --platform=node --outdir=.ops --out-extension:.js=.cjs",

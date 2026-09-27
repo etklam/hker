@@ -4,6 +4,8 @@ import { Filters } from "@/components/directory/Filters";
 import { CatalogSearchService, getTaxonomy } from "@/server/catalog/service";
 import { ListingResults } from "@/components/directory/ListingCard";
 import { TagPicker } from "@/components/directory/TagPicker";
+import { CatalogSearchObservation } from "@/components/directory/CatalogEvents";
+import { issueCatalogSearchObservation } from "@/server/catalog/analytics";
 import {
   resolveSearchParams,
   searchToParams,
@@ -51,7 +53,24 @@ export default async function SearchPage({
     );
   }
   const result = await CatalogSearchService.search(input);
-  const formInput = { ...input, sort: params.get("sort") ? input.sort : undefined };
+  const hasStructuredCriteria = Boolean(
+    input.categoryId ||
+    input.areaId ||
+    input.tagIds.length ||
+    input.priceMin !== null ||
+    input.priceMax !== null ||
+    input.featured !== undefined,
+  );
+  const eventKind = input.query ? "search" : "filter";
+  const eventKey = input.query || "applied";
+  const observation =
+    input.query || hasStructuredCriteria
+      ? issueCatalogSearchObservation(eventKind, eventKey, input, result.total)
+      : null;
+  const formInput = {
+    ...input,
+    sort: params.get("sort") ? input.sort : undefined,
+  };
   const pageUrl = (page: number) => {
     const copy = searchToParams(formInput);
     copy.set("page", String(page));
@@ -59,6 +78,12 @@ export default async function SearchPage({
   };
   return (
     <div className="container">
+      <CatalogSearchObservation
+        kind={eventKind}
+        eventKey={eventKey}
+        search={input}
+        observation={observation}
+      />
       <div className="page-heading">
         <h1>探索香港生活目錄</h1>
       </div>
@@ -210,11 +235,7 @@ export default async function SearchPage({
                 next.delete(filter.key);
                 next.delete("page");
                 return (
-                  <a
-                    key={filter.key}
-                    className="chip"
-                    href={`/search?${next}`}
-                  >
+                  <a key={filter.key} className="chip" href={`/search?${next}`}>
                     移除 {filter.label}
                   </a>
                 );
@@ -240,8 +261,16 @@ export default async function SearchPage({
               )}
             </div>
             {input.page > Math.max(1, result.totalPages) ? (
-              <div className="empty"><h3>這一頁已沒有結果</h3><p className="muted">收錄可能已更新，請返回第一頁繼續瀏覽。</p><a className="button" href={pageUrl(1)}>返回第一頁</a></div>
-            ) : <ListingResults items={result.items} />}
+              <div className="empty">
+                <h3>這一頁已沒有結果</h3>
+                <p className="muted">收錄可能已更新，請返回第一頁繼續瀏覽。</p>
+                <a className="button" href={pageUrl(1)}>
+                  返回第一頁
+                </a>
+              </div>
+            ) : (
+              <ListingResults items={result.items} />
+            )}
             <nav className="pagination" aria-label="搜尋分頁">
               {input.page > 1 && (
                 <a className="button" href={pageUrl(input.page - 1)}>
@@ -249,7 +278,9 @@ export default async function SearchPage({
                 </a>
               )}
               <span>
-                {input.page > Math.max(1, result.totalPages) ? `所選第 ${input.page} 頁・共 ${result.totalPages} 頁` : `${input.page} / ${Math.max(1, result.totalPages)}`}
+                {input.page > Math.max(1, result.totalPages)
+                  ? `所選第 ${input.page} 頁・共 ${result.totalPages} 頁`
+                  : `${input.page} / ${Math.max(1, result.totalPages)}`}
               </span>
               {input.page < result.totalPages && (
                 <a className="button" href={pageUrl(input.page + 1)}>

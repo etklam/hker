@@ -42,12 +42,14 @@ export function Editor({
   kind,
   initial,
   taxonomy,
+  returnFocus,
   onClose,
   onSaved,
 }: {
   kind: string;
   initial: EditorValue;
   taxonomy: Taxonomy;
+  returnFocus?: HTMLElement | null;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -62,10 +64,15 @@ export function Editor({
     if (!dirty || window.confirm("尚有未儲存的變更。確定放棄？")) onClose();
   };
   useEffect(() => {
-    const trigger = document.activeElement as HTMLElement | null;
+    const trigger =
+      returnFocus ?? (document.activeElement as HTMLElement | null);
     dialog.current?.showModal();
-    return () => trigger?.focus();
-  }, []);
+    return () => {
+      requestAnimationFrame(() => {
+        if (trigger?.isConnected) trigger.focus();
+      });
+    };
+  }, [returnFocus]);
   useEffect(() => {
     const handler = (event: BeforeUnloadEvent) => {
       if (dirty) {

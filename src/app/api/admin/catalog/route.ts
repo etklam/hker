@@ -1,3 +1,4 @@
+import { AppError } from "@/lib/errors";
 import { matchingSelection } from "@/server/catalog/content-plans";
 import {
   reorderVisible,
@@ -140,14 +141,17 @@ export const POST = withAdmin(async (req, { user }) =>
       : saveTaxonomy(kind, data, id, { actorId: user.id });
   }),
 );
-export const DELETE = withAdmin(async (req) =>
+export const DELETE = withAdmin(async (req, { user }) =>
   catalogResponse(async () => {
-    const { kind, id } = parseBody(
+    const { kind, id, revision } = parseBody(
       await readJsonBody(req),
-      mutation.omit({ data: true }).extend({ id: z.number().int().positive() }),
+      mutation.omit({ data: true }).extend({ id: z.number().int().positive(), revision: z.number().int().positive().optional() }),
     );
-    if (kind === "listings") await deleteListing(id);
-    else await deleteTaxonomy(kind, id);
+    if (kind === "listings") {
+      if (!revision) throw new AppError("CONFLICT", "請重新載入最新收錄");
+      await deleteListing(id, revision, { actorId: user.id });
+    }
+    else await deleteTaxonomy(kind, id, { actorId: user.id });
     return { ok: true };
   }),
 );

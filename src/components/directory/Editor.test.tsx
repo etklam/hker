@@ -14,6 +14,26 @@ beforeEach(() => {
   };
 });
 describe("catalog editor conflicts", () => {
+  it("restores focus to an explicit opener after the modal unmounts", async () => {
+    const opener = document.createElement("button");
+    document.body.append(opener);
+    const { unmount } = render(
+      <Editor
+        kind="categories"
+        initial={{ name: "分類", slug: "category" }}
+        taxonomy={taxonomy}
+        returnFocus={opener}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+      />,
+    );
+
+    unmount();
+
+    await waitFor(() => expect(opener).toHaveFocus());
+    opener.remove();
+  });
+
   it("preserves a draft and link identity after a stale revision rejection", async () => {
     const fetch = vi
       .fn()

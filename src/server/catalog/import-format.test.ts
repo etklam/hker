@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   decodeImportBytes,
+  interpretImportRow,
   importDecimal,
   normalizeImportRow,
   parseCsv,
@@ -8,6 +9,17 @@ import {
 } from "./import-format";
 
 describe("versioned import contract", () => {
+  it.each([
+    { attrsJson: "{bad" }, { attrsJson: "null" }, { attrsJson: "[]" },
+    { aliasesJson: "{bad" }, { aliasesJson: "{}" }, { linksJson: "null" },
+    { linksJson: "[broken" }, { linksJson: "[]", website: "https://example.test" },
+    { priceMin: "1e2" }, { categorySlug: "local", categoryId: "1" },
+  ])("isolates invalid embedded values as a typed row error: %j", (values) => {
+    const result = interpretImportRow({ name: "虛構", slug: "fictional", formatVersion: "2", ...values }, 3);
+    expect(result.status).toBe("invalid");
+    expect(result.location.row).toBe(3);
+    expect(result.errors.length).toBeGreaterThan(0);
+  });
   it("distinguishes unknown prices from zero and rejects non-decimal or excessive precision", () => {
     expect(importDecimal("", "priceMin")).toBeNull();
     expect(importDecimal(undefined, "priceMin")).toBeNull();

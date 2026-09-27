@@ -1,4 +1,5 @@
 import { AppError } from "@/lib/errors";
+import { listingSchema, type ListingInput } from "@/schemas/directory";
 export const IMPORT_LIMITS = {
   bytes: 500000,
   rows: 200,
@@ -256,9 +257,125 @@ export type ImportMapping = {
   id: number;
 };
 
-export function importDecimal(value: string | undefined, column: string): number | null {
+export function importDecimal(
+  value: string | undefined,
+  column: string,
+): number | null {
   const text = value?.trim();
   if (!text) return null;
-  if (!/^\d+(?:\.\d{1,2})?$/.test(text)) throw new AppError("INVALID_REQUEST", `${column}: use a nonnegative decimal with at most two decimal places`);
+  if (!/^\d+(?:\.\d{1,2})?$/.test(text))
+    throw new AppError(
+      "INVALID_REQUEST",
+      `${column}: use a nonnegative decimal with at most two decimal places`,
+    );
   return Number(text);
+}
+
+type RowValues = Pick<
+  ListingInput,
+  | "name"
+  | "slug"
+  | "shortDescription"
+  | "description"
+  | "priceMin"
+  | "priceMax"
+  | "priceCurrency"
+  | "aliases"
+  | "attrs"
+  | "links"
+>;
+export const nativeRowValues = Symbol("nativeRowValues");
+export type ImportSourceRow = Record<string, string> & {
+  [nativeRowValues]?: {
+    values: Pick<RowValues, "aliases" | "attrs" | "links">;
+    errors: string[];
+  };
+};
+type RowInterpretationBase = {
+  location: { row: number };
+  fields: Record<string, string>;
+  present: string[];
+  warnings: string[];
+  errors: string[];
+};
+export type RowInterpretation = RowInterpretationBase &
+  (
+    { status: "valid"; values: RowValues } | { status: "invalid"; values: null }
+  );
+
+// Interpret embedded values once; update merging consumes only this typed result.
+export function interpretImportRow(
+  source: ImportSourceRow,
+  row: number,
+): RowInterpretation {
+  const base: RowInterpretationBase = {
+    location: { row },
+    fields: source,
+    present: [],
+    warnings: [],
+    errors: [],
+  };
+  try {
+    if (source[nativeRowValues]?.errors.length)
+      return {
+        ...base,
+        status: "invalid",
+        values: null,
+        errors: source[nativeRowValues]!.errors,
+      };
+    const fields = normalizeImportRow(source);
+    base.fields = fields;
+    base.present = Object.keys(source)
+      .filter((key) => source[key]?.trim())
+      .map(
+        (key) =>
+          ({
+            linksJson: "links",
+            website: "links",
+            telegram: "links",
+            instagram: "links",
+            aliasesJson: "aliases",
+            attrsJson: "attrs",
+            categorySlug: "category",
+            areaSlug: "area",
+            tagSlugs: "tags",
+          })[key] ?? key,
+      );
+    const json = (key: "aliases" | "attrs" | "links", fallback: unknown) => {
+      if (source[nativeRowValues]) return source[nativeRowValues]!.values[key];
+      let value = fallback;
+      try {
+        value = fields[key]?.trim() ? JSON.parse(fields[key]) : fallback;
+      } catch {
+        throw new AppError("INVALID_REQUEST", `${key}: JSON 格式不正確`);
+      }
+      const result = listingSchema.shape[key].safeParse(value);
+      if (!result.success)
+        throw new AppError(
+          "INVALID_REQUEST",
+          `${key}: JSON 類型或欄位不符合格式`,
+        );
+      return result.data;
+    };
+    const values: RowValues = {
+      name: fields.name ?? "",
+      slug: fields.slug ?? "",
+      shortDescription: fields.shortDescription ?? "",
+      description: fields.description ?? "",
+      priceMin: importDecimal(fields.priceMin, "priceMin"),
+      priceMax: importDecimal(fields.priceMax, "priceMax"),
+      priceCurrency: fields.priceCurrency || "HKD",
+      aliases: json("aliases", []) as ListingInput["aliases"],
+      attrs: json("attrs", {}) as ListingInput["attrs"],
+      links: json("links", []) as ListingInput["links"],
+    };
+    return { ...base, status: "valid", values };
+  } catch (error) {
+    return {
+      ...base,
+      status: "invalid",
+      values: null,
+      errors: [error instanceof AppError ? error.message : "欄位格式不正確"],
+    };
+  }
 }

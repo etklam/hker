@@ -2,27 +2,54 @@
 import { useEffect } from "react";
 import { searchFromParams } from "@/lib/directory";
 import type { SearchInput } from "@/schemas/directory";
+import type {
+  CatalogEventReceipt,
+  CatalogSearchObservation as SearchObservation,
+} from "@/server/catalog/analytics";
 
-type EventReceipt = {
-  actionId: string;
-  occurredAt: string;
-  signature: string;
-};
+const SEARCH_MARKER = "hker:catalog-search-submit";
+
+function destinationHash(value: string) {
+  let left = 2166136261;
+  let right = 2246822507;
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    left = Math.imul(left ^ code, 16777619);
+    right = Math.imul(right ^ code, 3266489909);
+  }
+  return `${(left >>> 0).toString(16).padStart(8, "0")}${(right >>> 0).toString(16).padStart(8, "0")}`;
+}
+
+function currentDestination() {
+  return `${location.pathname}${location.search}`;
+}
 
 export function observeCatalogEvent(
   kind: "search" | "filter" | "preset" | "tag",
   key: string,
   search?: SearchInput,
-  receipt?: EventReceipt,
+  receipt?: CatalogEventReceipt,
+  observation?: SearchObservation,
 ) {
-  if (!receipt || (kind !== "filter" && !key.trim()) || key.length > 200)
+  if (
+    (!receipt && !observation) ||
+    (kind !== "filter" && !key.trim()) ||
+    key.length > 200
+  )
     return false;
   const request = () =>
     fetch("/api/catalog/events", {
       method: "POST",
       keepalive: true,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind, key, search, source: "web", receipt }),
+      body: JSON.stringify({
+        kind,
+        key,
+        search,
+        source: "web",
+        receipt,
+        observation,
+      }),
     });
   void request()
     .then((response) => {
@@ -36,11 +63,44 @@ export function observeCatalogEvent(
   return true;
 }
 
+export function CatalogSearchObservation({
+  kind,
+  eventKey,
+  search,
+  observation,
+}: {
+  kind: "search" | "filter";
+  eventKey: string;
+  search: SearchInput;
+  observation: SearchObservation | null;
+}) {
+  useEffect(() => {
+    if (!observation) return;
+    try {
+      const stored = sessionStorage.getItem(SEARCH_MARKER);
+      sessionStorage.removeItem(SEARCH_MARKER);
+      if (!stored) return;
+      const marker = JSON.parse(stored) as { hash?: unknown; at?: unknown };
+      if (
+        marker.hash !== destinationHash(currentDestination()) ||
+        typeof marker.at !== "number" ||
+        Date.now() - marker.at > 60_000 ||
+        Date.now() < marker.at
+      )
+        return;
+      observeCatalogEvent(kind, eventKey, search, undefined, observation);
+    } catch {
+      /* Search remains available when browser measurement storage is unavailable. */
+    }
+  }, [eventKey, kind, observation, search]);
+  return null;
+}
+
 // Observe browser actions only. Rendering, pagination and back navigation emit nothing.
 export function CatalogEvents() {
   useEffect(() => {
-    let receipt: EventReceipt | undefined;
-    let receiptRequest: Promise<EventReceipt | undefined> | undefined;
+    let receipt: CatalogEventReceipt | undefined;
+    let receiptRequest: Promise<CatalogEventReceipt | undefined> | undefined;
     let actionQueue = Promise.resolve();
     let stopped = false;
     const refillReceipt = () => {
@@ -56,6 +116,9 @@ export function CatalogEvents() {
           if (!response.ok) return undefined;
           const value = await response.json();
           if (
+            value.version === 1 &&
+            value.purpose === "catalog-navigation" &&
+            value.source === "web" &&
             typeof value.actionId === "string" &&
             typeof value.occurredAt === "string" &&
             typeof value.signature === "string"
@@ -98,18 +161,28 @@ export function CatalogEvents() {
         const search = searchFromParams(params);
         const hasStructuredCriteria = Boolean(
           search.categoryId ||
-            search.areaId ||
-            search.tagIds?.length ||
-            search.priceMin !== null ||
-            search.priceMax !== null ||
-            search.featured !== undefined,
+          search.areaId ||
+          search.tagIds?.length ||
+          search.priceMin !== null ||
+          search.priceMax !== null ||
+          search.featured !== undefined,
         );
         if (!search.query && !hasStructuredCriteria) return;
-        observe(
-          search.query ? "search" : "filter",
-          search.query ? params.get("q") ?? "" : "applied",
-          search,
-        );
+        const destination = new URL(event.target.action, location.href);
+        destination.search = params.toString();
+        try {
+          sessionStorage.setItem(
+            SEARCH_MARKER,
+            JSON.stringify({
+              hash: destinationHash(
+                `${destination.pathname}${destination.search}`,
+              ),
+              at: Date.now(),
+            }),
+          );
+        } catch {
+          /* Submission continues without measurement when storage is unavailable. */
+        }
       } catch {
         /* Invalid filters are not analytics events. */
       }

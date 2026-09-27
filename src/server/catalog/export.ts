@@ -1,9 +1,8 @@
-import { inArray, sql } from "drizzle-orm";
-import { db } from "@/server/db";
-import { listings } from "@/db/schema/directory";
+import { sql } from "drizzle-orm";
+import { db, type DB } from "@/server/db";
 import { AppError } from "@/lib/errors";
 import {
-  CatalogSearchService,
+  readCatalogBatch,
   configureCatalogTransaction,
   getTaxonomy,
 } from "./service";
@@ -33,7 +32,11 @@ export function serializeCsv(
     .map((row) => row.map((value) => csvCell(value, spreadsheet)).join(","))
     .join("\r\n");
 }
-export async function exportCatalog(ids: number[], format: "json" | "csv") {
+export async function exportCatalog(
+  ids: number[],
+  format: "json" | "csv",
+  database: DB = db,
+) {
   if (
     !ids.length ||
     ids.length > IMPORT_LIMITS.rows ||
@@ -43,23 +46,15 @@ export async function exportCatalog(ids: number[], format: "json" | "csv") {
       "INVALID_REQUEST",
       "明確選取 1–200 項；大型目錄請分批匯出",
     );
-  return db.transaction(async (tx) => {
+  return database.transaction(async (tx) => {
     await tx.execute(
       sql`set transaction isolation level repeatable read read only`,
     );
     await configureCatalogTransaction(tx);
-    const identities = await tx
-      .select({ id: listings.id, slug: listings.slug })
-      .from(listings)
-      .where(inArray(listings.id, ids));
-    if (identities.length !== ids.length)
+    const rows = await readCatalogBatch({ ids }, "admin", tx);
+    if (rows.length !== ids.length)
       throw new AppError("CONFLICT", "選取的內容已變更；請重新選取");
     const taxonomy = await getTaxonomy("admin", tx);
-    const rows = await Promise.all(
-      identities
-        .sort((a, b) => a.id - b.id)
-        .map((item) => CatalogSearchService.detail(item.slug, "admin", tx)),
-    );
     const portable = rows.map((row) => {
       if (!row) throw new AppError("CONFLICT", "內容已變更");
       return {

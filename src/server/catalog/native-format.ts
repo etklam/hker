@@ -1,7 +1,12 @@
 import { z } from "zod";
 import { listingSchema, taxonomySchemas } from "@/schemas/directory";
 import { AppError } from "@/lib/errors";
-import { IMPORT_LIMITS, parseCsv } from "./import-format";
+import {
+  IMPORT_LIMITS,
+  parseCsv,
+  nativeRowValues,
+  type ImportSourceRow,
+} from "./import-format";
 const slug = z
   .string()
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
@@ -75,9 +80,7 @@ export function parseNativeCatalog(source: string) {
       "INVALID_REQUEST",
       "File exceeds 500 KB; split the selected scope",
     );
-  const parsed = nativeCatalogSchema.safeParse(
-    JSON.parse(source.replace(/^\uFEFF/, "")),
-  );
+  const parsed = nativeCatalogSchema.safeParse(readNativeJson(source));
   if (!parsed.success)
     throw new AppError(
       "INVALID_REQUEST",
@@ -98,10 +101,19 @@ export function parseNativeCatalog(source: string) {
     );
   return parsed.data;
 }
+function readNativeJson(source: string): unknown {
+  if (Buffer.byteLength(source) > IMPORT_LIMITS.bytes)
+    throw new AppError("INVALID_REQUEST", "File exceeds 500 KB");
+  try {
+    return JSON.parse(source.replace(/^\uFEFF/, ""));
+  } catch {
+    throw new AppError("INVALID_REQUEST", "Native catalog JSON 格式不正確");
+  }
+}
 export function parseImportSource(
   source: string,
   columns: Record<string, string> = {},
-): Record<string, string>[] {
+): ImportSourceRow[] {
   if (
     !source
       .replace(/^\uFEFF/, "")
@@ -109,30 +121,72 @@ export function parseImportSource(
       .startsWith("{")
   )
     return parseCsv(source, columns);
-  return parseNativeCatalog(source).listings.map((row) => ({
-    formatVersion: "2",
-    name: row.name,
-    slug: row.slug,
-    shortDescription: row.shortDescription,
-    description: row.description,
-    categorySlug: row.categorySlug ?? "",
-    areaSlug: row.areaSlug ?? "",
-    tagSlugs: row.tagSlugs.join("|"),
-    priceMin: row.priceMin === null ? "" : String(row.priceMin),
-    priceMax: row.priceMax === null ? "" : String(row.priceMax),
-    priceCurrency: row.priceCurrency,
-    linksJson: JSON.stringify(
-      row.links.map(({ type, label, url, sortOrder, enabled }) => ({
-        type,
-        label,
-        url,
-        sortOrder,
-        enabled,
-      })),
-    ),
-    aliasesJson: JSON.stringify(row.aliases),
-    attrsJson: JSON.stringify(row.attrs),
-    featured: String(row.featured),
-    sortOrder: String(row.sortOrder),
-  }));
+  const envelope = nativeCatalogSchema
+    .omit({ listings: true })
+    .extend({ listings: z.array(z.unknown()).min(1).max(IMPORT_LIMITS.rows) })
+    .safeParse(readNativeJson(source));
+  if (!envelope.success)
+    throw new AppError(
+      "INVALID_REQUEST",
+      "Native catalog version/envelope invalid",
+    );
+  if (
+    Object.values(envelope.data.taxonomy).reduce(
+      (count, rows) => count + rows.length,
+      0,
+    ) > 200
+  )
+    throw new AppError("INVALID_REQUEST", "Taxonomy exceeds 200 items");
+  return envelope.data.listings.map((input): ImportSourceRow => {
+    const parsed = nativeCatalogSchema.shape.listings.element.safeParse(input);
+    if (!parsed.success) {
+      const raw =
+        input && typeof input === "object" && !Array.isArray(input)
+          ? (input as Record<string, unknown>)
+          : {};
+      return {
+        name: typeof raw.name === "string" ? raw.name : "",
+        slug: typeof raw.slug === "string" ? raw.slug : "",
+        [nativeRowValues]: {
+          values: { aliases: [], attrs: {}, links: [] },
+          errors: parsed.error.issues
+            .slice(0, 8)
+            .map(
+              (issue) =>
+                `${issue.path.join(".") || "record"}: 原生記錄欄位格式不正確`,
+            ),
+        },
+      };
+    }
+    const row = parsed.data;
+    const links = row.links.map(({ type, label, url, sortOrder, enabled }) => ({
+      type,
+      label,
+      url,
+      sortOrder,
+      enabled,
+    }));
+    return {
+      formatVersion: "2",
+      name: row.name,
+      slug: row.slug,
+      shortDescription: row.shortDescription,
+      description: row.description,
+      categorySlug: row.categorySlug ?? "",
+      areaSlug: row.areaSlug ?? "",
+      tagSlugs: row.tagSlugs.join("|"),
+      priceMin: row.priceMin === null ? "" : String(row.priceMin),
+      priceMax: row.priceMax === null ? "" : String(row.priceMax),
+      priceCurrency: row.priceCurrency,
+      linksJson: JSON.stringify(links),
+      aliasesJson: JSON.stringify(row.aliases),
+      attrsJson: JSON.stringify(row.attrs),
+      featured: String(row.featured),
+      sortOrder: String(row.sortOrder),
+      [nativeRowValues]: {
+        values: { aliases: row.aliases, attrs: row.attrs, links },
+        errors: [],
+      },
+    };
+  });
 }

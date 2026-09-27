@@ -20,8 +20,7 @@ import { catalogImportJobs } from "@/db/schema/directoryOperations";
 import { generateListingSlug } from "@/lib/directory";
 
 import {
-  normalizeImportRow,
-  importDecimal,
+  interpretImportRow,
   resolveImportTerm,
   normalizeName,
   normalizeUrl,
@@ -46,7 +45,10 @@ export async function previewImport(
   } = {},
 ) {
   const rows = parseImportSource(csv, mapping.columns);
-  const native = csv.replace(/^\uFEFF/, "").trimStart().startsWith("{");
+  const native = csv
+    .replace(/^\uFEFF/, "")
+    .trimStart()
+    .startsWith("{");
   const taxonomy = await getTaxonomy("admin", executor);
   const areaChoices = taxonomy.areas.map((area) => {
     const names = [area.name];
@@ -80,15 +82,9 @@ export async function previewImport(
   const slugs = new Set([...existing, ...oldSlugs].map((r) => r.slug));
   const urls = new Set(links.map((r) => normalizeUrl(r.url)));
   const items = rows.map((source, index) => {
-    let row = source;
-    if (mapping.mode === "update" && !source.name?.trim())
-      row = {
-        ...source,
-        name:
-          existing.find((item) => item.slug === source.slug?.trim())?.name ??
-          "",
-      };
-    const errors: string[] = [],
+    const interpretation = interpretImportRow(source, index + 2);
+    const row = interpretation.fields;
+    const errors: string[] = [...interpretation.errors],
       warnings: string[] = [];
     const resolve = (
       value: string | undefined,
@@ -110,7 +106,9 @@ export async function previewImport(
           }
         : resolveImportTerm(value, choices);
       if (native && result.state === "disabled" && "candidates" in result) {
-        warnings.push(`${label}「${value}」已停用；接受後只保留關聯，不會啟用分類或發佈收錄`);
+        warnings.push(
+          `${label}「${value}」已停用；接受後只保留關聯，不會啟用分類或發佈收錄`,
+        );
         return result.candidates[0].id;
       }
       if (result.id === null)
@@ -128,9 +126,16 @@ export async function previewImport(
     }
     let data: ListingInput | null = null;
     try {
-      row = normalizeImportRow(row);
+      if (interpretation.status === "invalid")
+        throw new AppError("INVALID_REQUEST", interpretation.errors[0]);
       const parsed = listingSchema.safeParse({
         ...row,
+        ...interpretation.values,
+        name:
+          mapping.mode === "update" && !source.name?.trim()
+            ? (existing.find((item) => item.slug === source.slug?.trim())
+                ?.name ?? "")
+            : interpretation.values.name,
         slug,
         enabled: false,
         featured: row.featured === "true",
@@ -147,17 +152,6 @@ export async function previewImport(
               ?.split("|")
               .filter(Boolean)
               .map((v) => resolve(v, taxonomy.tags, "標籤")) ?? []),
-        priceMin: importDecimal(row.priceMin, "priceMin"),
-        priceMax: importDecimal(row.priceMax, "priceMax"),
-        priceCurrency: row.priceCurrency || "HKD",
-        aliases: row.aliases ? JSON.parse(row.aliases) : [],
-        attrs: row.attrs ? JSON.parse(row.attrs) : {},
-        links: [
-          ...(row.links ? JSON.parse(row.links) : []),
-          ...(row.website
-            ? [{ type: "website", label: "官方網站", url: row.website }]
-            : []),
-        ],
       });
       if (!parsed.success)
         errors.push(
@@ -167,7 +161,10 @@ export async function previewImport(
         );
       else {
         data = parsed.data;
-        if (mapping.mode !== "update" && data.links.some((l) => l.id !== undefined))
+        if (
+          mapping.mode !== "update" &&
+          data.links.some((l) => l.id !== undefined)
+        )
           errors.push("匯入連結不可指定既有 ID");
         if (
           data.categoryId &&
@@ -178,12 +175,15 @@ export async function previewImport(
           errors.push("分類 ID 不存在或已停用");
         if (
           data.areaId &&
-          !taxonomy.areas.some((c) => c.id === data!.areaId && (c.enabled || native))
+          !taxonomy.areas.some(
+            (c) => c.id === data!.areaId && (c.enabled || native),
+          )
         )
           errors.push("地區 ID 不存在或已停用");
         if (
           data.tagIds.some(
-            (id) => !taxonomy.tags.some((t) => t.id === id && (t.enabled || native)),
+            (id) =>
+              !taxonomy.tags.some((t) => t.id === id && (t.enabled || native)),
           )
         )
           errors.push("標籤 ID 不存在或已停用");
@@ -203,11 +203,12 @@ export async function previewImport(
           warnings.push("此收錄含相同類型及 URL 的重複連結；確認後將保留");
       }
     } catch (error) {
-      errors.push(
-        error instanceof AppError
-          ? error.message
-          : "links、aliases 或 attrs JSON 格式不正確",
-      );
+      if (interpretation.status !== "invalid")
+        errors.push(
+          error instanceof AppError
+            ? error.message
+            : "links、aliases 或 attrs JSON 格式不正確",
+        );
     }
     if (mapping.decisions?.[String(index + 2)] !== "skip") slugs.add(slug);
     const candidates = data
@@ -234,6 +235,7 @@ export async function previewImport(
       : [];
     return {
       candidates,
+      interpretation,
       row: index + 2,
       name: row.name,
       slug,

@@ -1,3 +1,5 @@
+> Phase 9 release candidate: [findings, current evidence and staging gates](directory-phase9-release-candidate.md). Earlier aggregate counts below are historical. No staging or live beta is certified.
+
 > Phase 8 local implementation and verification complete: [content operations / import-export / analytics](directory-phase8-evidence.md). Fresh results: 569 unit, 72 isolated integration and 36 required-fixture Chromium tests passed, zero skips; migrations, production build and runtime image verified. Staging/live acceptance remains unperformed.
 
 > Latest extended Phase 7 evidence: [extended acceptance matrix](directory-phase7-extended.md) and [performance observations](directory-performance-observations.md). Earlier counts below are historical; the extended final aggregate passed 547 unit / 60 integration / 34 Chromium tests with zero skips. Staging/live gates remain open.
@@ -30,7 +32,7 @@ Search combines PostgreSQL full-text ranking with escaped substring matching for
 - Phase 6: safe CSV import and inventory analytics complete.
 
 ## Risks / deployment
-Back up PostgreSQL before applying migrations; additive schema is rollback-safe by reverting application code without dropping tables. Never run db:push against production. Existing databases must already match migration 0000. Configure DATABASE_URL, APP_BASE_URL, session cookie and Telegram secret/token. Provision an administrator using the bootstrap command that reuses existing authentication; registration will be inaccessible. No seed content is represented as real curated data.
+Back up PostgreSQL before applying migrations; application rollback requires compatibility testing against the forward schema and reconciliation of writes accepted after deployment. Never run db:push against production. Existing databases must already match migration 0000. Configure DATABASE_URL, APP_BASE_URL, session cookie and Telegram secret/token. Provision an administrator using the bootstrap command that reuses existing authentication; registration will be inaccessible. No seed content is represented as real curated data.
 
 Legacy source and tests remain for later archival/removal; a later migration may drop legacy tables only after explicit data retention review.
 
