@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { db } from "../src/server/db";
+import { db, closeDatabase } from "../src/server/db";
 import { users } from "../src/db/schema/users";
 import { register } from "../src/server/services/auth-service";
 import { z } from "zod";
@@ -21,14 +21,14 @@ async function main() {
     .where(eq(users.email, input.email.toLowerCase()))
     .limit(1);
   if (existing) throw new Error("Account already exists; no changes made");
-  const user = await register(input.email, input.password, input.name);
-  await db.update(users).set({ role: "admin" }).where(eq(users.id, user.id));
+  await register(input.email, input.password, input.name, "admin");
   console.log("Administrator created");
-  process.exit(0);
 }
-main().catch(() => {
+main().catch((error) => {
   console.error(
-    "Administrator creation failed. Check credentials, database and whether the account already exists.",
+    error instanceof Error && error.message === "Account already exists; no changes made"
+      ? error.message
+      : "Administrator creation failed. Check credentials, database and whether the account already exists.",
   );
-  process.exit(1);
-});
+  process.exitCode = 1;
+}).finally(closeDatabase);

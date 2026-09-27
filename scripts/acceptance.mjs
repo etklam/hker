@@ -1,10 +1,12 @@
 import { spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import os from "node:os";
+import { join } from "node:path";
 import postgres from "postgres";
 import { chromium } from "@playwright/test";
-const evidence = "artifacts/release-candidate";
+const runId = `${new Date().toISOString().replace(/[^0-9]/g, "").slice(0, 14)}-${randomBytes(3).toString("hex")}`;
+const evidence = join("artifacts/release-candidate/acceptance", runId);
 mkdirSync(evidence, { recursive: true });
 const git = (...args) =>
   spawnSync("git", args, { encoding: "utf8" }).stdout?.trim();
@@ -40,6 +42,7 @@ const manifest = {
     readFileSync("node_modules/@playwright/test/package.json", "utf8"),
   ).version,
   fixture: "disposable loopback hker_directory_test; mock Telegram",
+  evidenceDirectory: evidence,
   startedAt: new Date().toISOString(),
   stages: [],
 };
@@ -61,6 +64,8 @@ const env = {
   ...process.env,
   DIRECTORY_E2E_FIXTURE: "1",
   DIRECTORY_ACCEPTANCE: "1",
+  HKER_ACCEPTANCE_EVIDENCE_DIR: evidence,
+  HKER_ENVIRONMENT: "test",
   TELEGRAM_DELIVERY_MODE: "mock",
   AUTH_SESSION_SECRET:
     process.env.AUTH_SESSION_SECRET ??
@@ -79,7 +84,7 @@ manifest.chromium =
   spawnSync(chromium.executablePath(), ["--version"], {
     encoding: "utf8",
   }).stdout?.trim() || "unavailable";
-env.PLAYWRIGHT_JSON_OUTPUT_NAME = "artifacts/release-candidate/chromium.json";
+env.PLAYWRIGHT_JSON_OUTPUT_NAME = join(evidence, "chromium.json");
 const sanitize = (text) =>
   text
     .replace(/postgres(?:ql)?:\/\/[^\s"']+/gi, "[REDACTED_DATABASE_URL]")
@@ -93,7 +98,7 @@ for (const args of [
     "--maxWorkers=4",
     "--reporter=default",
     "--reporter=json",
-    "--outputFile=artifacts/release-candidate/unit.json",
+    `--outputFile=${join(evidence, "unit.json")}`,
   ],
   ["run", "test:migrations"],
   ["run", "db:migrate:safe"],
@@ -103,7 +108,7 @@ for (const args of [
     "--",
     "--reporter=default",
     "--reporter=json",
-    "--outputFile=artifacts/release-candidate/integration.json",
+    `--outputFile=${join(evidence, "integration.json")}`,
   ],
   ["run", "build"],
   ["run", "e2e:fixture"],

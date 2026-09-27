@@ -1,5 +1,7 @@
 # Phase 9 release candidate
 
+> Historical Phase 9 report. The current deployment path and acceptance status are in the [Phase 10 handover](directory-phase10-beta-handover.md). Phase 10 adds migration `0009_phase10_maintenance_runs`; the Phase 9 migration statements below describe the code at that earlier checkpoint.
+
 This report supersedes Phase 7/8 local counts, without certifying a deployment. The reviewed baseline is `d5aaa1944ddf0689aa00be249741f2a763744986`. Its [GitHub acceptance run 36314293368](https://github.com/etklam/hker/actions/runs/36314293368) was independently checked as successful. A replacement candidate requires its own completed CI run; the baseline pass does not certify these changes.
 
 ## Finding register
@@ -23,6 +25,8 @@ Search observation expiry is 10 minutes with 60 seconds future skew. The client 
 No new migration is required. Representative EXPLAIN used 10,000 terminal jobs plus the delayed-head/150-successor/B/C backlog and returned exactly eligible B/C. Existing indexes avoid full-table scans; trial indexes measured 0.866 ms versus 0.874 ms without them, which does not justify their cost. The uncommitted trial migration was removed; committed migrations 0000–0008 remain unchanged. `rc02-representative-plan.txt` preserves the comparison. Queue eligibility and active lease ownership remain separate from heartbeat health.
 
 ## Reproducible local evidence
+
+The commands and results in this section are the Phase 9 run record. For a new candidate, follow the current [Phase 10 release checklist](directory-release-checklist.md) and run `npm run ops:rehearsal`.
 
 Use Node 24, the lockfile, PostgreSQL 16, and a disposable loopback database named `hker_directory_test`. Never use a production database. Commands:
 

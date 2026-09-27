@@ -1,13 +1,35 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { telegram, TelegramDeliveryError, truncateTelegram } from "./bot-transport";
 import { telegramUpdateSchema, parseCallback, parseCatalogBotInput } from "./bot";
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); vi.useRealTimers(); });
 describe("bounded and isolated Telegram transport", () => {
     it("mocks delivery by default even with a token", async () => {
         vi.stubEnv("TELEGRAM_DELIVERY_MODE", "mock");
         vi.stubEnv("TELEGRAM_BOT_TOKEN", "configured-token");
         const fetcher = vi.spyOn(globalThis, "fetch");
         expect(await telegram("sendMessage", { chat_id: 123, text: "hello" })).toEqual({ message_id: 1 });
+        expect(fetcher).not.toHaveBeenCalled();
+    });
+    it("supports bounded test pacing only in mock delivery mode", async () => {
+        vi.useFakeTimers();
+        vi.stubEnv("TELEGRAM_DELIVERY_MODE", "mock");
+        vi.stubEnv("TELEGRAM_MOCK_DELAY_MS", "250");
+        const delivery = telegram("sendMessage", { chat_id: 123, text: "hello" });
+        await vi.advanceTimersByTimeAsync(250);
+        await expect(delivery).resolves.toEqual({ message_id: 1 });
+        vi.stubEnv("TELEGRAM_DELIVERY_MODE", "live");
+        vi.stubEnv("TELEGRAM_TEST_CHAT_ID", "1");
+        vi.stubEnv("TELEGRAM_BOT_TOKEN", "test");
+        const fetcher = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ ok: true, result: { message_id: 2 } }));
+        await expect(telegram("sendMessage", { chat_id: 1, text: "live" })).resolves.toEqual({ message_id: 2 });
+        expect(fetcher).toHaveBeenCalledTimes(1);
+    });
+    it("fails closed for disabled or misspelled delivery modes", async () => {
+        const fetcher = vi.spyOn(globalThis, "fetch");
+        vi.stubEnv("TELEGRAM_DELIVERY_MODE", "disabled");
+        await expect(telegram("sendMessage", { chat_id: 123, text: "hello" })).rejects.toMatchObject({ classification: "configuration", retryable: false });
+        vi.stubEnv("TELEGRAM_DELIVERY_MODE", "mokk");
+        await expect(telegram("sendMessage", { chat_id: 123, text: "hello" })).rejects.toMatchObject({ classification: "configuration", retryable: false });
         expect(fetcher).not.toHaveBeenCalled();
     });
     it("requires a dedicated development test chat", async () => {

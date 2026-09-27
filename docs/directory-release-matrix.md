@@ -1,4 +1,4 @@
-> Latest extended Phase 7 evidence: [extended acceptance matrix](directory-phase7-extended.md) and [performance observations](directory-performance-observations.md). Earlier counts below are historical; the extended final aggregate passed 547 unit / 60 integration / 34 Chromium tests with zero skips. Staging/live gates remain open.
+> Current implementation and release gates: [Phase 10 handover](directory-phase10-beta-handover.md), [release checklist](directory-release-checklist.md) and [K3s operator runbook](k3s-deploy.md). The Phase 7/8 counts and matrix below are historical evidence; they do not certify the Phase 10 candidate. Staging/live gates remain open.
 
 > Historical evidence inherited in the dirty worktree. For this request's independently rerun commands, additional defects and current limitations, use [Phase 7 checklist](directory-phase7-checklist.md). The statement below that the working tree was clean describes an earlier run, not the start of this request.
 

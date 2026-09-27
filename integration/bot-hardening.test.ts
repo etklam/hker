@@ -340,7 +340,7 @@ describe("Telegram durable navigation", () => {
     it("recovers accepted work across real runner process restarts", async () => {
         await execFileAsync("npm", ["run", "ops:build"], { cwd: process.cwd(), timeout: 30000 });
         await handleCatalogUpdate(message(8320, "/help", 832), small.db);
-        const first = await execFileAsync(process.execPath, [".ops/bot-runner.cjs", "--limit", "100"], { cwd: process.cwd(), env: { ...process.env, TELEGRAM_DELIVERY_MODE: "mock" }, timeout: 30000 });
+        const first = await execFileAsync(process.execPath, [".ops/bot-runner.cjs", "--limit", "100"], { cwd: process.cwd(), env: { ...process.env, HKER_ENVIRONMENT: "test", APP_BASE_URL: process.env.APP_BASE_URL ?? "http://localhost:3000", TELEGRAM_DELIVERY_MODE: "mock" }, timeout: 30000 });
         expect(JSON.parse(first.stdout.trim()).completed).toBeGreaterThanOrEqual(1);
         expect((await job(8320)).status).toBe("complete");
         await handleCatalogUpdate(message(8321, "/all", 832), small.db);

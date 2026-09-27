@@ -1,74 +1,84 @@
-> Current release candidate: [Phase 9 evidence and supervised staging/beta checklist](directory-phase9-release-candidate.md). Phase 7/8 counts below are historical.
-
-> Latest extended Phase 7 evidence: [extended acceptance matrix](directory-phase7-extended.md) and [performance observations](directory-performance-observations.md). Earlier counts below are historical; the extended final aggregate passed 547 unit / 60 integration / 34 Chromium tests with zero skips. Staging/live gates remain open.
-
 # Directory release checklist
 
-Historical Phase 7 rerun, scope boundaries and defect checklist: [Phase 7 acceptance](directory-phase7-checklist.md). Advanced import/behavioral analytics enhancements remain outside Phase 7, regardless of inherited experimental implementation.
+This is the authoritative release procedure for the curated Hong Kong directory. Phase 7/8 observations and Phase 9 regression evidence are historical context; current candidate evidence and the remaining external gates are in the [Phase 10 handover](directory-phase10-beta-handover.md). The [K3s runbook](k3s-deploy.md) uses the same render and apply tooling described here.
 
-This is the current release procedure. The earlier phase completion notes in `directory-rebuild-plan.md` are historical, not evidence of production acceptance. No production deployment, credentials change or live Telegram call was performed for this release.
+## Re-run the local gates
 
-## Reproducible local acceptance
-
-Use Node 24 (`nvm use`), PostgreSQL 16 and `npm ci`. The test database must be disposable, on loopback and named `hker_directory_test`. For example:
+Use Node 24 (`.nvmrc`), npm lockfile install, and PostgreSQL 16. Run integration acceptance only against a disposable PostgreSQL database on loopback named `hker_directory_test`. `scripts/acceptance.mjs` and `scripts/migration-acceptance.mjs` enforce that name, loopback host, and `ALLOW_DIRECTORY_TEST_RESET=1`; never relax those checks to reach a container or remote database.
 
 ```sh
-docker run --name hker-directory-test -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=directory-test -e POSTGRES_DB=hker_directory_test -p 127.0.0.1:55439:5432 -d postgres:16-alpine
-export DATABASE_URL=postgres://postgres:directory-test@127.0.0.1:55439/hker_directory_test
+fnm install 24
+fnm use 24
+npm ci
+
+# Supply DATABASE_URL from a private local environment for the disposable
+# loopback database, then run the guarded test suite.
 export ALLOW_DIRECTORY_TEST_RESET=1
-npx playwright install chromium
 npm run test:acceptance
+unset DATABASE_URL ALLOW_DIRECTORY_TEST_RESET
+
+# This command rejects an inherited DATABASE_URL and creates its own isolated
+# Compose projects, generated credentials, and disposable PostgreSQL volumes.
+npm run ops:rehearsal
+npm run ops:k3s:render
 ```
 
-`test:acceptance` fails without its safety guard, uses mock Telegram, executes typecheck/lint/unit/safe migrations/DB integration/build, seeds taxonomy/listings and an administrator, then runs Chromium against a production server. Fixtures reset directory rows; never point this at a real database. The private admin storage state is generated under ignored `.next/` after the build. It is not an account credential for another deployment. CI runs this same mode. Ordinary `test:e2e` may skip the seeded suites; that is smoke mode, not release acceptance.
+`test:acceptance` reruns typecheck, lint, unit and integration tests, the Phase 9 RC-01..05 regressions, guarded migration acceptance, production build and Chromium journeys. A previous CI count does not certify a changed candidate. The release rehearsal requires the local Docker daemon and runs the candidate's production image without source mounts. It runs candidate migration preflight/application, bootstrap, Web and watch worker; imports, duplicate review, export, discovery, external links, unpublish, authenticated mock webhook, cleanup, read-only doctor, negative configuration/schema/migration cases, database interruption, backup/restore, and the committed predecessor against the forward schema.
 
-## Build and run
+The rehearsal builds one dirty-or-clean candidate image and a separate committed predecessor image for rollback compatibility. It records a local Docker image ID, not a registry digest. Its unique evidence directory is printed in the result under `evidenceDirectory`; the host dump and generated environment files are removed. Only the exact generated Compose projects and their disposable volumes are removed. The candidate image is left available for review and promotion.
 
-```sh
-docker build -t hker:release-candidate .
-docker run --rm --env-file /secure/path/hker-runtime.env -p 3000:3000 hker:release-candidate
-```
+## Runtime commands
 
-Runtime environment follows `.env.example`. Provide a strong existing `AUTH_SESSION_SECRET` (do not rotate accidentally), database URL and exact APP_BASE_URL origin. Default `__Host-hker_session` requires HTTPS. For local HTTP explicitly use `hker_session`. `TRUST_PROXY_HEADERS=false` is safe by default; enabling it requires an ingress that overwrites `x-real-ip` and prevents direct origin access. Without trusted ingress, anonymous limits share a bucket. No runtime secrets are Docker build args. Container runs as `node`. `/api/health` is liveness; `/api/ready` checks the catalog DB schema. Neither returns credentials.
+The same commands are bundled under `ops/` in the production image. Runtime secrets are injected when a container or one-shot job starts, never passed as Docker build arguments.
 
-Operational bundles are shipped inside the runtime image, with dependencies bundled:
+| Image command | Effect |
+| --- | --- |
+| `node ops/migrate.cjs` | Read-only migration ledger preflight. |
+| `node ops/migrate.cjs --apply` | Applies reviewed migrations after preflight. Use only on a disposable database or an explicitly authorized target after backup and writer quiescence. |
+| `node ops/create-admin.cjs` | One-time bootstrap. Refuses an existing email without changing or promoting it. Keep its short-lived credentials out of Web/worker environments. |
+| `node ops/start.cjs` | Validates configuration and starts the Web server. |
+| `node ops/bot-runner.cjs --watch` | Durable Bot worker. Web-only mode uses `TELEGRAM_DELIVERY_MODE=disabled` and zero workers. |
+| `node ops/analytics-cleanup.cjs` | Bounded Bot, content, analytics and maintenance-evidence cleanup; records sanitized outcome/counts in `directory_maintenance_runs`. |
+| `node ops/doctor.cjs` | Read-only, detailed CLI diagnosis of configuration, DB identity hash, required release schema, migration preflight, worker evidence and cleanup. It does not contact Telegram or mutate data. |
+| `node ops/telegram-ops.mjs inspect` | Local config-only dry run. Add `--network` only for an authorized `getMe`/`getWebhookInfo` inspection. |
+| `node ops/telegram-ops.mjs set-webhook` | Network inspection and dry run. Mutation additionally requires `--apply`, exact Bot identity, HTTPS endpoint, webhook secret and a separate explicit acknowledgment. |
 
-```sh
-docker run --rm --env-file /secure/path/hker-runtime.env hker:release-candidate node ops/migrate.cjs
-# Only after a verified backup and reviewed compatible preflight:
-docker run --rm --env-file /secure/path/hker-runtime.env hker:release-candidate node ops/migrate.cjs --apply
-# New installations only; ADMIN_EMAIL, ADMIN_PASSWORD (12+ chars), optional ADMIN_NAME are runtime env.
-docker run --rm --env-file /secure/path/hker-bootstrap.env hker:release-candidate node ops/create-admin.cjs
-```
+`/api/health` is liveness and remains independent from the database. `/api/ready` checks the Web's required table/column contract and exposes only `ready` or `unavailable`; it never migrates. Worker health comes from a process-local file/identity; diagnostic progress is separate from an idle worker heartbeat. Detailed diagnostics stay in the CLI/Admin boundary.
 
-Admin bootstrap refuses existing email addresses; it does not silently promote or overwrite users. Remove bootstrap secrets after the one-time command. Local equivalents: `npm run db:preflight`, `db:migrate:safe`, `admin:create`.
+## Configuration boundary
 
-## Migration safety and rehearsal
+Use `.env.example` only as a local starting point; replace the local password placeholder and session secret before starting Compose. Never reuse these local values for staging or production.
 
-Migrations 0000–0003 are unchanged. Phase 8 migrations 0004–0008 remain intact; Phase 9 requires no new schema migration. The isolated rehearsal covers fresh, 0003 upgrade and reviewed 0008 schema compatibility, plus genuine backup/restore from the production image. 0004 adds listing aliases/revisions, old-slug reservations, import receipts, aggregate analytics and durable Bot delivery fields; restrictive taxonomy FKs replace silent SET NULL/cascade broadening. 0005 adds delivery, retention and slug-alias lookup indexes. Existing journal rows lacking ownership are marked completed if fully delivered, otherwise failed with a restart explanation; no unknown user identity is invented.
+| Setting | Contract |
+| --- | --- |
+| `HKER_ENVIRONMENT` | `local`, `test`, `staging` or `production`; staging/production require explicit HTTPS origin and proxy trust setting. |
+| `DATABASE_URL` | PostgreSQL URL for this environment's directory database. Staging/test and production never share databases, Bot jobs or Bot credentials. |
+| `APP_BASE_URL` | Exact origin, with no path/query. Production and staging use HTTPS and `__Host-` session cookies. |
+| `TRUST_PROXY_HEADERS` | Explicit `true`/`false` in staging/production. Enable only behind an ingress that overwrites forwarded client IPs and blocks direct origin access. |
+| `AUTH_SESSION_SECRET` | Existing strong signing secret. Do not rotate implicitly during deploy; worker/bootstrap roles do not receive it. |
+| `TELEGRAM_DELIVERY_MODE` | `mock` for local/test, `live` only with protected runtime credentials, or `disabled` for Web-only operation. Staging live mode requires a dedicated `TELEGRAM_TEST_CHAT_ID`. Unknown values fail closed. |
+| `TELEGRAM_WEBHOOK_SECRET` | Required by Web when live mode accepts Telegram webhook requests; worker does not need it. The webhook route retains secret validation when staging access protection is arranged. |
+| `ANALYTICS_ACTION_SECRET` | Optional HMAC key. If set, keep it consistent across Web instances. Analytics can be disabled/degraded without disabling discovery. |
 
-Preflight checks every ledger hash and timestamp against the repository prefix before applying anything; concurrent migrators serialize with a session advisory lock. A pre-existing schema with no ledger, unknown historical rows or a checksum mismatch causes failure. The historical legacy-ledger mismatch is not automatically repaired. Restore a backup into an isolated rehearsal database, identify the exact schema/history, and create a reviewed reconciliation procedure before deployment. Never replay all SQL blindly, rewrite ledger hashes, run `db:push`, or treat SQL errors as already-applied success.
+Mock delivery belongs only to an isolated synthetic database. The rehearsal strips inherited database, Admin, session and Telegram variables from its Docker subprocess and injects an empty token plus mock mode. It cannot consume a real Bot queue under its defaults.
 
-Backup/restore example (operator-supplied URLs, never embed credentials in docs/logs):
+## Upgrade, recovery and promotion
 
-```sh
-pg_dump --format=custom --no-owner --file=hker-before-release.dump "$SOURCE_DATABASE_URL"
-pg_restore --exit-on-error --no-owner --dbname="$ISOLATED_RESTORE_DATABASE_URL" hker-before-release.dump
-DATABASE_URL="$ISOLATED_RESTORE_DATABASE_URL" node ops/migrate.cjs
-DATABASE_URL="$ISOLATED_RESTORE_DATABASE_URL" node ops/migrate.cjs --apply
-```
+Migration `0009_bright_palladium` adds bounded maintenance-run evidence. Migration preflight verifies the full ledger prefix and checksums; never replay SQL by hand, rewrite ledger rows, use `db:push`, or delete a namespace as a repair. The image-only rollback test starts the committed Phase 9 Web and worker against the candidate's forward schema. It does not prove that unrelated future migrations remain backward compatible.
 
-Verify row counts, known draft/enabled states, link identities/URLs, admin login and discovery on the restored copy. Keep the backup encrypted and access-controlled. Schema rollback is backup restoration to a separate DB followed by a coordinated connection switch; never drop added columns or force an old writer against new semantics. Stop writes and Bot workers first. An application-only rollback must be compatibility-tested against the forward schema; lost writes after the backup require separate reconciliation.
+Before an authorized staging migration, identify the exact candidate/image digest and database, stop writers and the worker, take a recoverable backup to separate storage, restore it into a separate database and verify it, run the target's read-only preflight, then apply the candidate migration once and start the matching Web/worker. Reopen ingress only after readiness and the selected smoke cases pass. Application-image rollback and database restore are different actions; preserve writes accepted after a backup and coordinate any connection switch. Never run a destructive down migration or restore over the source database.
 
-## Bot and retention
+`ops:rehearsal` produces a local image ID. To promote the exact tested bytes, tag and push that image to the approved registry/platform, record the returned registry manifest digest, and render K3s with `HKER_IMAGE=registry/path@sha256:<digest>`. Do not rebuild a second application image for staging; do not use `latest` as the release identity. The K3s tool applies nothing by default. Its explicit apply path requires exact context/namespace/image/origin confirmations, a candidate migration preflight/review acknowledgment, verified separate backup, quiesced writers and an explicit mutation acknowledgment.
 
-See `directory-telegram.md`. Mock is default; live requires explicit `TELEGRAM_DELIVERY_MODE=live`, token and fail-closed webhook secret. Schedule `node ops/bot-runner.cjs` at least once per minute, and `--cleanup` daily. Schedule `node ops/analytics-cleanup.cjs` daily. Monitor failed jobs and readiness. No Redis or queue service is needed. Active jobs are not cleaned. Terminal Bot dedup lasts 30 days; analytics receipts last 7 days and aggregate days 90. Import receipts remain durable so a lost-response retry does not reimport; archive them only with an explicit retention/idempotency decision.
+## Cleanup evidence
 
-## External acceptance before release
+The rehearsal ages only fictional rows and verifies one cleanup removes expired Bot bodies/jobs/sessions/leases, expired content plans/history, analytics receipts/aggregates and old maintenance evidence. It reruns cleanup and requires zero second-pass deletions while a locked Bot job and unexpired content plan remain. `directory_maintenance_runs` records sanitized execution status and counts; the read-only doctor reports the last observed run.
 
-- Restore an actual production backup and resolve its migration ledger using preflight; local synthetic fresh/upgrade testing cannot prove that deployed history matches.
-- Supply real catalog content and administrator ownership; verify proxy trust, HTTPS, cookie settings and persistent scheduler in staging.
-- Authorize a dedicated Telegram test chat and webhook; test shared-chat ownership, 429/restart recovery, commands and publication changes. Local transport is mocked and makes no exactly-once claim.
-- Deploy only after operator authorization, monitor readiness/errors, rehearse restore and verify backup access.
+Local Compose rehearsal uses an explicit one-shot cleanup command. K3s supplies one daily CronJob in `Asia/Hong_Kong`; `Forbid` prevents overlap from that CronJob only and is not a cluster-wide lock. A scheduled job is not evidence of execution: inspect the cleanup ledger and CronJob result. See the official [Kubernetes CronJob semantics](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/).
 
-Exact local results and screenshots are recorded in `directory-release-matrix.md`. These external items remain unchecked.
+## External release gates
+
+- **Staging applied/verified:** not implied by offline K3s rendering or local Docker rehearsal. Requires target authorization, exact candidate promotion, private configuration, ingress/network protection, backup evidence, migration ledger reconciliation and staging smoke.
+- **Live Telegram verified:** not implied by mock delivery. Requires a separately authorized dedicated chat and webhook action. Never set `drop_pending_updates=true`; `getWebhookInfo` does not expose or prove the configured secret token. See [Telegram `setWebhook`](https://core.telegram.org/bots/api#setwebhook) and [`getWebhookInfo`](https://core.telegram.org/bots/api#getwebhookinfo).
+- **Real content approved:** remains an owner/content gate. Rehearsal listings are fictional and must not be presented as current businesses, prices, official status or reviews.
+- **Independent backup and host-loss recovery:** not proven by a local backup on the same machine. Record storage, retention, roles/extensions and a separate target restore before claiming recovery objectives.

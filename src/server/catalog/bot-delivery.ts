@@ -124,7 +124,11 @@ export async function deliverCatalogUpdate(id: number, options: BotDeliveryOptio
 
 export async function recordBotRunnerHeartbeat(runnerId: string, at?: Date) {
     const now = currentTime(at);
-    await db.insert(botRunnerState).values({ key: "delivery", runnerId, heartbeatAt: now, updatedAt: now }).onConflictDoUpdate({ target: botRunnerState.key, set: { runnerId, heartbeatAt: now, updatedAt: now } });
+    await db.insert(botRunnerState).values({ key: `process:${runnerId}`, runnerId, heartbeatAt: now, updatedAt: now }).onConflictDoUpdate({ target: botRunnerState.key, set: { runnerId, heartbeatAt: now, updatedAt: now } });
+}
+async function recordBotDeliveryProgress(runnerId: string, at?: Date) {
+    const now = currentTime(at);
+    await db.insert(botRunnerState).values({ key: `progress:${runnerId}`, runnerId, heartbeatAt: now, updatedAt: now }).onConflictDoUpdate({ target: botRunnerState.key, set: { runnerId, heartbeatAt: now, updatedAt: now } });
 }
 export async function runBotDelivery(limit = 100, options: { signal?: AbortSignal; concurrency?: number; runnerId?: string; now?: Date; config?: BotDeliveryConfig } = {}) {
     const runnerId = options.runnerId ?? randomUUID();
@@ -233,6 +237,7 @@ export async function runBotDelivery(limit = 100, options: { signal?: AbortSigna
     };
     await Promise.all(Array.from({ length: Math.min(groups.length || 1, Math.max(1, Math.min(16, options.concurrency ?? 4))) }, worker));
     await recordBotRunnerHeartbeat(runnerId, options.now);
+    if (completed > 0) await recordBotDeliveryProgress(runnerId, options.now);
     return { scanned: jobs.length, eligible: jobs.length, claimed, completed, retried, expired, blocked: jobs.length - claimed - expired };
 }
 
@@ -246,13 +251,25 @@ export async function cleanupBotState(batchSize = 500) {
     const sessions = await db.delete(botSessions).where(inArray(botSessions.key, sessionKeys)).returning({ key: botSessions.key });
     const chatKeys = db.select({ key: botChatLeases.key }).from(botChatLeases).where(sql`${botChatLeases.updatedAt} < now() - interval '7 days' and (${botChatLeases.lockedUntil} is null or ${botChatLeases.lockedUntil} < now()) and not exists (select 1 from directory_bot_updates u where u.chat_key = ${botChatLeases.key} and u.status not in ('complete','failed'))`).orderBy(botChatLeases.key).limit(batch);
     const chats = await db.delete(botChatLeases).where(inArray(botChatLeases.key, chatKeys)).returning({ key: botChatLeases.key });
-    return { bodies: bodies.length, jobs: jobs.length, sessions: sessions.length, chats: chats.length };
+    const runners = await db.delete(botRunnerState).where(sql`(${botRunnerState.key} like 'process:%' or ${botRunnerState.key} like 'progress:%') and ${botRunnerState.updatedAt} < now() - interval '30 days'`).returning({ key: botRunnerState.key });
+    return { bodies: bodies.length, jobs: jobs.length, sessions: sessions.length, chats: chats.length, runners: runners.length };
 }
 
 export async function getBotDeliveryStatus() {
     const counts = await db.execute(sql`select status, count(*)::int as count from directory_bot_updates group by status order by status`);
     const [age] = await db.execute(sql`select greatest(0, extract(epoch from (now() - min(created_at))))::int as seconds from directory_bot_updates where status not in ('complete','failed')`);
-    const [heartbeat] = await db.select().from(botRunnerState).where(eq(botRunnerState.key, "delivery"));
+    const runners = await db.execute(sql`
+      select process.runner_id as "runnerId", process.heartbeat_at as "heartbeatAt",
+             progress.heartbeat_at as "progressAt"
+      from directory_bot_runner_state process
+      left join directory_bot_runner_state progress
+        on progress.key = 'progress:' || process.runner_id
+      where process.key like 'process:%'
+      order by process.heartbeat_at desc
+      limit 20
+    `);
+    const [legacyHeartbeat] = await db.select().from(botRunnerState).where(eq(botRunnerState.key, "delivery"));
+    const [heartbeat] = runners;
     const errors = await db.execute(sql`select coalesce(error_class, 'unknown') as class, count(*)::int as count from directory_bot_updates where status = 'failed' group by error_class order by count desc limit 10`);
-    return { counts, oldestPendingSeconds: Number(age?.seconds ?? 0), heartbeat: heartbeat ? { at: heartbeat.heartbeatAt, runnerId: heartbeat.runnerId } : null, errors };
+    return { counts, oldestPendingSeconds: Number(age?.seconds ?? 0), heartbeat: heartbeat ? { at: heartbeat.heartbeatAt, runnerId: heartbeat.runnerId } : legacyHeartbeat ? { at: legacyHeartbeat.heartbeatAt, runnerId: legacyHeartbeat.runnerId } : null, runners, errors };
 }

@@ -19,7 +19,7 @@
     "test:e2e:webkit": "node scripts/webkit-acceptance.mjs",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "admin:create": "esbuild scripts/create-admin.ts --bundle --platform=node --packages=external --outfile=.next/admin-bootstrap.cjs && node .next/admin-bootstrap.cjs",
-    "ops:build": "esbuild scripts/migrate.ts scripts/create-admin.ts scripts/bot-runner.ts scripts/analytics-cleanup.ts --bundle --platform=node --outdir=.ops --out-extension:.js=.cjs",
+    "ops:build": "esbuild scripts/migrate.ts scripts/create-admin.ts scripts/bot-runner.ts scripts/analytics-cleanup.ts scripts/doctor.ts --bundle --platform=node --packages=external --outdir=.ops --out-extension:.js=.cjs && cp scripts/runtime-env.cjs .ops/runtime-env.cjs",
     "db:preflight": "npm run ops:build && node .ops/migrate.cjs",
     "db:migrate:safe": "npm run ops:build && node .ops/migrate.cjs --apply",
     "bot:run": "npm run ops:build && node .ops/bot-runner.cjs",
@@ -30,7 +30,11 @@
     "e2e:fixture": "esbuild scripts/e2e-fixture.ts --bundle --platform=node --outfile=.next/e2e-fixture.cjs && node .next/e2e-fixture.cjs",
     "test:acceptance": "node scripts/acceptance.mjs",
     "test:migrations": "node scripts/migration-acceptance.mjs",
-    "bot:status": "npm run ops:build && node .ops/bot-runner.cjs --status"
+    "bot:status": "npm run ops:build && node .ops/bot-runner.cjs --status",
+    "ops:doctor": "npm run ops:build && node .ops/doctor.cjs",
+    "ops:k3s:render": "node scripts/render-k3s.mjs",
+    "ops:rehearsal": "node scripts/ops-rehearsal.mjs",
+    "ops:telegram": "node scripts/telegram-ops.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

@@ -1,6 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
 if (process.env.DIRECTORY_ACCEPTANCE === '1' && process.env.DIRECTORY_E2E_FIXTURE !== '1') throw new Error('Acceptance fixture is required');
+const acceptance = process.env.DIRECTORY_ACCEPTANCE === '1';
+const baseUrl = process.env.E2E_BASE_URL ?? 'http://localhost:3000';
 export default defineConfig({
   testDir: './e2e',
   // Legacy product tests are retained as migration history, outside the active suite.
@@ -39,8 +41,10 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: process.env.DIRECTORY_ACCEPTANCE === '1' ? `npm run start -- --hostname 127.0.0.1 --port ${new URL(process.env.E2E_BASE_URL ?? 'http://localhost:3000').port || '3000'}` : 'npm run dev',
-    url: process.env.E2E_BASE_URL ?? 'http://localhost:3000',
-    reuseExistingServer: process.env.DIRECTORY_ACCEPTANCE !== '1' && !process.env.CI,
+    command: acceptance ? 'node server.js' : 'npm run dev',
+    cwd: acceptance ? '.next/standalone' : undefined,
+    env: acceptance ? { HOSTNAME: '127.0.0.1', PORT: new URL(baseUrl).port || '3000' } : undefined,
+    url: baseUrl,
+    reuseExistingServer: !acceptance && !process.env.CI,
   },
 });

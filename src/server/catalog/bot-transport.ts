@@ -32,12 +32,23 @@ export async function telegram(method: string, body: Record<string, unknown>, ti
     message_id?: number;
 }> {
     validateTelegramBody(body);
-    // Development never contacts Telegram unless explicitly configured for a dedicated chat.
-    if (process.env.TELEGRAM_DELIVERY_MODE !== "live")
+    const mode = process.env.TELEGRAM_DELIVERY_MODE ?? (process.env.NODE_ENV === "production" ? "" : "mock");
+    if (mode === "mock") {
+        const mockDelay = Number(process.env.TELEGRAM_MOCK_DELAY_MS ?? 0);
+        if (Number.isInteger(mockDelay) && mockDelay > 0 && mockDelay <= 10000)
+            await new Promise((resolve) => setTimeout(resolve, mockDelay));
         return { message_id: 1 };
+    }
+    if (mode !== "live")
+        throw new TelegramDeliveryError("Telegram delivery is disabled or misconfigured", false, 0, undefined, "delivery disabled", undefined, "configuration");
+    const deployment = process.env.HKER_ENVIRONMENT ?? (process.env.NODE_ENV === "production" ? "production" : "local");
     if (process.env.NODE_ENV !== "production" &&
         (!process.env.TELEGRAM_TEST_CHAT_ID || (body.chat_id !== undefined && String(body.chat_id) !== process.env.TELEGRAM_TEST_CHAT_ID))) {
         throw new TelegramDeliveryError("Live development delivery requires the dedicated test chat", false, 0, undefined, "test chat mismatch", undefined, "configuration");
+    }
+    if (deployment === "staging" &&
+        (!process.env.TELEGRAM_TEST_CHAT_ID || (body.chat_id !== undefined && String(body.chat_id) !== process.env.TELEGRAM_TEST_CHAT_ID))) {
+        throw new TelegramDeliveryError("Staging delivery requires the dedicated test chat", false, 0, undefined, "test chat mismatch", undefined, "configuration");
     }
     const token = process.env.TELEGRAM_BOT_TOKEN;
     if (!token)

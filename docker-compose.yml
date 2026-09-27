@@ -4,13 +4,13 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-app}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in a private env file}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:${HKER_DEV_DB_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -18,20 +18,175 @@ services:
   app:
     build: .
     ports:
-      - "3000:3000"
+      - "127.0.0.1:${HKER_DEV_WEB_PORT:-3000}:3000"
     depends_on:
       db:
         condition: service_healthy
+    restart: "on-failure:5"
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-app}
+      HKER_ENVIRONMENT: ${HKER_ENVIRONMENT:-local}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-app}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
       AUTH_SESSION_SECRET: ${AUTH_SESSION_SECRET:?Set a random secret of at least 32 characters}
       AUTH_SESSION_COOKIE_NAME: ${AUTH_SESSION_COOKIE_NAME:-hker_session}
       AUTH_SESSION_TTL_DAYS: ${AUTH_SESSION_TTL_DAYS:-30}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
-      TRUST_PROXY_HEADERS: ${TRUST_PROXY_HEADERS:-false}
+      TELEGRAM_TEST_CHAT_ID: ${TELEGRAM_TEST_CHAT_ID:-}
       TELEGRAM_DELIVERY_MODE: ${TELEGRAM_DELIVERY_MODE:-mock}
+      TRUST_PROXY_HEADERS: ${TRUST_PROXY_HEADERS:-false}
+
+  migrate:
+    image: ${HKER_IMAGE:-hker:release-candidate}
+    pull_policy: never
+    profiles: ["rehearsal"]
+    command: ["node", "ops/migrate.cjs", "--apply"]
+    restart: "no"
+    healthcheck:
+      disable: true
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${HKER_MIGRATION_DATABASE_URL:-postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-app}}
+
+  bootstrap:
+    image: ${HKER_IMAGE:-hker:release-candidate}
+    pull_policy: never
+    profiles: ["rehearsal"]
+    command: ["node", "ops/create-admin.cjs"]
+    restart: "no"
+    healthcheck:
+      disable: true
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-app}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_NAME: ${ADMIN_NAME:-HKER Fictional Rehearsal Admin}
+
+  web:
+    image: ${HKER_IMAGE:-hker:release-candidate}
+    pull_policy: never
+    profiles: ["rehearsal"]
+    ports:
+      - "127.0.0.1:${HKER_REHEARSAL_WEB_PORT:-3100}:3000"
+    restart: "on-failure:5"
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      HKER_ENVIRONMENT: local
+      HKER_CANDIDATE_ID: ${HKER_CANDIDATE_ID:-local-rehearsal}
+      HKER_IMAGE_REF: ${HKER_IMAGE:-hker:release-candidate}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-app}
+      APP_BASE_URL: http://127.0.0.1:${HKER_REHEARSAL_WEB_PORT:-3100}
+      AUTH_SESSION_SECRET: ${AUTH_SESSION_SECRET:?Set isolated rehearsal session secret}
+      AUTH_SESSION_COOKIE_NAME: hker_rehearsal_session
+      AUTH_SESSION_TTL_DAYS: "1"
+      TRUST_PROXY_HEADERS: "false"
+      TELEGRAM_DELIVERY_MODE: mock
+      TELEGRAM_BOT_TOKEN: ""
+      TELEGRAM_WEBHOOK_SECRET: ${HKER_REHEARSAL_WEBHOOK_SECRET:-}
+      TELEGRAM_TEST_CHAT_ID: ""
+      DIRECTORY_ANALYTICS_ENABLED: ${DIRECTORY_ANALYTICS_ENABLED:-true}
+
+  worker:
+    image: ${HKER_IMAGE:-hker:release-candidate}
+    pull_policy: never
+    profiles: ["rehearsal"]
+    command: ["node", "ops/bot-runner.cjs", "--watch"]
+    restart: "on-failure:5"
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "node", "-e", "const fs=require('node:fs');const p=process.env.BOT_HEALTH_FILE||'/tmp/hker-worker-health';if(!fs.existsSync(p)||Date.now()-fs.statSync(p).mtimeMs>30000)process.exit(1)"]
+      interval: 10s
+      timeout: 3s
+      start_period: 20s
+      retries: 3
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      HKER_ENVIRONMENT: local
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-app}
+      APP_BASE_URL: http://127.0.0.1:${HKER_REHEARSAL_WEB_PORT:-3100}
+      TELEGRAM_DELIVERY_MODE: mock
+      TELEGRAM_BOT_TOKEN: ""
+      TELEGRAM_WEBHOOK_SECRET: ""
+      BOT_HEALTH_FILE: /tmp/hker-worker-health
+
+  cleanup:
+    image: ${HKER_IMAGE:-hker:release-candidate}
+    pull_policy: never
+    profiles: ["rehearsal"]
+    command: ["node", "ops/analytics-cleanup.cjs"]
+    restart: "no"
+    healthcheck:
+      disable: true
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      HKER_ENVIRONMENT: local
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-app}
+      APP_BASE_URL: http://127.0.0.1:${HKER_REHEARSAL_WEB_PORT:-3100}
+      TELEGRAM_DELIVERY_MODE: mock
+
+  doctor:
+    image: ${HKER_IMAGE:-hker:release-candidate}
+    pull_policy: never
+    profiles: ["rehearsal"]
+    command: ["node", "ops/doctor.cjs"]
+    restart: "no"
+    healthcheck:
+      disable: true
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      HKER_ENVIRONMENT: local
+      HKER_CANDIDATE_ID: ${HKER_CANDIDATE_ID:-local-rehearsal}
+      HKER_IMAGE_REF: ${HKER_IMAGE:-hker:release-candidate}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-app}
+      APP_BASE_URL: http://127.0.0.1:${HKER_REHEARSAL_WEB_PORT:-3100}
+      AUTH_SESSION_SECRET: ${AUTH_SESSION_SECRET:?Set isolated rehearsal session secret}
+      AUTH_SESSION_COOKIE_NAME: hker_rehearsal_session
+      TRUST_PROXY_HEADERS: "false"
+      TELEGRAM_DELIVERY_MODE: mock
+      TELEGRAM_BOT_TOKEN: ""
+      TELEGRAM_WEBHOOK_SECRET: ""
+
+  schema-negative-web:
+    image: ${HKER_IMAGE:-hker:release-candidate}
+    pull_policy: never
+    profiles: ["negative"]
+    ports:
+      - "127.0.0.1:${HKER_NEGATIVE_WEB_PORT:-3199}:3000"
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      HKER_ENVIRONMENT: local
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-app}
+      APP_BASE_URL: http://127.0.0.1:${HKER_NEGATIVE_WEB_PORT:-3199}
+      AUTH_SESSION_SECRET: ${AUTH_SESSION_SECRET:?Set isolated negative-test session secret}
+      AUTH_SESSION_COOKIE_NAME: hker_negative_session
+      TRUST_PROXY_HEADERS: "false"
+      TELEGRAM_DELIVERY_MODE: mock
+      TELEGRAM_BOT_TOKEN: ""
+      TELEGRAM_WEBHOOK_SECRET: ""
 
 volumes:
   pgdata:

@@ -64,4 +64,11 @@ describe('middleware', () => {
 
     expect(response.headers.get('Cache-Control')).toBeNull()
   })
+
+  it('marks staging responses noindex without blocking webhook routes', () => {
+    vi.stubEnv('HKER_ENVIRONMENT', 'staging')
+    const response = middleware(createMockRequest('/api/telegram/webhook'))
+    expect(response.headers.get('X-Robots-Tag')).toBe('noindex, nofollow')
+    expect(response.status).toBe(200)
+  })
 })

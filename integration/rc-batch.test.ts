@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { inArray } from "drizzle-orm";
 import { createDatabase, db } from "@/server/db";
 import { listings, listingLinks, listingTags } from "@/db/schema/directory";
@@ -111,9 +112,11 @@ describe("RC-05 bounded batch reads", () => {
         expect(exported.listings[0].links).toHaveLength(2);
       }
       console.log("RC05_STATEMENTS", JSON.stringify(observations));
-      mkdirSync("artifacts/release-candidate", { recursive: true });
+      const evidenceDirectory = process.env.HKER_ACCEPTANCE_EVIDENCE_DIR
+        ?? `artifacts/release-candidate/rc05-statements/${run}`;
+      mkdirSync(evidenceDirectory, { recursive: true });
       writeFileSync(
-        "artifacts/release-candidate/rc05-statements.json",
+        join(evidenceDirectory, "rc05-statements.json"),
         JSON.stringify(
           { node: process.version, concurrency: 1, observations },
           null,

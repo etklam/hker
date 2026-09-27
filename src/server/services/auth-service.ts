@@ -35,7 +35,7 @@ function verifyPassword(password: string, stored: string): Promise<boolean> {
   })
 }
 
-export async function register(email: string, password: string, displayName?: string) {
+export async function register(email: string, password: string, displayName?: string, role: 'user' | 'admin' = 'user') {
   const normalizedEmail = email.toLowerCase()
   const passwordHashValue = await hashPassword(password)
 
@@ -45,6 +45,7 @@ export async function register(email: string, password: string, displayName?: st
       .values({
         email: normalizedEmail,
         displayName: displayName ?? null,
+        role,
       })
       .returning()
 

@@ -3,15 +3,21 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export function middleware(request: NextRequest) {
+  const deployment = process.env.HKER_ENVIRONMENT ?? (process.env.NODE_ENV === 'production' ? 'production' : 'local')
   if (isRetiredPath(request.nextUrl.pathname)) {
-    return new NextResponse('This legacy feature is no longer available.', { status: 410 })
+    const retired = new NextResponse('This legacy feature is no longer available.', { status: 410 })
+    if (deployment === 'staging') retired.headers.set('X-Robots-Tag', 'noindex, nofollow')
+    return retired
   }
-  const response = NextResponse.next()
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-hker-deployment-environment', deployment)
+  const response = NextResponse.next({ request: { headers: requestHeaders } })
   
   response.headers.set('X-Content-Type-Options', 'nosniff')
   response.headers.set('X-Frame-Options', 'DENY')
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
   response.headers.set('X-DNS-Prefetch-Control', 'on')
+  if (deployment === 'staging') response.headers.set('X-Robots-Tag', 'noindex, nofollow')
 
   if (process.env.NODE_ENV === 'production') {
     response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')

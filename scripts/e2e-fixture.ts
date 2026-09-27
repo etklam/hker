@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { cpSync, existsSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { sql } from "drizzle-orm";
 import { db, closeDatabase } from "../src/server/db";
 import { users } from "../src/db/schema/users";
@@ -21,6 +22,14 @@ async function main() {
     throw new Error(
       "Set the same AUTH_SESSION_SECRET for fixture and test server",
     );
+  if (existsSync(".next/standalone/server.js")) {
+    cpSync(".next/static", join(".next/standalone", ".next", "static"), {
+      recursive: true,
+    });
+    cpSync("public", join(".next/standalone", "public"), {
+      recursive: true,
+    });
+  }
   const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3000";
   if (
     !["localhost", "127.0.0.1", "::1", "[::1]"].includes(

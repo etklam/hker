@@ -66,4 +66,4 @@ See [phase reports and migration map](docs/directory-rebuild-plan.md). Historica
 
 ## Release acceptance
 
-The current [evidence matrix](docs/directory-release-matrix.md) and [release checklist](docs/directory-release-checklist.md) supersede earlier phase reports. `npm run test:acceptance` requires a guarded disposable DB, exercises fresh/upgrade migrations and seeds the real browser workflow. Docker ships migration, admin bootstrap, mock-safe Bot runner and retention commands; runtime secrets are supplied only when running the container.
+The current [Phase 10 handover](docs/directory-phase10-beta-handover.md), [evidence matrix](docs/directory-release-matrix.md) and [release checklist](docs/directory-release-checklist.md) define current evidence and release gates. `npm run test:acceptance` requires a guarded disposable DB, exercises fresh/upgrade migrations and browser workflows. `npm run ops:rehearsal` builds one isolated candidate image and exercises Docker Compose deployment, recovery and rollback compatibility with mocked Telegram. Runtime secrets are supplied only when running the container.

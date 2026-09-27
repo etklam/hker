@@ -107,3 +107,16 @@ export const catalogHistory = pgTable(
     retention: index("directory_content_history_created_idx").on(t.createdAt),
   }),
 );
+
+export const maintenanceRuns = pgTable("directory_maintenance_runs", {
+  id: text("id").primaryKey(),
+  kind: text("kind").notNull(),
+  status: text("status").notNull(),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
+  counts: jsonb("counts").$type<Record<string, number | null>>().notNull().default({}),
+  errorClass: text("error_class"),
+}, (t) => ({
+  valid: check("directory_maintenance_run_valid", sql`${t.kind} = 'retention' and ${t.status} in ('succeeded', 'failed')`),
+  recent: index("directory_maintenance_run_recent_idx").on(t.kind, t.startedAt),
+}));
