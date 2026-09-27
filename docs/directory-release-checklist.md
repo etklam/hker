@@ -1,6 +1,6 @@
 # Directory release checklist
 
-This is the authoritative release procedure for the curated Hong Kong directory. Phase 7/8 observations and Phase 9 regression evidence are historical context; current candidate evidence and the remaining external gates are in the [Phase 10 handover](directory-phase10-beta-handover.md). The [K3s runbook](k3s-deploy.md) uses the same render and apply tooling described here.
+This is the authoritative release procedure for the curated Hong Kong directory. Phase 7/8 observations and Phase 9 regression evidence are historical context; current candidate evidence and the remaining external gates are in the [unified completion report](directory-final-completion.md); the [Phase 10 handover](directory-phase10-beta-handover.md) is historical. The [K3s runbook](k3s-deploy.md) uses the same render and apply tooling described here.
 
 ## Re-run the local gates
 
