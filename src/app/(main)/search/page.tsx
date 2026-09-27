@@ -1,3 +1,4 @@
+import { AppError } from "@/lib/errors";
 import { guardPublicSearch } from "@/server/catalog/abuse";
 import { SearchForm } from "@/components/directory/SearchForm";
 import { Filters } from "@/components/directory/Filters";
@@ -24,11 +25,13 @@ export default async function SearchPage({
 }) {
   try {
     await guardPublicSearch();
-  } catch {
+  } catch (error) {
+    const limited = error instanceof AppError && error.code === "RATE_LIMITED";
     return (
       <div className="container page-heading">
-        <h1>搜尋過於頻繁</h1>
-        <p>請稍候一分鐘再試。</p>
+        <h1>{limited ? "搜尋過於頻繁" : "搜尋服務暫時無法使用"}</h1>
+        <p>{limited ? "請稍候一分鐘再試。" : "目前未能載入資料，請稍後重試。"}</p>
+        <a href="" className="button">重試目前搜尋</a>
       </div>
     );
   }
@@ -269,7 +272,7 @@ export default async function SearchPage({
                 </a>
               </div>
             ) : (
-              <ListingResults items={result.items} />
+              <ListingResults returnTo={pageUrl(input.page)} items={result.items} />
             )}
             <nav className="pagination" aria-label="搜尋分頁">
               {input.page > 1 && (

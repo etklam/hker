@@ -1,11 +1,12 @@
 import Link from "next/link";
 import type { CatalogListing } from "@/server/catalog/service";
 import { formatPrice } from "@/lib/directory";
-export function ListingCard({ listing }: { listing: CatalogListing }) {
+export function ListingCard({ listing, returnTo }: { listing: CatalogListing; returnTo?: string }) {
+  const detailHref = `/listing/${listing.slug}${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`;
   return (
     <article className="listing-card">
       <h3>
-        <Link href={`/listing/${listing.slug}`}>{listing.name}</Link>
+        <Link href={detailHref}>{listing.name}</Link>
       </h3>
       <div className="listing-meta">
         {[listing.area?.name, listing.category?.name]
@@ -33,17 +34,17 @@ export function ListingCard({ listing }: { listing: CatalogListing }) {
           </span>
         ))}
       </div>
-      <Link className="text-link" href={`/listing/${listing.slug}`}>
+      <Link className="text-link" href={detailHref}>
         查看詳情 →
       </Link>
     </article>
   );
 }
-export function ListingResults({ items }: { items: CatalogListing[] }) {
+export function ListingResults({ items, returnTo }: { items: CatalogListing[]; returnTo?: string }) {
   return items.length ? (
     <div className="listing-grid">
       {items.map((item) => (
-        <ListingCard key={item.id} listing={item} />
+        <ListingCard key={item.id} listing={item} returnTo={returnTo} />
       ))}
     </div>
   ) : (

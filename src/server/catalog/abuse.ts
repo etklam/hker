@@ -23,9 +23,13 @@ export async function allowCatalogRequest(
   bucket: string,
   limit = 60,
 ) {
-  return (await rateLimit(abuseKey(header, bucket), limit, 60_000)).allowed;
+  try {
+    return (await rateLimit(abuseKey(header, bucket), limit, 60_000)).allowed;
+  } catch {
+    throw new AppError("SERVICE_UNAVAILABLE", "搜尋服務暫時無法使用，請稍後重試。");
+  }
 }
 export async function guardPublicSearch() {
   if (!(await allowCatalogRequest(new Headers(await headers()), "search", 90)))
-    throw new AppError("INVALID_REQUEST", "搜尋過於頻繁，請稍後再試。");
+    throw new AppError("RATE_LIMITED", "搜尋過於頻繁，請稍後再試。");
 }

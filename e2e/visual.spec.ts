@@ -3,7 +3,7 @@ import {mkdir} from 'node:fs/promises';
 const enabled=process.env.DIRECTORY_E2E_FIXTURE==='1';
 test.describe('directory viewport acceptance',()=>{
  test.skip(!enabled,'Requires deterministic isolated fixture');
- for(const width of [390,768,1440]) {
+ for(const width of [320,390,768,1440]) {
   test(`public and admin at ${width}px`,async({browser})=>{
    await mkdir('.impeccable/review/release',{recursive:true});
    const context=await browser.newContext({viewport:{width,height:900},storageState:process.env.DIRECTORY_E2E_STATE??'.next/directory-e2e-state.json'});

@@ -65,6 +65,7 @@ beforeAll(async () => {
   ).id;
   await saveListing({
     name: "測試維修店",
+    aliases: ["Repair Hub", "修理專家"],
     slug: "repair-shop",
     description: "手機維修",
     categoryId: category,
@@ -125,6 +126,33 @@ describe("PostgreSQL directory domain", () => {
     expect((await catalog.search({ query: "維修" })).total).toBe(1);
     expect((await catalog.search({ query: "手提電話" })).total).toBe(2);
     expect((await catalog.search({ query: "%" })).total).toBe(0);
+  });
+  it.each([
+    ["測試", ["repair-shop"]], ["維修店", ["repair-shop"]], ["測試維修店", ["repair-shop"]],
+    ["維修", ["repair-shop"]], ["Repair Hub", ["repair-shop"]], ["Ｒｅｐａｉｒ　Ｈｕｂ", ["repair-shop"]],
+    [" repair   hub ", ["repair-shop"]], ["REPAIR HUB", ["repair-shop"]], ["repair", ["repair-shop"]],
+    ["修理專家", ["repair-shop"]], ["修理", ["repair-shop"]], ["手提電話", ["online", "repair-shop"]],
+    ["手機", ["online", "repair-shop"]], ["網上", ["online"]], ["社群", ["online"]], ["網上社群", ["online"]],
+    ["不存在", []], ["%", []], ["_", []], ["alliance", []],
+  ])("fictional search corpus: %s", async (query, expected) => {
+    const found = await catalog.search({ query: query as string });
+    expect(found.items.map(row => row.slug).sort()).toEqual(expected);
+  });
+  it.each([
+    ["parent area", () => ({ areaId: area }), ["repair-shop"]],
+    ["child area", () => ({ areaId: child }), ["repair-shop"]],
+    ["category", () => ({ categoryId: category }), ["repair-shop"]],
+    ["AND", () => ({ tagIds: [tag, tag2] }), ["repair-shop"]],
+    ["OR", () => ({ tagIds: [tag, tag2], tagMatchMode: "or" as const }), ["online", "repair-shop"]],
+    ["zero minimum", () => ({ priceMin: 0 }), ["online", "repair-shop"]],
+    ["bounded price", () => ({ priceMax: 500 }), ["repair-shop"]],
+    ["open price", () => ({ priceMin: 600 }), ["online"]],
+    ["featured", () => ({ featured: true }), ["repair-shop"]],
+    ["not featured", () => ({ featured: false }), ["online"]],
+    ["manual", () => ({ sort: "manual" as const }), ["online", "repair-shop"]],
+    ["newest", () => ({ sort: "newest" as const }), ["online", "repair-shop"]],
+  ] as const)("fictional filter corpus: %s", async (_name, input, expected) => {
+    expect((await catalog.search(input())).items.map(row => row.slug).sort()).toEqual(expected);
   });
   it("uses AND by default and supports explicit OR", async () => {
     expect((await catalog.search({ tagIds: [tag, tag2] })).total).toBe(1);
@@ -234,7 +262,7 @@ describe("PostgreSQL directory domain", () => {
       (
         await adminPost(
           req("POST", {
-            kind: "listings",
+            kind: "listings", requestKey: crypto.randomUUID(),
             data: { name: "Forbidden", slug: "forbidden" },
           }),
         )
@@ -243,14 +271,14 @@ describe("PostgreSQL directory domain", () => {
     await db.update(users).set({ role: "admin" }).where(eq(users.id, user.id));
     const res = await adminPost(
       req("POST", {
-        kind: "listings",
+        kind: "listings", requestKey: crypto.randomUUID(),
         data: { name: "Allowed", slug: "allowed" },
       }),
     );
     expect(res.status).toBe(200);
     const row = await res.json();
     expect(
-      (await adminDelete(req("DELETE", { kind: "listings", id: row.id, revision: row.revision })))
+      (await adminDelete(req("DELETE", { kind: "listings", requestKey: crypto.randomUUID(), id: row.id, revision: row.revision })))
         .status,
     ).toBe(200);
     vi.unstubAllEnvs();

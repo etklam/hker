@@ -12,7 +12,7 @@ export async function catalogResponse(work: () => Promise<unknown>) {
           message: e.message,
           ...("impact" in e ? { impact: e.impact } : {}),
         },
-        { status: response.status },
+        { status: response.status, headers: response.headers },
       );
     }
     if (e instanceof ZodError)

@@ -11,7 +11,7 @@ export const GET = withOptionalAuth(async (req) => {
     if (req.nextUrl.searchParams.has("audience") && req.nextUrl.searchParams.get("audience") !== "public")
       throw new AppError("INVALID_REQUEST", "Invalid public audience");
     if (!(await allowCatalogRequest(req.headers, "catalog-api", 90)))
-      throw new AppError("INVALID_REQUEST", "搜尋過於頻繁，請稍後再試。");
+      throw new AppError("RATE_LIMITED", "搜尋過於頻繁，請稍後再試。");
     const taxonomy = await getTaxonomy();
     if (req.nextUrl.searchParams.get("taxonomy") === "1") return taxonomy;
     let input;

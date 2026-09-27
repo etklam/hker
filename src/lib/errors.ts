@@ -6,6 +6,8 @@ export type ErrorCode =
   | 'INVALID_REQUEST'
   | 'CONFLICT'
   | 'INTERNAL_ERROR'
+  | 'RATE_LIMITED'
+  | 'SERVICE_UNAVAILABLE'
 
 export interface ApiError {
   code: ErrorCode
@@ -20,10 +22,12 @@ const statusMap: Record<ErrorCode, number> = {
   INVALID_REQUEST: 400,
   CONFLICT: 409,
   INTERNAL_ERROR: 500,
+  RATE_LIMITED: 429,
+  SERVICE_UNAVAILABLE: 503,
 }
 
 export function apiError(code: ErrorCode, message: string): Response {
-  return Response.json({ code, message }, { status: statusMap[code] })
+  return Response.json({ code, message }, { status: statusMap[code], headers: code === 'RATE_LIMITED' ? { 'Retry-After': '60' } : undefined })
 }
 
 export class AppError extends Error {

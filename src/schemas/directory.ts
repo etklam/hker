@@ -1,3 +1,4 @@
+import { safeStoredDestination } from "@/lib/directory-links";
 import { z } from "zod";
 const id = z.number().int().positive();
 const optionalId = id.nullable().default(null);
@@ -41,18 +42,7 @@ export const linkSchema = z.object({
     .string()
     .trim()
     .max(2000)
-    .refine((value) => {
-      try {
-        const url = new URL(value);
-        return (
-          ["https:", "http:", "tel:", "mailto:"].includes(url.protocol) &&
-          !url.username &&
-          !url.password
-        );
-      } catch {
-        return false;
-      }
-    }, "Use an http, https, tel or mailto URL"),
+    .refine(safeStoredDestination, "Use a safe http, https, tel or mailto URL"),
   sortOrder: order,
   enabled: z.boolean().default(true),
 }).refine(v => v.type === "phone" ? v.url.startsWith("tel:") : v.type === "email" ? v.url.startsWith("mailto:") : /^https?:\/\//i.test(v.url), { message: "Link type and URL scheme do not match", path: ["url"] });

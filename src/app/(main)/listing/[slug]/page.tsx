@@ -1,6 +1,8 @@
+import { ExternalActions } from "@/components/directory/ExternalActions";
 import { notFound, permanentRedirect } from "next/navigation";
 import Link from "next/link";
-import { CatalogSearchService } from "@/server/catalog/service";
+import { publicListingDetail } from "@/server/catalog/public-detail";
+import { searchReturnPath } from "@/lib/search-return";
 import { formatPrice } from "@/lib/directory";
 export const dynamic = "force-dynamic";
 export async function generateMetadata({
@@ -9,7 +11,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const listing = await CatalogSearchService.detail(slug);
+  const listing = await publicListingDetail(slug);
   if (!listing) return { title: "找不到收錄", robots: { index: false } };
   return {
     title: listing.name,
@@ -25,17 +27,20 @@ export async function generateMetadata({
 }
 export default async function ListingDetail({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const returnTo = searchReturnPath((await searchParams).returnTo);
   const { slug } = await params;
-  const listing = await CatalogSearchService.detail(slug);
+  const listing = await publicListingDetail(slug);
   if (!listing) notFound();
-  if (listing.slug !== slug) permanentRedirect(`/listing/${listing.slug}`);
+  if (listing.slug !== slug) permanentRedirect(`/listing/${listing.slug}${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`);
   return (
     <div className="container">
       <article className="detail">
-        <Link href="/search" className="text-link">
+        <Link href={returnTo ?? "/search"} className="text-link">
           ← 返回目錄
         </Link>
         <header className="detail-header">
@@ -66,19 +71,7 @@ export default async function ListingDetail({
           </div>
         </header>
         <div className="detail-body">{listing.description}</div>
-        <div className="detail-links">
-          {listing.links.map((l) => (
-            <a
-              key={l.id}
-              className="button"
-              href={`/out/${l.id}?source=web`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {l.label} ↗
-            </a>
-          ))}
-        </div>
+        <ExternalActions links={listing.links} />
         {Object.keys(listing.attrs).length > 0 && (
           <dl className="attributes">
             {Object.entries(listing.attrs).map(([key, value]) => (
