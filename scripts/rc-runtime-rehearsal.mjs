@@ -314,7 +314,7 @@ async function adminCreate(baseUrl, cookie, kind, data) {
       origin: baseUrl,
       cookie,
     },
-    body: JSON.stringify({ kind, data }),
+    body: JSON.stringify({ kind, data, requestKey: kind === "listings" ? crypto.randomUUID() : undefined }),
   });
   const body = await response.json();
   if (!response.ok)

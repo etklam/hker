@@ -53,7 +53,7 @@ jobs:
             artifacts/release-candidate/**/*.yaml
             test-results/**/*.png
             test-results/**/*.json
-            .impeccable/review/*.png
+            .impeccable/review/**/*.png
       - name: Report evidence upload failure separately
         if: always() && steps.evidence_upload.outcome == 'failure'
         run: echo '::error::Evidence upload failed; inspect upload step diagnostics independently of acceptance results.'

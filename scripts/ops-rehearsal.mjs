@@ -315,7 +315,7 @@ try {
   const created = [];
   for (let index = 0; index < fixtures.length; index++) {
     const fixture = fixtures[index];
-    created.push(await adminRequest("/api/admin/catalog", { kind: "listings", data: {
+    created.push(await adminRequest("/api/admin/catalog", { kind: "listings", requestKey: crypto.randomUUID(), data: {
       name: fixture.name,
       slug: `phase10-${index}-${suffix}`,
       shortDescription: "Fictional disposable rehearsal fixture",
@@ -347,7 +347,7 @@ try {
   const privateImportVisible = beforeImportPublication.items.some((item) => item.slug === `phase10-import-${suffix}`);
   if (privateImportVisible || !beforeImportPublication.items.some((item) => item.slug === `phase10-0-${suffix}`))
     throw new Error("Public discovery violated the reviewed import publication boundary");
-  await adminRequest("/api/admin/catalog", { action: "publish", kind: "listings", id: importedId, enabled: true, revision: importedListing.revision }, "PATCH");
+  await adminRequest("/api/admin/catalog", { action: "publish", kind: "listings", requestKey: crypto.randomUUID(), id: importedId, enabled: true, revision: importedListing.revision }, "PATCH");
   const publicResponse = await expectHttp(`${baseUrl}/api/catalog?pageSize=100`, 200);
   const publicCatalog = await publicResponse.json();
   const visible = new Set(publicCatalog.items.map((item) => item.slug));
@@ -356,7 +356,7 @@ try {
   const firstPublic = publicCatalog.items.find((item) => item.slug === `phase10-0-${suffix}`);
   if (firstPublic.links.length !== 2 || firstPublic.links[0].type !== "website")
     throw new Error("Public HTTP response did not preserve repeated external links");
-  await adminRequest("/api/admin/catalog", { action: "publish", kind: "listings", id: created[0].id, enabled: false, revision: created[0].revision }, "PATCH");
+  await adminRequest("/api/admin/catalog", { action: "publish", kind: "listings", requestKey: crypto.randomUUID(), id: created[0].id, enabled: false, revision: created[0].revision }, "PATCH");
   const afterUnpublish = await (await expectHttp(`${baseUrl}/api/catalog?pageSize=100`, 200)).json();
   if (afterUnpublish.items.some((item) => item.slug === `phase10-0-${suffix}`))
     throw new Error("An unpublished rehearsal listing remained public");
@@ -485,6 +485,8 @@ try {
   await waitHttp(`${negativeUrl}/api/ready`, 503, "negative-schema readiness");
   const workerConfigured = await compose(project, mainEnv, "rehearsal", ["ps", "-q", "worker"], { label: "verify watch worker remains single replica" });
   if (!workerConfigured.stdout.trim()) throw new Error("Candidate watch worker is not running");
+  const finalWorkerHealth = await command("docker", ["inspect", "--format", "{{.State.Health.Status}}", workerConfigured.stdout.trim()], { label: "verify worker heartbeat before teardown" });
+  if (finalWorkerHealth.stdout.trim() !== "healthy") throw new Error("Candidate watch worker heartbeat is not healthy");
 
   const badConfiguration = await command("docker", ["run", "--rm", image, "node", "ops/runtime-env.cjs"], { allowFailure: true, label: "negative missing configuration refusal" });
   if (badConfiguration.status === 0 || !`${badConfiguration.stdout}${badConfiguration.stderr}`.includes("Missing required configuration"))
