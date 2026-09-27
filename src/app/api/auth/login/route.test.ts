@@ -8,6 +8,7 @@ const mockClearLoginFailures = vi.fn()
 
 vi.mock('@/server/api-helpers', () => ({
   applyRateLimit: mockApplyRateLimit,
+  validateOrigin: vi.fn().mockReturnValue(true),
   isAccountLocked: mockIsAccountLocked,
   trackLoginFailure: mockTrackLoginFailure,
   clearLoginFailures: mockClearLoginFailures,
@@ -19,6 +20,7 @@ vi.mock('@/server/services/auth-service', () => ({
 
 vi.mock('@/server/services/session-service', () => ({
   createSession: vi.fn().mockResolvedValue('mock-token'),
+  SESSION_TTL_DAYS: 30,
 }))
 
 vi.mock('@/server/auth', () => ({

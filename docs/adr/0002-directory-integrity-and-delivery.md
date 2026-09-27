@@ -1,0 +1,11 @@
+# Directory integrity and delivery decisions
+
+Status: accepted for this release.
+
+- Services accept an explicit Drizzle executor. Transaction work stays on that connection; Telegram network I/O occurs outside database transactions. A max-two pool regression detects global-client re-entry.
+- Taxonomy deletion is restrictive and returns dependency counts. Disable affects navigation/labels, not publication of associated listings. Group visibility affects group presentation; individual tag flags determine visibility. Invalid presets are unavailable and cannot silently broaden.
+- A preset resolves once to explicit editable search state. Explicit edits remove the lingering preset identity. Search uses a native GET form and native filter/pagination anchors consistently, avoiding mixed client/native history races; restored native field values are synchronized from resolved state without resetting controlled tags. Query-without-sort means relevance; browse-without-sort means manual order. Matching tiers are exact name, listing alias, tag/alias, partial name, other bounded public text, then manual order and ID. HKD range filtering/ordering never compares foreign amounts as HKD.
+- Listing revisions reject stale updates. Links retain identities. Old slugs remain reserved and redirect to the current canonical listing. Imports share the listing namespace advisory lock and bind row decisions to the preview; durable receipts make retries idempotent.
+- Telegram journals persist scheduling, owner leases and progress. A DB-backed one-shot runner recovers jobs after restart. Delivery snapshots are revalidated; network ambiguity after a send but before persistence can duplicate a message. This is not exactly-once delivery.
+- Analytics counts explicit actions, not service reads. Search keys undergo conservative privacy filtering, daily aggregate cardinality is bounded, action receipts deduplicate retries, and savepoints/timeouts isolate metric failures. Stored-link redirects schedule metrics after the response. Direct Telegram URL clicks remain unobservable.
+- Runtime images contain self-contained operational bundles. Migrations require a verified ledger prefix and stop on legacy history mismatches. Runtime secrets never enter image build arguments.

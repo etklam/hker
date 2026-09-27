@@ -1,6 +1,7 @@
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 
+import * as operationsSchema from '@/db/schema/directoryOperations'
 import * as directorySchema from '@/db/schema/directory'
 import * as usersSchema from '@/db/schema/users'
 import * as authSchema from '@/db/schema/auth'
@@ -13,14 +14,17 @@ import * as rateLimitSchema from '@/db/schema/rateLimit'
 import { installPostgresSerializerGuards } from '@/server/postgres-serializers'
 
 const connectionString = process.env.DATABASE_URL
-if (!connectionString) throw new Error('DATABASE_URL environment variable is required')
+if (!connectionString && process.env.NEXT_PHASE !== 'phase-production-build') throw new Error('DATABASE_URL environment variable is required')
 
-const client = postgres(connectionString, { max: 20, idle_timeout: 30 })
-
-export const db = drizzle(client, {
+export function createDatabase(url: string, options: {max?:number} = {}) {
+const max = options.max ?? Number(process.env.DATABASE_POOL_MAX ?? 20)
+if (!Number.isInteger(max) || max < 1 || max > 50) throw new Error('Invalid database pool size')
+const client = postgres(url, { max, idle_timeout: 30, connect_timeout: 10 })
+const database = drizzle(client, {
   schema: {
     ...usersSchema,
     ...directorySchema,
+    ...operationsSchema,
     ...authSchema,
     ...collectionsSchema,
     ...marketplaceSchema,
@@ -31,5 +35,9 @@ export const db = drizzle(client, {
   },
 })
 installPostgresSerializerGuards(client)
-
+return {db: database, close: () => client.end({timeout:5})}
+}
+const configured = createDatabase(connectionString ?? 'postgres://build:build@127.0.0.1:1/build')
+export const db = configured.db
+export const closeDatabase = configured.close
 export type DB = typeof db

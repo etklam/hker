@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CatalogEvents } from "@/components/directory/CatalogEvents";
 export default function MainLayout({
   children,
 }: {
@@ -6,6 +7,7 @@ export default function MainLayout({
 }) {
   return (
     <>
+      <CatalogEvents />
       <header className="site-header">
         <div className="container header-inner">
           <Link href="/" className="brand">

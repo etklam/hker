@@ -4,13 +4,13 @@ import { db } from '@/server/db'
 import { authSessions } from '@/db/schema/auth'
 import * as userService from '@/server/services/user-service'
 
-const SESSION_TTL_DAYS = parseInt(process.env.AUTH_SESSION_TTL_DAYS ?? '30', 10)
+export const SESSION_TTL_DAYS = parseInt(process.env.AUTH_SESSION_TTL_DAYS ?? '30', 10)
 const SESSION_SECRET = process.env.AUTH_SESSION_SECRET
 if (!SESSION_SECRET) {
-  if (process.env.NODE_ENV === 'production') {
+  if (process.env.NODE_ENV === 'production' && process.env.NEXT_PHASE !== 'phase-production-build') {
     throw new Error('AUTH_SESSION_SECRET environment variable is required in production')
   }
-  console.warn('⚠ AUTH_SESSION_SECRET not set — using insecure default for development')
+  if (process.env.NEXT_PHASE !== 'phase-production-build') console.warn('⚠ AUTH_SESSION_SECRET not set — using insecure default for development')
 }
 const SESSION_HMAC_KEY = SESSION_SECRET ?? 'dev-only-insecure-secret'
 

@@ -18,7 +18,19 @@ export function ListingCard({ listing }: { listing: CatalogListing }) {
       )}
       <div className="tag-list">
         {listing.tags.slice(0, 3).map((tag) => (
-          <span key={tag.id}>{tag.filterable ? <Link href={`/search?tags=${tag.slug}`}>#{tag.name}</Link> : `#${tag.name}`}</span>
+          <span key={tag.id}>
+            {tag.filterable ? (
+              <Link
+                href={`/search?tags=${tag.slug}`}
+                data-catalog-kind="tag"
+                data-catalog-key={tag.id}
+              >
+                #{tag.name}
+              </Link>
+            ) : (
+              `#${tag.name}`
+            )}
+          </span>
         ))}
       </div>
       <Link className="text-link" href={`/listing/${listing.slug}`}>

@@ -1,3 +1,9 @@
+> Latest extended Phase 7 evidence: [extended acceptance matrix](directory-phase7-extended.md) and [performance observations](directory-performance-observations.md). Earlier counts below are historical; the extended final aggregate passed 547 unit / 60 integration / 34 Chromium tests with zero skips. Staging/live gates remain open.
+
+> Phase 7 current scope and fresh evidence: [Phase 7 checklist](directory-phase7-checklist.md). The worktree already contained uncommitted hardening when this Phase 7 pass began; historical completion claims below are not new execution evidence. Advanced import formats and behavioral analytics remain outside Phase 7 acceptance/backlog; existing implementations were preserved, not newly requested or certified as complete.
+
+> Historical phase report below is superseded by [release evidence](directory-release-matrix.md) and [release procedure](directory-release-checklist.md). In particular, inventory-only analytics, ID-only CSV, middleware-only retirement and the old audit result are obsolete.
+
 # Hong Kong directory rebuild
 
 ## Phase 0 — audit and migration map
@@ -91,3 +97,7 @@ Git commit 4360f4a squashed earlier migrations into 0000_initial_schema. Before 
 4. Register the actual Telegram webhook with matching secret_token and smoke-test in Telegram.
 5. Review dependency audit separately: locked installation reported 17 advisories; dependencies were not upgraded as part of this domain rewrite.
 6. Remove legacy source/tables only in a later retention-approved cleanup; current middleware retirement is deliberate and reversible.
+
+## Full hardening continuation
+
+Implemented executor ownership and restrictive taxonomy dependencies; shared OR/preset semantics, explainable aliases/ranking and HKD scope; stable links/revisions/slug aliases; typed searchable CMS; reachable Bot menus and durable runner; mapped multi-link idempotent imports; privacy-filtered aggregate metrics; server retirement and runtime/migration safeguards. Follow the release evidence matrix for actual verification and external blockers. No phase completion statement substitutes for acceptance.

@@ -621,45 +621,6 @@ dialog::backdrop {
   .filters[open] summary {
     margin-bottom: 20px;
   }
-  .admin-shell {
-    display: block;
-  }
-  .admin-menu {
-    display: block;
-    padding: 14px 16px;
-    background: white;
-    border-bottom: 1px solid var(--border);
-  }
-  .admin-sidebar {
-    display: none;
-  }
-  .admin-menu nav {
-    display: grid;
-    gap: 10px;
-    padding: 16px 0;
-  }
-  .admin-content {
-    padding: 24px 16px;
-  }
-  .admin-table thead {
-    display: none;
-  }
-  .admin-table tr {
-    display: block;
-    padding: 12px;
-    border-bottom: 1px solid var(--border);
-  }
-  .admin-table td {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 5px;
-    border: 0;
-  }
-  .admin-table td:before {
-    content: attr(data-label);
-    color: var(--muted);
-  }
   .form-grid {
     grid-template-columns: 1fr;
   }
@@ -704,5 +665,54 @@ dialog::backdrop {
     min-height: 44px;
     display: inline-flex;
     align-items: center;
+  }
+}
+
+.tag-picker-options { max-height: 300px; overflow-y: auto; margin-top: 12px; }
+.tag-picker-options > div + div { margin-top: 18px; }
+.tag-picker-options small { display: block; }
+.active-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-block: 16px; }
+.editor, .admin-table td, .listing-card { overflow-wrap: anywhere; }
+@media (max-width: 760px) { input, select, textarea { font-size: 16px; } }
+
+@media (max-width: 1024px) {
+  .admin-shell {
+    display: block;
+  }
+  .admin-menu {
+    display: block;
+    padding: 14px 16px;
+    background: white;
+    border-bottom: 1px solid var(--border);
+  }
+  .admin-sidebar {
+    display: none;
+  }
+  .admin-menu nav {
+    display: grid;
+    gap: 10px;
+    padding: 16px 0;
+  }
+  .admin-content {
+    padding: 24px 16px;
+  }
+  .admin-table thead {
+    display: none;
+  }
+  .admin-table tr {
+    display: block;
+    padding: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .admin-table td {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 5px;
+    border: 0;
+  }
+  .admin-table td:before {
+    content: attr(data-label);
+    color: var(--muted);
   }
 }

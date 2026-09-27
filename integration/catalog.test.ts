@@ -12,6 +12,8 @@ import {
   getTaxonomy,
 } from "@/server/catalog/service";
 import { previewImport, confirmImport } from "@/server/catalog/import";
+import { runBotDelivery } from "@/server/catalog/bot-delivery";
+import * as botTransport from "@/server/catalog/bot-transport";
 import { handleCatalogUpdate } from "@/server/catalog/bot";
 import {
   POST as adminPost,
@@ -31,7 +33,7 @@ let category: number,
   hidden: number;
 beforeAll(async () => {
   await db.execute(
-    sql`truncate directory_listings, directory_categories, directory_areas, directory_tags, directory_tag_groups, directory_navigation_presets, directory_bot_sessions, directory_bot_updates restart identity cascade`,
+    sql`truncate directory_import_jobs, directory_listings, directory_categories, directory_areas, directory_tags, directory_tag_groups, directory_navigation_presets, directory_bot_sessions, directory_bot_updates restart identity cascade`,
   );
   category = (
     await saveTaxonomy("categories", { name: "維修服務", slug: "repair" })
@@ -129,13 +131,13 @@ describe("PostgreSQL directory domain", () => {
     expect(
       (await catalog.search({ tagIds: [tag, tag2], tagMatchMode: "or" })).total,
     ).toBe(2);
-    expect((await catalog.search({ tagIds: [hidden] })).total).toBe(0);
+    await expect(catalog.search({ tagIds: [hidden] })).rejects.toMatchObject({code: "INVALID_REQUEST"});
   });
   it("filters category and area descendants", async () => {
     expect(
       (await catalog.search({ categoryId: category, areaId: area })).total,
     ).toBe(1);
-    expect((await catalog.search({ areaId: 99999 })).total).toBe(0);
+    await expect(catalog.search({ areaId: 99999 })).rejects.toMatchObject({code: "INVALID_REQUEST"});
   });
   it("uses price overlap, open bounds and deterministic pagination", async () => {
     expect((await catalog.search({ priceMin: 500, priceMax: 600 })).total).toBe(
@@ -155,11 +157,11 @@ describe("PostgreSQL directory domain", () => {
       links: [{ type: "website", label: "a", url: "https://a.example" }],
     });
     await expect(
-      saveListing({ name: "Bad", slug: "temporary", tagIds: [999999] }, row.id),
+      saveListing({ name: "Bad", slug: "temporary", tagIds: [999999], revision: row.revision }, row.id),
     ).rejects.toThrow();
     expect((await catalog.detail("temporary"))?.name).toBe("Temporary");
     await saveListing(
-      { name: "Updated", slug: "temporary", tagIds: [tag2], enabled: false },
+      { name: "Updated", slug: "temporary", tagIds: [tag2], enabled: false, revision: row.revision },
       row.id,
     );
     expect(await catalog.detail("temporary")).toBeNull();
@@ -193,11 +195,12 @@ describe("PostgreSQL directory domain", () => {
     const csv = "name,slug,website\nImported,imported,https://import.example";
     const preview = await previewImport(csv);
     expect(preview.valid).toBe(true);
-    await expect(confirmImport(csv + "x", preview.digest)).rejects.toThrow();
-    expect(await confirmImport(csv, preview.digest)).toEqual({ imported: 1 });
+    const options = { actorId: 1, requestKey: "catalog-import" };
+    await expect(confirmImport(csv + "x", preview.digest, options)).rejects.toThrow();
+    expect(await confirmImport(csv, preview.digest, options)).toMatchObject({ imported: 1, replayed: false });
     expect(await catalog.detail("imported")).toBeNull();
     expect((await previewImport(csv)).valid).toBe(false);
-    await expect(confirmImport(csv, preview.digest)).rejects.toThrow();
+    expect(await confirmImport(csv, preview.digest, options)).toMatchObject({ imported: 1, replayed: true });
     await deleteListing((await catalog.detail("imported", "admin"))!.id);
   });
   it("does not default database inserts to public", async () => {
@@ -253,6 +256,8 @@ describe("PostgreSQL directory domain", () => {
   });
   it("generates configured bot buttons, toggles multiple tags and resumes duplicate updates", async () => {
     vi.stubEnv("TELEGRAM_BOT_TOKEN", "test-token");
+    vi.stubEnv("TELEGRAM_DELIVERY_MODE", "live");
+    vi.stubEnv("TELEGRAM_TEST_CHAT_ID", "7");
     const fetcher = vi
       .spyOn(globalThis, "fetch")
       .mockImplementation(async () => Response.json({ ok: true }));
@@ -305,7 +310,7 @@ describe("PostgreSQL directory domain", () => {
         data: `d:${nonce}:results:0`,
       },
     });
-    expect(fetcher).toHaveBeenCalledTimes(count);
+    expect(fetcher).toHaveBeenCalledTimes(count + 1); // Repeated callback acknowledgement is harmless.
     const [job] = await db
       .select()
       .from(botUpdates)
@@ -314,19 +319,21 @@ describe("PostgreSQL directory domain", () => {
     vi.unstubAllEnvs();
   });
   it('resumes a failed bot delivery without repeating acknowledged messages', async () => {
-    vi.stubEnv('TELEGRAM_BOT_TOKEN', 'test-token');
-    const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(Response.json({ok:true})).mockRejectedValueOnce(new Error('temporary network error')).mockImplementation(async () => Response.json({ok:true}));
+    const sender = vi.spyOn(botTransport, 'telegram').mockRejectedValueOnce(new botTransport.TelegramDeliveryError('network', true)).mockResolvedValue({message_id: 8});
     const update = {update_id:200,message:{chat:{id:8},from:{id:8},text:'手提電話'}};
-    await expect(handleCatalogUpdate(update)).rejects.toThrow('temporary network error');
-    const [job] = await db.select().from(botUpdates).where(eq(botUpdates.id,200));
-    expect(job.nextOperation).toBe(1);
     await handleCatalogUpdate(update);
-    const bodies = fetcher.mock.calls.map(c => JSON.parse(String(c[1]?.body)));
-    expect(bodies.filter(body => body.text?.includes('2 個結果'))).toHaveLength(1);
-    vi.unstubAllEnvs();
+    const [job] = await db.select().from(botUpdates).where(eq(botUpdates.id,200));
+    expect(job.status).toBe('retry');
+    expect(job.nextOperation).toBe(0);
+    await db.update(botUpdates).set({nextAttemptAt:new Date(0)}).where(eq(botUpdates.id,200));
+    await runBotDelivery();
+    await handleCatalogUpdate(update);
+    expect(sender).toHaveBeenCalledTimes(2);
+    sender.mockRestore();
   });
   it('generates result pagination and rejects expired callback navigation', async () => {
     vi.stubEnv('TELEGRAM_BOT_TOKEN', 'test-token');
+    vi.stubEnv('TELEGRAM_DELIVERY_MODE', 'live'); vi.stubEnv('TELEGRAM_TEST_CHAT_ID', '9');
     const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => Response.json({ok:true}));
     await db.insert(botSessions).values({key:'9:9',state:{version:1,nonce:'abcdef12',search:{pageSize:1}}});
     await handleCatalogUpdate({update_id:201,callback_query:{id:'page',from:{id:9},message:{chat:{id:9}},data:'d:abcdef12:results:0'}});

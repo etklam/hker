@@ -27,6 +27,8 @@ export default async function Tags() {
                   className="chip"
                   key={t.id}
                   href={`/search?tags=${t.slug}`}
+                  data-catalog-kind="tag"
+                  data-catalog-key={t.id}
                 >
                   #{t.name}
                 </Link>

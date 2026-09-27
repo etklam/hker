@@ -35,6 +35,7 @@ function selectChain(): any {
 }
 
 const db = {
+  execute: vi.fn(() => Promise.resolve([])),
   select: vi.fn(() => selectChain()),
   insert: vi.fn(() => ({
     values: vi.fn(() => ({

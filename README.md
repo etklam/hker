@@ -5,9 +5,10 @@ A curated directory of shops, services, attractions, online resources and commun
 ## Local development
 
 ```sh
+nvm use # Node 24
 npm ci
 # Configure DATABASE_URL, AUTH_SESSION_SECRET and APP_BASE_URL first.
-npm run db:migrate
+npm run db:migrate:safe
 npm run dev
 ```
 
@@ -38,7 +39,16 @@ Public registration and legacy routes return 410. Existing admin/superadmin acco
 
 Search combines a PostgreSQL full-text GIN index with escaped Chinese substring matching and taxonomy aliases. Chinese substring matching remains a scan in v1; assess real catalog scale before adding pg_trgm. No external search engine is required.
 
-Telegram stores selection state and per-update delivery progress in PostgreSQL. State expires after 24 hours. Reply plans commit before network sends; duplicate completed updates do not resend, and failed delivery resumes. Telegram sendMessage has no idempotency key: a process crash after Telegram accepts a message but before its acknowledgement is stored can still duplicate that one message. A dispatch lease lasts 10 minutes; configure Telegram retries and inspect failed webhook responses. Old update/session rows require periodic retention cleanup according to operational policy. This is a PostgreSQL delivery journal, not an external queue.
+Telegram stores selection state and per-update delivery progress in PostgreSQL. State expires after 24 hours. Reply plans commit before network sends; duplicate completed updates do not resend, and failed delivery resumes. Telegram sendMessage has no idempotency key: a process crash after Telegram accepts a message but before its acknowledgement is stored can still duplicate that one message. Delivery leases, retry attempts, maximum job age and jittered backoff use the `BOT_*` settings in `.env.example`. This is a PostgreSQL delivery journal, not an external queue.
+
+Build the operational scripts before starting a long-running delivery worker. The status command reports queue counts, oldest outstanding work, error classes and the latest runner heartbeat without exposing message payloads.
+
+```sh
+npm run ops:build
+node .ops/bot-runner.cjs --watch
+node .ops/bot-runner.cjs --status
+node .ops/bot-runner.cjs --cleanup
+```
 
 ## Validation
 
@@ -47,9 +57,13 @@ npm run typecheck
 npm run lint
 npm test -- --maxWorkers=4
 # Isolated PostgreSQL only; integration suite refuses other database names.
-DATABASE_URL=postgres://.../hker_directory_test npm run db:migrate
+DATABASE_URL=postgres://.../hker_directory_test npm run db:migrate:safe
 DATABASE_URL=postgres://.../hker_directory_test npm run test:integration
 npm run build
 ```
 
 See [phase reports and migration map](docs/directory-rebuild-plan.md). Historical product documents and source remain for data-retention review; this README, PRODUCT.md and DESIGN.md describe the new product.
+
+## Release acceptance
+
+The current [evidence matrix](docs/directory-release-matrix.md) and [release checklist](docs/directory-release-checklist.md) supersede earlier phase reports. `npm run test:acceptance` requires a guarded disposable DB, exercises fresh/upgrade migrations and seeds the real browser workflow. Docker ships migration, admin bootstrap, mock-safe Bot runner and retention commands; runtime secrets are supplied only when running the container.

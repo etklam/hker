@@ -9,6 +9,7 @@ vi.mock('@/server/services/session-service', () => ({
 }))
 
 vi.mock('@/server/auth', () => ({
+  SESSION_COOKIE_NAME: '__Host-hker_session',
   clearSessionCookie: vi.fn().mockReturnValue('cleared-cookie'),
 }))
 
@@ -30,8 +31,10 @@ describe('POST /api/auth/logout', () => {
   }
 
   it('destroys session and returns 204', async () => {
-    const res = await POST(makeReq('session-token'), { user: { id: 1 } })
+    const req = makeReq('session-token')
+    const res = await POST(req, { user: { id: 1 } })
     expect(res.status).toBe(204)
+    expect(req.cookies.get).toHaveBeenCalledWith('__Host-hker_session')
     expect(sessionService.destroySession).toHaveBeenCalledWith('session-token')
   })
 

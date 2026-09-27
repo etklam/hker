@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
     "lint": "eslint .",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "npm run db:migrate:safe",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "test": "vitest run",
@@ -17,21 +17,32 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "test:integration": "vitest run --config vitest.integration.config.ts",
-    "admin:create": "esbuild scripts/create-admin.ts --bundle --platform=node --packages=external --outfile=.next/admin-bootstrap.cjs && node .next/admin-bootstrap.cjs"
+    "admin:create": "esbuild scripts/create-admin.ts --bundle --platform=node --packages=external --outfile=.next/admin-bootstrap.cjs && node .next/admin-bootstrap.cjs",
+    "ops:build": "esbuild scripts/migrate.ts scripts/create-admin.ts scripts/bot-runner.ts scripts/analytics-cleanup.ts --bundle --platform=node --outdir=.ops --out-extension:.js=.cjs",
+    "db:preflight": "npm run ops:build && node .ops/migrate.cjs",
+    "db:migrate:safe": "npm run ops:build && node .ops/migrate.cjs --apply",
+    "bot:run": "npm run ops:build && node .ops/bot-runner.cjs",
+    "bot:cleanup": "npm run ops:build && node .ops/bot-runner.cjs --cleanup",
+    "analytics:cleanup": "npm run ops:build && node .ops/analytics-cleanup.cjs",
+    "benchmark:catalog": "esbuild scripts/catalog-benchmark.ts --bundle --platform=node --packages=external --outfile=.next/catalog-benchmark.cjs && node .next/catalog-benchmark.cjs",
+    "env:check": "node scripts/runtime-env.cjs",
+    "e2e:fixture": "esbuild scripts/e2e-fixture.ts --bundle --platform=node --outfile=.next/e2e-fixture.cjs && node .next/e2e-fixture.cjs",
+    "test:acceptance": "node scripts/acceptance.mjs",
+    "test:migrations": "node scripts/migration-acceptance.mjs",
+    "bot:status": "npm run ops:build && node .ops/bot-runner.cjs --status"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@tailwindcss/postcss": "^4.0.0",
-    "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "drizzle-orm": "^0.38.0",
-    "esbuild": "^0.28.0",
+    "drizzle-orm": "^0.45.3",
+    "esbuild": "^0.28.1",
     "i18next": "^25.0.0",
     "lucide-react": "^1.8.0",
-    "next": "^15.0.0",
+    "next": "^15.5.26",
     "postgres": "^3.4.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -46,12 +57,21 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
-    "@vitest/coverage-v8": "^4.1.5",
-    "drizzle-kit": "^0.30.0",
+    "@types/node": "^24.19.0",
+    "@vitest/coverage-v8": "^4.1.11",
+    "drizzle-kit": "^0.31.11",
     "eslint": "^9.0.0",
-    "eslint-config-next": "^15.0.0",
+    "eslint-config-next": "^15.5.26",
     "jsdom": "^29.0.2",
     "msw": "^2.13.4",
-    "vitest": "^4.1.5"
+    "vitest": "^4.1.11"
+  },
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "8.5.28"
+    }
   }
 }

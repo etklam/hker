@@ -15,6 +15,7 @@ const price = z
   .finite()
   .min(0)
   .max(9999999999.99)
+  .multipleOf(0.01, "Use at most two decimal places")
   .nullable()
   .default(null);
 const order = z.number().int().min(-1000000).max(1000000).default(0);
@@ -33,6 +34,7 @@ export const linkTypes = [
   "other",
 ] as const;
 export const linkSchema = z.object({
+  id: id.optional(),
   type: z.enum(linkTypes),
   label: z.string().trim().min(1).max(100),
   url: z
@@ -53,10 +55,12 @@ export const linkSchema = z.object({
     }, "Use an http, https, tel or mailto URL"),
   sortOrder: order,
   enabled: z.boolean().default(true),
-});
+}).refine(v => v.type === "phone" ? v.url.startsWith("tel:") : v.type === "email" ? v.url.startsWith("mailto:") : /^https?:\/\//i.test(v.url), { message: "Link type and URL scheme do not match", path: ["url"] });
 export const listingSchema = z
   .object({
     name: z.string().trim().min(1).max(200),
+    revision: id.optional(),
+    aliases: z.array(z.string().trim().min(1).max(200)).max(30).default([]),
     slug,
     shortDescription: z.string().trim().max(300).default(""),
     description: z.string().trim().max(20000).default(""),
@@ -70,6 +74,7 @@ export const listingSchema = z
       .default("HKD"),
     attrs: z
       .record(z.string().min(1).max(80), z.string().max(1000))
+      .refine(v => Object.keys(v).length <= 30, "At most 30 public attributes")
       .default({}),
     featured: z.boolean().default(false),
     enabled: z.boolean().default(false),
@@ -108,6 +113,7 @@ export const taxonomySchemas = {
   navigation: z
     .object({
       label: z.string().trim().min(1).max(100),
+      allowBroad: z.boolean().default(false),
       placement: z.enum(["public", "bot", "both"]).default("both"),
       icon: z.string().max(100).nullable().default(null),
       categoryId: optionalId,
@@ -134,12 +140,24 @@ export const searchSchema = z
     priceMax: price,
     page: z.number().int().min(1).max(10000).default(1),
     pageSize: z.number().int().min(1).max(100).default(12),
+    requestedSort: z.enum(["auto", "relevance", "manual", "newest", "price-asc", "price-desc"]).optional(),
     sort: z
-      .enum(["relevance", "manual", "newest", "price-asc", "price-desc"])
-      .default("manual"),
+      .enum(["auto", "relevance", "manual", "newest", "price-asc", "price-desc"])
+      .optional(),
     featured: z.boolean().optional(),
     status: z.enum(["all", "enabled", "disabled"]).default("all"),
   })
-  .refine(rangeValid, { message: "Invalid price range" });
+  .refine(rangeValid, { message: "Invalid price range" })
+  .transform(v => {
+    const query = v.query.normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase("en");
+    const requestedSort = v.requestedSort ?? v.sort ?? "auto";
+    return {
+      ...v,
+      query,
+      tagIds: [...new Set(v.tagIds)].sort((a, b) => a - b),
+      requestedSort,
+      sort: requestedSort === "auto" ? (query ? "relevance" as const : "manual" as const) : requestedSort,
+    };
+  });
 export type SearchInput = z.input<typeof searchSchema>;
 export type SearchState = z.output<typeof searchSchema>;

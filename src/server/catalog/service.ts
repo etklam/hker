@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, inArray, sql, type SQL } from "drizzle-orm";
-import { db } from "@/server/db";
+import { db, type DB } from "@/server/db";
 import * as s from "@/db/schema/directory";
 import {
   listingSchema,
@@ -9,8 +9,15 @@ import {
   type TaxonomyKind,
 } from "@/schemas/directory";
 import { parseBody } from "@/schemas/parse-body";
+import { orderAreaHierarchy } from "@/lib/directory";
+import { resolveNavigationPreset } from "@/lib/directory-presets";
 import { AppError } from "@/lib/errors";
 
+export type CatalogExecutor = Pick<DB, "select" | "insert" | "update" | "delete" | "execute" | "transaction">;
+export async function configureCatalogTransaction(executor: CatalogExecutor) {
+  await executor.execute(sql`set local lock_timeout = '2s'`);
+  await executor.execute(sql`set local statement_timeout = '10s'`);
+}
 export type Audience = "public" | "bot" | "admin";
 export const publicVisibility = () => eq(s.listings.enabled, true);
 const tables = {
@@ -30,27 +37,27 @@ function tagVisibility(audience: Audience): SQL {
           : eq(s.tags.publicVisible, true),
       )!;
 }
-export async function getTaxonomy(audience: Audience = "public") {
+export async function getTaxonomy(audience: Audience = "public", executor: CatalogExecutor = db) {
   const [categories, areas, tags, groups, navigation, aliases, presetTags] =
     await Promise.all([
-      db
+      executor
         .select()
         .from(s.categories)
         .where(
           audience === "admin" ? undefined : eq(s.categories.enabled, true),
         )
         .orderBy(asc(s.categories.sortOrder), asc(s.categories.id)),
-      db
+      executor
         .select()
         .from(s.areas)
         .where(audience === "admin" ? undefined : eq(s.areas.enabled, true))
         .orderBy(asc(s.areas.sortOrder), asc(s.areas.id)),
-      db
+      executor
         .select()
         .from(s.tags)
         .where(tagVisibility(audience))
         .orderBy(asc(s.tags.sortOrder), asc(s.tags.id)),
-      db
+      executor
         .select()
         .from(s.tagGroups)
         .where(
@@ -63,8 +70,8 @@ export async function getTaxonomy(audience: Audience = "public") {
                   : eq(s.tagGroups.publicVisible, true),
               ),
         )
-        .orderBy(asc(s.tagGroups.sortOrder)),
-      db
+        .orderBy(asc(s.tagGroups.sortOrder), asc(s.tagGroups.id)),
+      executor
         .select()
         .from(s.navigationPresets)
         .where(
@@ -75,39 +82,34 @@ export async function getTaxonomy(audience: Audience = "public") {
                 inArray(s.navigationPresets.placement, [audience, "both"]),
               ),
         )
-        .orderBy(asc(s.navigationPresets.sortOrder)),
+        .orderBy(asc(s.navigationPresets.sortOrder), asc(s.navigationPresets.id)),
       audience === "admin"
-        ? db.select().from(s.tagAliases)
+        ? executor.select().from(s.tagAliases)
         : Promise.resolve([]),
-      db.select().from(s.navigationPresetTags),
+      executor.select().from(s.navigationPresetTags),
     ]);
   return {
     categories,
-    areas,
+    areas: orderAreaHierarchy(areas),
     tags: tags.map((t) => ({
       ...t,
       aliases: aliases.filter((a) => a.tagId === t.id).map((a) => a.alias),
     })),
     groups,
-    navigation: navigation
-      .map((p) => ({
-        ...p,
-        tagIds: presetTags
-          .filter((t) => t.presetId === p.id)
-          .map((t) => t.tagId),
-      }))
-      .filter(
-        (p) =>
-          audience === "admin" ||
-          ((!p.categoryId || categories.some((c) => c.id === p.categoryId)) &&
-            (!p.areaId || areas.some((a) => a.id === p.areaId)) &&
-            p.tagIds.every((id) =>
-              tags.some((t) => t.id === id && t.filterable),
-            )),
-      ),
+    navigation: navigation.map(preset => {
+      const tagIds = presetTags.filter(relation => relation.presetId === preset.id).map(relation => relation.tagId);
+      const resolution = resolveNavigationPreset({ ...preset, tagIds }, { categories, areas, tags }, audience);
+      return {
+        ...preset,
+        tagIds,
+        available: resolution.available,
+        warning: resolution.available ? null : resolution.reason,
+      };
+    }).filter(preset => audience === "admin" || preset.available),
   };
 }
 export type Taxonomy = Awaited<ReturnType<typeof getTaxonomy>>;
+const normalized = (value: SQL) => sql`lower(regexp_replace(trim(normalize(${value}, NFKC)), '\\s+', ' ', 'g'))`;
 const escapeLike = (value: string) => value.replace(/[\\%_]/g, "\\$&");
 export function buildSearchWhere(
   input: ReturnType<typeof searchSchema.parse>,
@@ -162,9 +164,12 @@ export function buildSearchWhere(
     const pattern = `%${escapeLike(input.query)}%`;
     conditions.push(sql`(
       to_tsvector('simple', ${s.listings.name} || ' ' || ${s.listings.shortDescription} || ' ' || ${s.listings.description}) @@ plainto_tsquery('simple', ${input.query})
-      or ${s.listings.name} ilike ${pattern} or ${s.listings.shortDescription} ilike ${pattern} or ${s.listings.description} ilike ${pattern}
-      or exists (select 1 from ${s.categories} where ${s.categories.id} = ${s.listings.categoryId} and ${s.categories.enabled} and ${s.categories.name} ilike ${pattern})
-      or exists (select 1 from ${s.listingTags} join ${s.tags} on ${s.tags.id} = ${s.listingTags.tagId} where ${s.listingTags.listingId} = ${s.listings.id} and ${tagVisibility(audience)} and (${s.tags.name} ilike ${pattern} or exists (select 1 from ${s.tagAliases} where ${s.tagAliases.tagId} = ${s.tags.id} and ${s.tagAliases.alias} ilike ${pattern})))
+      or ${normalized(sql`${s.listings.name}`)} like ${pattern} or ${normalized(sql`${s.listings.shortDescription}`)} like ${pattern} or ${normalized(sql`${s.listings.description}`)} like ${pattern}
+      or exists (select 1 from jsonb_array_elements_text(${s.listings.aliases}) a where ${normalized(sql`a`)} like ${pattern})
+      or exists (select 1 from jsonb_each_text(${s.listings.attrs}) a where ${normalized(sql`a.key || ' ' || a.value`)} like ${pattern})
+      or exists (select 1 from ${s.areas} where ${s.areas.id} = ${s.listings.areaId} and ${s.areas.enabled} and ${normalized(sql`${s.areas.name}`)} like ${pattern})
+      or exists (select 1 from ${s.categories} where ${s.categories.id} = ${s.listings.categoryId} and ${s.categories.enabled} and ${normalized(sql`${s.categories.name}`)} like ${pattern})
+      or exists (select 1 from ${s.listingTags} join ${s.tags} on ${s.tags.id} = ${s.listingTags.tagId} where ${s.listingTags.listingId} = ${s.listings.id} and ${tagVisibility(audience)} and (${normalized(sql`${s.tags.name}`)} like ${pattern} or exists (select 1 from ${s.tagAliases} where ${s.tagAliases.tagId} = ${s.tags.id} and ${normalized(sql`${s.tagAliases.alias}`)} like ${pattern})))
     )`);
   }
   return and(...conditions)!;
@@ -172,44 +177,44 @@ export function buildSearchWhere(
 async function hydrate(
   rows: (typeof s.listings.$inferSelect)[],
   audience: Audience,
+  executor: CatalogExecutor,
 ) {
-  const taxonomy = await getTaxonomy(audience);
-  const ids = rows.map((r) => r.id);
-  const [links, relations] = ids.length
-    ? await Promise.all([
-        db
-          .select()
-          .from(s.listingLinks)
-          .where(
-            and(
-              inArray(s.listingLinks.listingId, ids),
-              audience === "admin"
-                ? undefined
-                : eq(s.listingLinks.enabled, true),
-            ),
-          )
-          .orderBy(asc(s.listingLinks.sortOrder), asc(s.listingLinks.id)),
-        db
-          .select()
-          .from(s.listingTags)
-          .where(inArray(s.listingTags.listingId, ids)),
-      ])
-    : [[], []];
-  return rows.map((row) => ({
-    ...row,
-    category: taxonomy.categories.find((c) => c.id === row.categoryId) ?? null,
-    area: taxonomy.areas.find((a) => a.id === row.areaId) ?? null,
-    tags: taxonomy.tags.filter((t) =>
-      relations.some((r) => r.listingId === row.id && r.tagId === t.id),
-    ),
-    links: links.filter((l) => l.listingId === row.id),
-  }));
+  if (!rows.length) return [];
+  const ids = rows.map(r => r.id);
+  const categoryIds = rows.flatMap(r => r.categoryId ? [r.categoryId] : []);
+  const areaIds = rows.flatMap(r => r.areaId ? [r.areaId] : []);
+  const [categories, areas, links, relations] = await Promise.all([
+    categoryIds.length ? executor.select().from(s.categories).where(and(inArray(s.categories.id, categoryIds), audience === "admin" ? undefined : eq(s.categories.enabled, true))) : [],
+    areaIds.length ? executor.select().from(s.areas).where(and(inArray(s.areas.id, areaIds), audience === "admin" ? undefined : eq(s.areas.enabled, true))) : [],
+    executor.select().from(s.listingLinks).where(and(inArray(s.listingLinks.listingId, ids), audience === "admin" ? undefined : eq(s.listingLinks.enabled, true))).orderBy(asc(s.listingLinks.sortOrder), asc(s.listingLinks.id)),
+    executor.select({ listingId: s.listingTags.listingId, tag: s.tags }).from(s.listingTags).innerJoin(s.tags, eq(s.tags.id, s.listingTags.tagId)).where(and(inArray(s.listingTags.listingId, ids), tagVisibility(audience))).orderBy(asc(s.tags.sortOrder), asc(s.tags.id)),
+  ]);
+  const categoryMap = new Map(categories.map(c => [c.id, c]));
+  const areaMap = new Map(areas.map(a => [a.id, a]));
+  const linkMap = new Map<number, typeof links>();
+  const tagMap = new Map<number, (typeof s.tags.$inferSelect & { aliases: string[] })[]>();
+  for (const link of links) linkMap.set(link.listingId, [...(linkMap.get(link.listingId) ?? []), link]);
+  for (const relation of relations) tagMap.set(relation.listingId, [...(tagMap.get(relation.listingId) ?? []), { ...relation.tag, aliases: [] }]);
+  return rows.map(row => ({ ...row, category: categoryMap.get(row.categoryId!) ?? null, area: areaMap.get(row.areaId!) ?? null, links: linkMap.get(row.id) ?? [], tags: tagMap.get(row.id) ?? [] }));
 }
 export type CatalogListing = Awaited<ReturnType<typeof hydrate>>[number];
 export const CatalogSearchService = {
-  async search(raw: SearchInput = {}, audience: Audience = "public") {
+  async search(raw: SearchInput = {}, audience: Audience = "public", executor: CatalogExecutor = db) {
     const input = parseBody(raw, searchSchema);
-    const where = buildSearchWhere(input, audience);
+    if (audience !== "admin" && input.status !== "all") throw new AppError("INVALID_REQUEST", "公開搜尋不支援管理員狀態篩選。");
+    if (audience !== "admin") {
+      const [categories, areas, tags] = await Promise.all([
+        input.categoryId ? executor.select({ id: s.categories.id }).from(s.categories).where(and(eq(s.categories.id, input.categoryId), eq(s.categories.enabled, true))) : [],
+        input.areaId ? executor.select({ id: s.areas.id }).from(s.areas).where(and(eq(s.areas.id, input.areaId), eq(s.areas.enabled, true))) : [],
+        input.tagIds.length ? executor.select({ id: s.tags.id }).from(s.tags).where(and(inArray(s.tags.id, input.tagIds), tagVisibility(audience), eq(s.tags.filterable, true))) : [],
+      ]);
+      if ((input.categoryId && !categories.length) || (input.areaId && !areas.length) || tags.length !== input.tagIds.length) throw new AppError("INVALID_REQUEST", "所選篩選條件已停用或不存在，請重新選擇。");
+    }
+    const where = and(buildSearchWhere(input, audience), input.sort.startsWith("price-") ? eq(s.listings.priceCurrency, "HKD") : undefined)!;
+    const exact = sql`case when ${normalized(sql`${s.listings.name}`)} = ${input.query} then 400 when exists (select 1 from jsonb_array_elements_text(${s.listings.aliases}) a where ${normalized(sql`a`)} = ${input.query}) then 300 when exists (select 1 from ${s.listingTags} join ${s.tags} on ${s.tags.id}=${s.listingTags.tagId} where ${s.listingTags.listingId}=${s.listings.id} and ${tagVisibility(audience)} and (${normalized(sql`${s.tags.name}`)}=${input.query} or exists(select 1 from ${s.tagAliases} where ${s.tagAliases.tagId}=${s.tags.id} and ${normalized(sql`${s.tagAliases.alias}`)}=${input.query}))) then 200 when ${normalized(sql`${s.listings.name}`)} like ${`${escapeLike(input.query)}%`} then 150 when ${normalized(sql`${s.listings.name}`)} like ${`%${escapeLike(input.query)}%`} then 100
+      when exists (select 1 from jsonb_array_elements_text(${s.listings.aliases}) a where ${normalized(sql`a`)} like ${`%${escapeLike(input.query)}%`}) then 80
+      when exists (select 1 from ${s.listingTags} join ${s.tags} on ${s.tags.id}=${s.listingTags.tagId} where ${s.listingTags.listingId}=${s.listings.id} and ${tagVisibility(audience)} and (${normalized(sql`${s.tags.name}`)} like ${`%${escapeLike(input.query)}%`} or exists (select 1 from ${s.tagAliases} where ${s.tagAliases.tagId}=${s.tags.id} and ${normalized(sql`${s.tagAliases.alias}`)} like ${`%${escapeLike(input.query)}%`}))) then 60
+      else 0 end`;
     const rank = sql`ts_rank(to_tsvector('simple', ${s.listings.name} || ' ' || ${s.listings.description}), plainto_tsquery('simple', ${input.query}))`;
     const order =
       input.sort === "newest"
@@ -223,72 +228,72 @@ export const CatalogSearchService = {
                 sql`coalesce(${s.listings.priceMax}, ${s.listings.priceMin}) desc nulls last`,
               ]
             : input.sort === "relevance" && input.query
-              ? [desc(rank)]
+              ? [desc(exact), desc(rank), asc(s.listings.sortOrder)]
               : [asc(s.listings.sortOrder)];
     const [rows, [count]] = await Promise.all([
-      db
+      executor
         .select()
         .from(s.listings)
         .where(where)
         .orderBy(...order, asc(s.listings.id))
         .limit(input.pageSize)
         .offset((input.page - 1) * input.pageSize),
-      db
+      executor
         .select({ total: sql<number>`count(*)::int` })
         .from(s.listings)
         .where(where),
     ]);
     return {
-      items: await hydrate(rows, audience),
+      items: await hydrate(rows, audience, executor),
       total: count.total,
       page: input.page,
       pageSize: input.pageSize,
       totalPages: Math.ceil(count.total / input.pageSize),
     };
   },
-  async detail(slug: string, audience: Audience = "public") {
-    const rows = await db
+  async detail(slug: string, audience: Audience = "public", executor: CatalogExecutor = db) {
+    const rows = await executor
       .select()
       .from(s.listings)
       .where(
         and(
-          eq(s.listings.slug, slug),
+          sql`(${s.listings.slug} = ${slug} or ${s.listings.id} in (select ${s.listingSlugAliases.listingId} from ${s.listingSlugAliases} where ${s.listingSlugAliases.slug} = ${slug}))`,
           audience === "admin" ? undefined : publicVisibility(),
         ),
       )
       .limit(1);
-    return (await hydrate(rows, audience))[0] ?? null;
+    return (await hydrate(rows, audience, executor))[0] ?? null;
   },
 };
 export async function saveListing(raw: unknown, id?: number) {
-  const { links, tagIds, ...data } = parseBody(raw, listingSchema);
-  return db.transaction(async (tx) => {
-    const values = {
-      ...data,
-      priceMin: data.priceMin?.toFixed(2) ?? null,
-      priceMax: data.priceMax?.toFixed(2) ?? null,
-      updatedAt: new Date(),
-    };
-    const [row] = id
-      ? await tx
-          .update(s.listings)
-          .set(values)
-          .where(eq(s.listings.id, id))
-          .returning()
+  const { links, tagIds, revision, ...data } = parseBody(raw, listingSchema);
+  const replaceLinks = typeof raw === "object" && raw !== null && Object.hasOwn(raw, "links");
+  return db.transaction(async tx => {
+    await configureCatalogTransaction(tx);
+    // ponytail: serialize listing writes to protect the shared slug namespace; use ordered per-slug locks if write throughput requires it.
+    await tx.execute(sql`select pg_advisory_xact_lock(724111)`);
+    const [old] = id ? await tx.select().from(s.listings).where(eq(s.listings.id, id)).for("update") : [];
+    if (id && !old) throw new AppError("NOT_FOUND", "Listing not found");
+    if (old && revision !== old.revision) throw new AppError("CONFLICT", "此項目已被其他編輯更新，請保留草稿並重新載入。");
+    const [reserved] = await tx.select().from(s.listingSlugAliases).where(eq(s.listingSlugAliases.slug, data.slug));
+    const [canonical] = await tx.select().from(s.listings).where(eq(s.listings.slug, data.slug));
+    if ((reserved && reserved.listingId !== id) || (canonical && canonical.id !== id)) throw new AppError("CONFLICT", "此網址代稱已被使用或保留。");
+    const existing = id ? await tx.select().from(s.listingLinks).where(eq(s.listingLinks.listingId, id)) : [];
+    const submittedIds = links.flatMap(l => l.id ? [l.id] : []);
+    if (new Set(submittedIds).size !== submittedIds.length || submittedIds.some(childId => !existing.some(l => l.id === childId))) throw new AppError("INVALID_REQUEST", "外部連結不屬於此項目或重複提交。");
+    const values = { ...data, aliases: [...new Set(data.aliases)], priceMin: data.priceMin?.toFixed(2) ?? null, priceMax: data.priceMax?.toFixed(2) ?? null, updatedAt: new Date() };
+    const [row] = old
+      ? await tx.update(s.listings).set({ ...values, revision: old.revision + 1 }).where(and(eq(s.listings.id, old.id), eq(s.listings.revision, revision!))).returning()
       : await tx.insert(s.listings).values(values).returning();
-    if (!row) throw new AppError("NOT_FOUND", "Listing not found");
-    await tx.delete(s.listingLinks).where(eq(s.listingLinks.listingId, row.id));
+    if (!row) throw new AppError("CONFLICT", "此項目已被其他編輯更新。");
+    if (old && old.slug !== row.slug) await tx.insert(s.listingSlugAliases).values({ slug: old.slug, listingId: row.id }).onConflictDoNothing();
+    for (const link of existing) if (replaceLinks && !submittedIds.includes(link.id)) await tx.delete(s.listingLinks).where(eq(s.listingLinks.id, link.id));
+    for (const { id: linkId, ...link } of links) {
+      if (linkId) await tx.update(s.listingLinks).set({ ...link, updatedAt: new Date() }).where(and(eq(s.listingLinks.id, linkId), eq(s.listingLinks.listingId, row.id)));
+      else await tx.insert(s.listingLinks).values({ ...link, listingId: row.id });
+    }
     await tx.delete(s.listingTags).where(eq(s.listingTags.listingId, row.id));
-    if (links.length)
-      await tx
-        .insert(s.listingLinks)
-        .values(links.map((link) => ({ ...link, listingId: row.id })));
-    if (tagIds.length)
-      await tx
-        .insert(s.listingTags)
-        .values(
-          [...new Set(tagIds)].map((tagId) => ({ listingId: row.id, tagId })),
-        );
+    if (tagIds.length) await tx.insert(s.listingTags).values([...new Set(tagIds)].map(tagId => ({ listingId: row.id, tagId })));
     return row;
   });
 }
@@ -299,6 +304,27 @@ export async function deleteListing(id: number) {
     .returning({ id: s.listings.id });
   if (!rows.length) throw new AppError("NOT_FOUND", "Listing not found");
 }
+export async function validateNavigationPresetForSave(
+  tx: CatalogExecutor,
+  data: Parameters<typeof resolveNavigationPreset>[0],
+  allowBroad = false,
+) {
+  const { tagIds } = data;
+      const selectedCategories = data.categoryId ? await tx.select().from(s.categories).where(eq(s.categories.id, data.categoryId)).for("share") : [];
+      const selectedAreas = data.areaId ? await tx.select().from(s.areas).where(eq(s.areas.id, data.areaId)).for("share") : [];
+      const selectedTags = tagIds.length ? await tx.select().from(s.tags).where(inArray(s.tags.id, tagIds)).orderBy(asc(s.tags.id)).for("share") : [];
+      if ((data.categoryId && !selectedCategories.length) || (data.areaId && !selectedAreas.length) || selectedTags.length !== new Set(tagIds).size) {
+        throw new AppError("INVALID_REQUEST", "導覽參照不存在，請重新選擇。");
+      }
+      if (data.enabled) {
+        if (!data.categoryId && !data.areaId && !tagIds.length && data.priceMin === null && data.priceMax === null && !allowBroad) {
+          throw new AppError("INVALID_REQUEST", "請明確確認此導覽為全部收錄，或選擇篩選條件。");
+        }
+        const resolution = resolveNavigationPreset({ ...data, tagIds }, { categories: selectedCategories, areas: selectedAreas, tags: selectedTags }, "admin");
+        if (!resolution.available) throw new AppError("CONFLICT", resolution.reason);
+      }
+}
+
 export async function saveTaxonomy(
   kind: TaxonomyKind,
   raw: unknown,
@@ -308,6 +334,7 @@ export async function saveTaxonomy(
     const data = parseBody(raw, taxonomySchemas.areas);
     // Serialize hierarchy edits to prevent concurrent cycle creation.
     return db.transaction(async (tx) => {
+      await configureCatalogTransaction(tx);
       await tx.execute(sql`select pg_advisory_xact_lock(724110)`);
       if (id && data.parentId) {
         const rows = await tx.select().from(s.areas);
@@ -337,6 +364,7 @@ export async function saveTaxonomy(
   if (kind === "tags") {
     const { aliases, ...data } = parseBody(raw, taxonomySchemas.tags);
     return db.transaction(async (tx) => {
+      await configureCatalogTransaction(tx);
       const [row] = id
         ? await tx.update(s.tags).set(data).where(eq(s.tags.id, id)).returning()
         : await tx.insert(s.tags).values(data).returning();
@@ -352,13 +380,15 @@ export async function saveTaxonomy(
     });
   }
   if (kind === "navigation") {
-    const { tagIds, ...data } = parseBody(raw, taxonomySchemas.navigation);
+    const { tagIds, allowBroad, ...data } = parseBody(raw, taxonomySchemas.navigation);
     const values = {
       ...data,
       priceMin: data.priceMin?.toFixed(2) ?? null,
       priceMax: data.priceMax?.toFixed(2) ?? null,
     };
     return db.transaction(async (tx) => {
+      await configureCatalogTransaction(tx);
+      await validateNavigationPresetForSave(tx, { ...data, tagIds }, allowBroad);
       const [row] = id
         ? await tx
             .update(s.navigationPresets)
@@ -402,11 +432,37 @@ export async function saveTaxonomy(
   if (!row) throw new AppError("NOT_FOUND", "Group not found");
   return row;
 }
-export async function deleteTaxonomy(kind: TaxonomyKind, id: number) {
+async function removeTaxonomy(kind: TaxonomyKind, id: number, executor: CatalogExecutor) {
   const table = tables[kind];
-  const rows = await db
+  const rows = await executor
     .delete(table)
     .where(eq(table.id, id))
     .returning({ id: table.id });
   if (!rows.length) throw new AppError("NOT_FOUND", "Taxonomy not found");
+}
+
+export async function getTaxonomyImpact(kind: TaxonomyKind, id: number, executor: CatalogExecutor = db) {
+  const count = async (query: SQL) => Number((await executor.execute(query))[0]?.count ?? 0);
+  const [listings, presets, children, tags] = await Promise.all([
+    kind === "categories" ? count(sql`select count(*)::int from ${s.listings} where ${s.listings.categoryId}=${id}`) : kind === "areas" ? count(sql`select count(*)::int from ${s.listings} where ${s.listings.areaId}=${id}`) : kind === "tags" ? count(sql`select count(*)::int from ${s.listingTags} where ${s.listingTags.tagId}=${id}`) : 0,
+    kind === "categories" ? count(sql`select count(*)::int from ${s.navigationPresets} where ${s.navigationPresets.categoryId}=${id}`) : kind === "areas" ? count(sql`select count(*)::int from ${s.navigationPresets} where ${s.navigationPresets.areaId}=${id}`) : kind === "tags" ? count(sql`select count(*)::int from ${s.navigationPresetTags} where ${s.navigationPresetTags.tagId}=${id}`) : 0,
+    kind === "areas" ? count(sql`select count(*)::int from ${s.areas} where ${s.areas.parentId}=${id}`) : 0,
+    kind === "groups" ? count(sql`select count(*)::int from ${s.tags} where ${s.tags.groupId}=${id}`) : 0,
+  ]);
+  return { listings, presets, children, tags };
+}
+export async function deleteTaxonomy(kind: TaxonomyKind, id: number) {
+  return db.transaction(async tx => {
+    await configureCatalogTransaction(tx);
+    const table = tables[kind];
+    const rows = await tx.select({ id: table.id }).from(table).where(eq(table.id, id)).for("update");
+    if (!rows.length) throw new AppError("NOT_FOUND", "Taxonomy not found");
+    const impact = await getTaxonomyImpact(kind, id, tx);
+    if (Object.values(impact).some(Boolean)) {
+      const error = new AppError("CONFLICT", `仍有相依資料：${impact.listings} 個項目、${impact.presets} 個導覽、${impact.children} 個子地區、${impact.tags} 個標籤。請先停用或重新指派。`);
+      Object.assign(error, { impact });
+      throw error;
+    }
+    await removeTaxonomy(kind, id, tx);
+  });
 }

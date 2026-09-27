@@ -25,12 +25,13 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-app}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
-      AUTH_SESSION_SECRET: ${AUTH_SESSION_SECRET:-dev-secret-change-in-production}
+      AUTH_SESSION_SECRET: ${AUTH_SESSION_SECRET:?Set a random secret of at least 32 characters}
       AUTH_SESSION_COOKIE_NAME: ${AUTH_SESSION_COOKIE_NAME:-hker_session}
       AUTH_SESSION_TTL_DAYS: ${AUTH_SESSION_TTL_DAYS:-30}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
-      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+      TRUST_PROXY_HEADERS: ${TRUST_PROXY_HEADERS:-false}
+      TELEGRAM_DELIVERY_MODE: ${TELEGRAM_DELIVERY_MODE:-mock}
 
 volumes:
   pgdata:

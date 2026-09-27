@@ -16,6 +16,7 @@ const eslintConfig = [
       "**/*.test.tsx",
       "src/test/**",
       ".next/**",
+      ".ops/**",
       "node_modules/**",
       "coverage/**",
       "test-results/**",

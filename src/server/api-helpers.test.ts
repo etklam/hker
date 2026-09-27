@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { NextRequest } from 'next/server'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { db } from '@/server/db'
 
 // Mock auth dependency
@@ -7,6 +8,7 @@ vi.mock('@/server/auth', () => ({
 }))
 
 describe('api-helpers', () => {
+  afterEach(() => vi.unstubAllEnvs())
   let ah: typeof import('@/server/api-helpers')
   let auth: typeof import('@/server/auth')
 
@@ -30,30 +32,42 @@ describe('api-helpers', () => {
   })
 
   describe('getClientIp', () => {
-    it('returns x-real-ip by default', () => {
-      vi.stubEnv('TRUSTED_PROXIES', '')
-      const req = { headers: new Headers({ 'x-real-ip': '192.168.1.1' }) } as any
-      expect(ah.getClientIp(req)).toBe('192.168.1.1')
+    it('ignores all spoofable headers by default', () => {
+      vi.stubEnv('TRUST_PROXY_HEADERS', '')
+      expect(ah.getClientIp({headers:new Headers({'x-real-ip':'192.168.1.1','x-forwarded-for':'203.0.113.9'})})).toBe('untrusted-shared')
     })
-
-    it('returns 127.0.0.1 when no headers', () => {
-      vi.stubEnv('TRUSTED_PROXIES', '')
-      expect(ah.getClientIp({ headers: new Headers() } as any)).toBe('127.0.0.1')
+    it('uses only a valid overwritten ingress header when explicitly trusted', () => {
+      vi.stubEnv('TRUST_PROXY_HEADERS', 'true')
+      expect(ah.getClientIp({headers:new Headers({'x-real-ip':'2001:db8::1','x-forwarded-for':'203.0.113.9'})})).toBe('2001:db8::1')
+      expect(ah.getClientIp({headers:new Headers({'x-real-ip':'not-an-ip'})})).toBe('untrusted-shared')
+      expect(ah.getClientIp({headers:new Headers()})).toBe('untrusted-shared')
     })
-
-    // Note: TRUSTED_PROXIES is read at module level and cached as a Set.
-    // vi.stubEnv won't affect it after import. These tests verify the function
-    // logic with the default empty TRUSTED_PROXIES set.
-
-    it('ignores x-forwarded-for when proxy not trusted (default)', () => {
-      const req = {
-        headers: new Headers({
-          'x-real-ip': '10.0.0.1',
-          'x-forwarded-for': '203.0.113.50',
-        }),
-      } as any
-      // 10.0.0.1 is NOT in default empty TRUSTED_PROXIES, so direct IP is used
-      expect(ah.getClientIp(req)).toBe('10.0.0.1')
+  })
+  describe('server retirement and exact origin', () => {
+    it('blocks retired APIs before authorization, queries or mutation', async () => {
+      const handler=vi.fn(async()=>Response.json({ok:true}))
+      const request=new NextRequest('https://directory.test/api/me/collections',{method:'POST'})
+      expect((await ah.withAuth(handler)(request)).status).toBe(410)
+      expect((await ah.withOptionalAuth(handler)(request)).status).toBe(410)
+      expect(handler).not.toHaveBeenCalled()
+      expect(auth.resolveSession).not.toHaveBeenCalled()
+      expect(db.select).not.toHaveBeenCalled()
+    })
+    it('compares scheme, host and port and refuses malformed origins', () => {
+      vi.stubEnv('APP_BASE_URL','https://directory.test')
+      const check=(origin:string)=>ah.validateOrigin(new NextRequest('https://directory.test/api/admin/catalog',{method:'POST',headers:{origin}}))
+      expect(check('https://directory.test')).toBe(true)
+      for (const value of ['http://directory.test','https://directory.test:8443','https://directory.test.evil','null','https://user@directory.test','https://directory.test/path']) expect(check(value)).toBe(false)
+      expect(ah.validateOrigin(new NextRequest('https://directory.test/api/admin/catalog',{method:'POST',headers:{referer:'https://directory.test/admin'}}))).toBe(true)
+      expect(ah.validateOrigin(new NextRequest('https://directory.test/api/admin/catalog',{method:'POST',headers:{referer:'http://directory.test/admin'}}))).toBe(false)
+    })
+    it('fails closed for missing or malformed production configuration', () => {
+      vi.stubEnv('NODE_ENV','production')
+      const request=new NextRequest('https://directory.test/api/admin/catalog',{method:'POST'})
+      vi.stubEnv('APP_BASE_URL','')
+      expect(ah.validateOrigin(request)).toBe(false)
+      vi.stubEnv('APP_BASE_URL','not-a-url')
+      expect(ah.validateOrigin(request)).toBe(false)
     })
   })
 

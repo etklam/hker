@@ -3,11 +3,11 @@ import { cookies } from 'next/headers'
 import type { AuthUser } from '@/lib/types'
 import { validateSession } from '@/server/services/session-service'
 
-const COOKIE_NAME = process.env.AUTH_SESSION_COOKIE_NAME ?? '__Host-hker_session'
+export const SESSION_COOKIE_NAME = process.env.AUTH_SESSION_COOKIE_NAME ?? '__Host-hker_session'
 
 export async function getServerUser(): Promise<AuthUser | null> {
   const cookieStore = await cookies()
-  const token = cookieStore.get(COOKIE_NAME)?.value
+  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value
   if (!token) return null
 
   const result = await validateSession(token)
@@ -29,7 +29,7 @@ function isSecure(): boolean {
 }
 
 export async function resolveSession(req: NextRequest): Promise<AuthUser | null> {
-  const token = req.cookies.get(COOKIE_NAME)?.value
+  const token = req.cookies.get(SESSION_COOKIE_NAME)?.value
   if (!token) return null
 
   const result = await validateSession(token)
@@ -46,7 +46,7 @@ export async function resolveSession(req: NextRequest): Promise<AuthUser | null>
 
 export function setSessionCookie(token: string, expiresAt: Date): string {
   const parts = [
-    `${COOKIE_NAME}=${token}`,
+    `${SESSION_COOKIE_NAME}=${token}`,
     `Path=/`,
     `HttpOnly`,
     `SameSite=Lax`,
@@ -60,7 +60,7 @@ export function setSessionCookie(token: string, expiresAt: Date): string {
 
 export function clearSessionCookie(): string {
   const parts = [
-    `${COOKIE_NAME}=`,
+    `${SESSION_COOKIE_NAME}=`,
     `Path=/`,
     `HttpOnly`,
     `SameSite=Lax`,

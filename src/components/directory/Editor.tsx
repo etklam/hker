@@ -1,8 +1,43 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import type { Taxonomy } from "@/server/catalog/service";
-import { linkTypes } from "@/schemas/directory";
-export type EditorValue = Record<string, unknown>;
+import { TagPicker } from "./TagPicker";
+import { orderAreaHierarchy as areaTree } from "@/lib/directory";
+import { LinksEditor, type EditorLink } from "./LinksEditor";
+export type EditorValue = {
+  id?: number;
+  revision?: number;
+  name?: string;
+  label?: string;
+  slug?: string;
+  enabled?: boolean;
+  featured?: boolean;
+  sortOrder?: number;
+  description?: string | null;
+  shortDescription?: string | null;
+  icon?: string | null;
+  categoryId?: number | null;
+  areaId?: number | null;
+  parentId?: number | null;
+  groupId?: number | null;
+  publicVisible?: boolean;
+  botVisible?: boolean;
+  botFeatured?: boolean;
+  filterable?: boolean;
+  priceCurrency?: string;
+  priceMin?: number | string | null;
+  priceMax?: number | string | null;
+  tagIds?: number[];
+  tags?: { id: number }[];
+  aliases?: string[];
+  aliasesText?: string;
+  attrs?: Record<string, string>;
+  attributes?: { key: string; value: string }[];
+  links?: EditorLink[];
+  placement?: string;
+  matchMode?: string;
+  allowBroad?: boolean;
+};
 export function Editor({
   kind,
   initial,
@@ -21,13 +56,15 @@ export function Editor({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const dirty = JSON.stringify(value) !== JSON.stringify(initial);
-  const set = (key: string, v: unknown) =>
+  const set = (key: keyof EditorValue, v: unknown) =>
     setValue((old) => ({ ...old, [key]: v }));
   const close = () => {
     if (!dirty || window.confirm("尚有未儲存的變更。確定放棄？")) onClose();
   };
   useEffect(() => {
+    const trigger = document.activeElement as HTMLElement | null;
     dialog.current?.showModal();
+    return () => trigger?.focus();
   }, []);
   useEffect(() => {
     const handler = (event: BeforeUnloadEvent) => {
@@ -40,7 +77,7 @@ export function Editor({
     return () => window.removeEventListener("beforeunload", handler);
   }, [dirty]);
   const text = (
-    key: string,
+    key: keyof EditorValue,
     label: string,
     multiline = false,
     required = false,
@@ -61,7 +98,7 @@ export function Editor({
       )}
     </label>
   );
-  const number = (key: string, label: string, min?: number) => (
+  const number = (key: keyof EditorValue, label: string, min?: number) => (
     <label>
       {label}
       <input
@@ -75,7 +112,7 @@ export function Editor({
       />
     </label>
   );
-  const check = (key: string, label: string) => (
+  const check = (key: keyof EditorValue, label: string) => (
     <label className="check">
       <input
         type="checkbox"
@@ -86,7 +123,7 @@ export function Editor({
     </label>
   );
   const select = (
-    key: string,
+    key: keyof EditorValue,
     label: string,
     items: { id: number; name: string }[],
   ) => (
@@ -108,18 +145,6 @@ export function Editor({
     </label>
   );
   const tagIds = (value.tagIds ?? []) as number[];
-  const links = (value.links ?? []) as {
-    type: string;
-    label: string;
-    url: string;
-    sortOrder: number;
-    enabled: boolean;
-  }[];
-  const editLink = (index: number, key: string, v: unknown) =>
-    set(
-      "links",
-      links.map((link, i) => (i === index ? { ...link, [key]: v } : link)),
-    );
   const attributes = (value.attributes ?? []) as {
     key: string;
     value: string;
@@ -154,7 +179,7 @@ export function Editor({
               );
               delete data.attributes;
             }
-            if (kind === "tags") {
+            if (kind === "tags" || listing) {
               data.aliases = String(value.aliasesText ?? "")
                 .split("\n")
                 .map((v) => v.trim())
@@ -167,7 +192,14 @@ export function Editor({
               body: JSON.stringify({ kind, id: initial.id, data }),
             });
             const result = await response.json();
-            if (!response.ok) throw new Error(result.message ?? "儲存失敗");
+            if (!response.ok)
+              throw new Error(
+                response.status === 409
+                  ? `${result.message ?? "此項目已被其他管理員更新"}。你的草稿已保留，請複製變更後重新開啟最新版本。`
+                  : response.status === 401
+                    ? "登入已逾時。你的草稿仍保留在此編輯器，請在另一個分頁重新登入後再儲存。"
+                  : (result.message ?? "儲存失敗"),
+              );
             onSaved();
           } catch (e) {
             setError(e instanceof Error ? e.message : "儲存失敗");
@@ -194,10 +226,41 @@ export function Editor({
           {text(navigation ? "label" : "name", "名稱", false, true)}
           {!navigation &&
             text("slug", "網址代稱（英文小寫及連字號）", false, true)}
+          {!navigation && !initial.id && (
+            <button
+              type="button"
+              className="button"
+              onClick={async () => {
+                try {
+                  const response = await fetch(
+                    `/api/admin/catalog?${new URLSearchParams({ slugName: value.name ?? "", kind })}`,
+                  );
+                  const result = await response.json();
+                  if (!response.ok)
+                    throw new Error(result.message ?? "未能產生代稱");
+                  set("slug", result.slug);
+                } catch (error) {
+                  setError(
+                    error instanceof Error ? error.message : "未能產生代稱",
+                  );
+                }
+              }}
+            >
+              由名稱產生網址代稱
+            </button>
+          )}
+          {Boolean(initial.id) && !navigation && (
+            <p className="muted">
+              {listing
+                ? "修改網址代稱會改變公開網址；系統會保留舊收錄網址的轉址。請只在必要時修改。"
+                : "修改網址代稱會改變搜尋分享連結，請只在必要時修改。"}
+            </p>
+          )}
           {listing && (
             <>
               {text("shortDescription", "簡介", true)}
               {text("description", "詳細介紹", true)}
+              {text("aliasesText", "搜尋別名（每行一個）", true)}
               <h3>分類與標籤</h3>
             </>
           )}
@@ -205,28 +268,21 @@ export function Editor({
             <>
               <div className="form-grid">
                 {select("categoryId", "分類", taxonomy.categories)}
-                {select("areaId", "地區", taxonomy.areas)}
+                {select(
+                  "areaId",
+                  "地區",
+                  areaTree(taxonomy.areas).map((area) => ({
+                    ...area,
+                    name: `${"　".repeat(area.depth)}${area.name}`,
+                  })),
+                )}
               </div>
-              <fieldset>
-                <legend>標籤</legend>
-                {taxonomy.tags.map((t) => (
-                  <label className="check" key={t.id}>
-                    <input
-                      type="checkbox"
-                      checked={tagIds.includes(t.id)}
-                      onChange={(e) =>
-                        set(
-                          "tagIds",
-                          e.target.checked
-                            ? [...tagIds, t.id]
-                            : tagIds.filter((id) => id !== t.id),
-                        )
-                      }
-                    />
-                    {t.name}
-                  </label>
-                ))}
-              </fieldset>
+              <TagPicker
+                taxonomy={taxonomy}
+                selected={tagIds}
+                onChange={(ids) => set("tagIds", ids)}
+                admin
+              />
               <h3>價格範圍</h3>
               {listing && text("priceCurrency", "貨幣代碼")}
               <div className="form-grid">
@@ -240,97 +296,10 @@ export function Editor({
           )}
           {listing && (
             <>
-              <h3>外部連結</h3>
-              {links.map((link, index) => (
-                <div className="link-editor" key={index}>
-                  <div className="form-grid">
-                    <label>
-                      類型
-                      <select
-                        value={link.type}
-                        onChange={(e) =>
-                          editLink(index, "type", e.target.value)
-                        }
-                      >
-                        {linkTypes.map((type) => (
-                          <option key={type}>{type}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      按鈕文字
-                      <input
-                        required
-                        value={link.label}
-                        onChange={(e) =>
-                          editLink(index, "label", e.target.value)
-                        }
-                      />
-                    </label>
-                  </div>
-                  <label>
-                    網址
-                    <input
-                      required
-                      value={link.url}
-                      onChange={(e) => editLink(index, "url", e.target.value)}
-                      placeholder="https://…"
-                    />
-                  </label>
-                  <div className="form-grid">
-                    <label>
-                      排序
-                      <input
-                        type="number"
-                        value={link.sortOrder}
-                        onChange={(e) =>
-                          editLink(index, "sortOrder", Number(e.target.value))
-                        }
-                      />
-                    </label>
-                    <label className="check">
-                      <input
-                        type="checkbox"
-                        checked={link.enabled}
-                        onChange={(e) =>
-                          editLink(index, "enabled", e.target.checked)
-                        }
-                      />
-                      顯示連結
-                    </label>
-                  </div>
-                  <button
-                    type="button"
-                    className="button danger"
-                    onClick={() =>
-                      set(
-                        "links",
-                        links.filter((_, i) => i !== index),
-                      )
-                    }
-                  >
-                    移除連結
-                  </button>
-                </div>
-              ))}
-              <button
-                className="button"
-                type="button"
-                onClick={() =>
-                  set("links", [
-                    ...links,
-                    {
-                      type: "website",
-                      label: "官方網站",
-                      url: "",
-                      sortOrder: links.length,
-                      enabled: true,
-                    },
-                  ])
-                }
-              >
-                新增連結
-              </button>
+              <LinksEditor
+                links={value.links ?? []}
+                onChange={(links) => set("links", links)}
+              />
               <h3>公開資料</h3>
               <p className="muted">所有屬性會公開顯示，請勿填寫內部備註。</p>
               {attributes.map((a, index) => (
@@ -416,6 +385,12 @@ export function Editor({
               {check("filterable", "可用作篩選")}
             </>
           )}
+          {kind === "groups" && (
+            <p className="muted">
+              群組顯示設定控制群組標題及選單；個別標籤是否公開，由該標籤的網站／Telegram
+              顯示設定控制。停用群組不會取消發佈收錄。
+            </p>
+          )}
           {(kind === "tags" || kind === "groups") && (
             <>
               {check("publicVisible", "在網站顯示")}
@@ -424,6 +399,7 @@ export function Editor({
           )}
           {navigation && (
             <>
+              {check("allowBroad", "明確設定為全部收錄（不限制條件）")}
               <label>
                 顯示位置
                 <select

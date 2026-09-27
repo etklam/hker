@@ -1,11 +1,9 @@
 import { withAuth } from '@/server/api-helpers'
-import { clearSessionCookie } from '@/server/auth'
+import { clearSessionCookie, SESSION_COOKIE_NAME } from '@/server/auth'
 import { destroySession } from '@/server/services/session-service'
 
-const COOKIE_NAME = process.env.AUTH_SESSION_COOKIE_NAME ?? 'hker_session'
-
 export const POST = withAuth(async (req) => {
-  const token = req.cookies.get(COOKIE_NAME)?.value
+  const token = req.cookies.get(SESSION_COOKIE_NAME)?.value
 
   if (token) {
     await destroySession(token)

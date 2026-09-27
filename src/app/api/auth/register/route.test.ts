@@ -24,7 +24,7 @@ describe('POST /api/auth/register', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks()
-    const mod = await import('./route')
+    const mod = await import('./retired-implementation')
     POST = mod.POST
     authService = await import('@/server/services/auth-service')
     apiHelpers = await import('@/server/api-helpers')

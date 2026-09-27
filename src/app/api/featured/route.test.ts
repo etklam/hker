@@ -6,7 +6,7 @@ describe('GET /api/featured', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks()
-    const mod = await import('./route')
+    const mod = await import('./retired-implementation')
     GET = mod.GET
   })
 

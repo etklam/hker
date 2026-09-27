@@ -1,3 +1,5 @@
+import { isIP } from 'node:net'
+import { isRetiredPath, retiredResponse } from '@/lib/retired-routes'
 import { NextRequest } from 'next/server'
 import { resolveSession } from '@/server/auth'
 import { apiError, AppError } from '@/lib/errors'
@@ -21,35 +23,36 @@ async function rateLimitCheck(key: string, limit: number, windowMs: number): Pro
     await db.delete(rateLimitEntries).where(lt(rateLimitEntries.hitAt, windowStart)).catch(() => {})
   }
 
-  const [{ hitCount }] = await db
-    .select({ hitCount: sql<number>`count(*)::int` })
-    .from(rateLimitEntries)
-    .where(and(
-      eq(rateLimitEntries.key, key),
-      gte(rateLimitEntries.hitAt, windowStart),
-    ))
-
-  if (hitCount >= limit) {
-    // Find oldest hit in window to compute retry-after
-    const [oldest] = await db
-      .select({ hitAt: rateLimitEntries.hitAt })
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'rate-limit:' + key}, 0))`)
+    const [{ hitCount }] = await tx
+      .select({ hitCount: sql<number>`count(*)::int` })
       .from(rateLimitEntries)
       .where(and(
         eq(rateLimitEntries.key, key),
         gte(rateLimitEntries.hitAt, windowStart),
       ))
-      .orderBy(rateLimitEntries.hitAt)
-      .limit(1)
 
-    const retryAfterMs = oldest
-      ? windowMs - (Date.now() - oldest.hitAt.getTime())
-      : windowMs
+    if (hitCount >= limit) {
+      const [oldest] = await tx
+        .select({ hitAt: rateLimitEntries.hitAt })
+        .from(rateLimitEntries)
+        .where(and(
+          eq(rateLimitEntries.key, key),
+          gte(rateLimitEntries.hitAt, windowStart),
+        ))
+        .orderBy(rateLimitEntries.hitAt)
+        .limit(1)
 
-    return { allowed: false, retryAfterMs: Math.max(retryAfterMs, 0) }
-  }
+      const retryAfterMs = oldest
+        ? windowMs - (Date.now() - oldest.hitAt.getTime())
+        : windowMs
+      return { allowed: false, retryAfterMs: Math.max(retryAfterMs, 0) }
+    }
 
-  await db.insert(rateLimitEntries).values({ key })
-  return { allowed: true, retryAfterMs: 0 }
+    await tx.insert(rateLimitEntries).values({ key })
+    return { allowed: true, retryAfterMs: 0 }
+  })
 }
 
 // --- Rate limit config per endpoint ---
@@ -103,80 +106,76 @@ const LOCKOUT_DURATION_MS = 15 * 60_000
 
 export async function isAccountLocked(email: string): Promise<boolean> {
   const key = email.toLowerCase()
-  const [entry] = await db
-    .select()
-    .from(loginFailures)
-    .where(eq(loginFailures.email, key))
-    .limit(1)
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'login-failure:' + key}, 0))`)
+    const [entry] = await tx
+      .select()
+      .from(loginFailures)
+      .where(eq(loginFailures.email, key))
+      .limit(1)
 
-  if (!entry || !entry.lockedUntil) return false
-
-  if (new Date() >= entry.lockedUntil) {
-    await db.delete(loginFailures).where(eq(loginFailures.email, key))
-    return false
-  }
-  return true
+    if (!entry || !entry.lockedUntil) return false
+    if (new Date() >= entry.lockedUntil) {
+      await tx.delete(loginFailures).where(eq(loginFailures.email, key))
+      return false
+    }
+    return true
+  })
 }
 
 export async function trackLoginFailure(email: string): Promise<void> {
   const key = email.toLowerCase()
   const now = new Date()
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'login-failure:' + key}, 0))`)
+    const [existing] = await tx
+      .select()
+      .from(loginFailures)
+      .where(eq(loginFailures.email, key))
+      .limit(1)
 
-  const [existing] = await db
-    .select()
-    .from(loginFailures)
-    .where(eq(loginFailures.email, key))
-    .limit(1)
+    if (!existing) {
+      await tx.insert(loginFailures).values({
+        email: key,
+        failCount: 1,
+        firstFailure: now,
+        lockedUntil: null,
+      })
+      return
+    }
 
-  if (!existing) {
-    const lockedUntil = 1 >= MAX_LOGIN_FAILURES ? new Date(now.getTime() + LOCKOUT_DURATION_MS) : null
-    await db.insert(loginFailures).values({
-      email: key,
-      failCount: 1,
-      firstFailure: now,
-      lockedUntil,
-    })
-    return
-  }
+    const newCount = existing.failCount + 1
+    const lockedUntil = newCount >= MAX_LOGIN_FAILURES
+      ? new Date(now.getTime() + LOCKOUT_DURATION_MS)
+      : null
 
-  const newCount = existing.failCount + 1
-  const lockedUntil = newCount >= MAX_LOGIN_FAILURES
-    ? new Date(now.getTime() + LOCKOUT_DURATION_MS)
-    : null
-
-  await db
-    .update(loginFailures)
-    .set({ failCount: newCount, lockedUntil })
-    .where(eq(loginFailures.email, key))
+    await tx
+      .update(loginFailures)
+      .set({ failCount: newCount, lockedUntil })
+      .where(eq(loginFailures.email, key))
+  })
 }
 
 export async function clearLoginFailures(email: string): Promise<void> {
-  await db.delete(loginFailures).where(eq(loginFailures.email, email.toLowerCase()))
+  const key = email.toLowerCase()
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'login-failure:' + key}, 0))`)
+    await tx.delete(loginFailures).where(eq(loginFailures.email, key))
+  })
 }
 
 // --- Trusted proxy / IP parsing ---
 
-const TRUSTED_PROXIES = new Set(
-  (process.env.TRUSTED_PROXIES ?? '').split(',').map((s) => s.trim()).filter(Boolean),
-)
-
-export function getClientIp(req: NextRequest): string {
-  const directIp = req.headers.get('x-real-ip') ?? '127.0.0.1'
-
-  if (TRUSTED_PROXIES.has(directIp)) {
-    const forwarded = req.headers.get('x-forwarded-for')
-    if (forwarded) {
-      const first = forwarded.split(',')[0].trim()
-      if (first) return first
-    }
-  }
-
-  return directIp
+export function getClientIp(req: Pick<NextRequest, 'headers'>): string {
+  // The ingress must overwrite this header and prevent direct access before opting in.
+  if (process.env.TRUST_PROXY_HEADERS !== 'true') return 'untrusted-shared'
+  const value = req.headers.get('x-real-ip')?.trim()
+  return value && isIP(value) ? value : 'untrusted-shared'
 }
 
 // --- Origin / Referer CSRF validation ---
 
-function validateOrigin(req: NextRequest): boolean {
+export function validateOrigin(req: NextRequest): boolean {
   const method = req.method.toUpperCase()
   if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') {
     return true
@@ -191,11 +190,16 @@ function validateOrigin(req: NextRequest): boolean {
     return true
   }
 
-  const allowedHost = new URL(baseUrl).host
+  let allowedOrigin: string
+  try {
+    const configured = new URL(baseUrl)
+    if (!['http:', 'https:'].includes(configured.protocol) || configured.username || configured.password) return false
+    allowedOrigin = configured.origin
+  } catch { return false }
 
   if (origin) {
     try {
-      return new URL(origin).host === allowedHost
+      return new URL(origin).origin === allowedOrigin && new URL(origin).pathname === '/' && !new URL(origin).username && !new URL(origin).password && !new URL(origin).search && !new URL(origin).hash
     } catch {
       return false
     }
@@ -203,7 +207,7 @@ function validateOrigin(req: NextRequest): boolean {
 
   if (referer) {
     try {
-      return new URL(referer).host === allowedHost
+      return new URL(referer).origin === allowedOrigin
     } catch {
       return false
     }
@@ -226,6 +230,7 @@ type OptionalAuthHandler = (
 
 export function withAuth(handler: AuthenticatedHandler) {
   return async (req: NextRequest) => {
+    if (isRetiredPath(new URL(req.url).pathname)) return retiredResponse()
     if (!validateOrigin(req)) {
       return apiError('FORBIDDEN', 'Invalid origin')
     }
@@ -249,6 +254,7 @@ export function withAuth(handler: AuthenticatedHandler) {
 
 export function withOptionalAuth(handler: OptionalAuthHandler) {
   return async (req: NextRequest) => {
+    if (isRetiredPath(new URL(req.url).pathname)) return retiredResponse()
     if (!validateOrigin(req)) {
       return apiError('FORBIDDEN', 'Invalid origin')
     }

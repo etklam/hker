@@ -1,7 +1,9 @@
+import { readJsonBody } from '@/server/catalog/http'
 import { NextRequest } from 'next/server'
 import { apiError, AppError } from '@/lib/errors'
 import {
   applyRateLimit,
+  validateOrigin,
   isAccountLocked,
   trackLoginFailure,
   clearLoginFailures,
@@ -14,12 +16,13 @@ import { parseBody } from '@/schemas/parse-body'
 import { loginSchema } from '@/schemas/auth'
 
 export async function POST(req: NextRequest) {
+  if (!validateOrigin(req)) return apiError('FORBIDDEN', 'Invalid origin')
   const rateLimitResponse = await applyRateLimit(req)
   if (rateLimitResponse) return rateLimitResponse
 
   let body: unknown
   try {
-    body = await req.json()
+    body = await readJsonBody(req, 12_000)
   } catch {
     return apiError('INVALID_REQUEST', 'Invalid JSON body')
   }
@@ -40,7 +43,7 @@ export async function POST(req: NextRequest) {
     const token = await sessionService.createSession(user.id)
 
     const expiresAt = new Date()
-    expiresAt.setDate(expiresAt.getDate() + 30)
+    expiresAt.setDate(expiresAt.getDate() + sessionService.SESSION_TTL_DAYS)
 
     const cookie = setSessionCookie(token, expiresAt)
 

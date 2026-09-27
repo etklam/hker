@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import Link from "next/link";
 import { CatalogSearchService } from "@/server/catalog/service";
 import { formatPrice } from "@/lib/directory";
@@ -31,6 +31,7 @@ export default async function ListingDetail({
   const { slug } = await params;
   const listing = await CatalogSearchService.detail(slug);
   if (!listing) notFound();
+  if (listing.slug !== slug) permanentRedirect(`/listing/${listing.slug}`);
   return (
     <div className="container">
       <article className="detail">
@@ -48,7 +49,19 @@ export default async function ListingDetail({
           <div className="price">{formatPrice(listing)}</div>
           <div className="tag-list">
             {listing.tags.map((t) => (
-              <span key={t.id}>{t.filterable ? <Link href={`/search?tags=${t.slug}`}>#{t.name}</Link> : `#${t.name}`}</span>
+              <span key={t.id}>
+                {t.filterable ? (
+                  <Link
+                    href={`/search?tags=${t.slug}`}
+                    data-catalog-kind="tag"
+                    data-catalog-key={t.id}
+                  >
+                    #{t.name}
+                  </Link>
+                ) : (
+                  `#${t.name}`
+                )}
+              </span>
             ))}
           </div>
         </header>
@@ -58,7 +71,7 @@ export default async function ListingDetail({
             <a
               key={l.id}
               className="button"
-              href={l.url}
+              href={`/out/${l.id}?source=web`}
               target="_blank"
               rel="noopener noreferrer"
             >

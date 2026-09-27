@@ -1,71 +1,59 @@
-import Link from "next/link";
+import { guardPublicSearch } from "@/server/catalog/abuse";
+import { SearchForm } from "@/components/directory/SearchForm";
 import { Filters } from "@/components/directory/Filters";
 import { CatalogSearchService, getTaxonomy } from "@/server/catalog/service";
 import { ListingResults } from "@/components/directory/ListingCard";
-import { searchFromParams } from "@/lib/directory";
-import { searchSchema } from "@/schemas/directory";
+import { TagPicker } from "@/components/directory/TagPicker";
+import {
+  resolveSearchParams,
+  searchToParams,
+  orderAreaHierarchy,
+} from "@/lib/directory";
+import type { SearchState } from "@/schemas/directory";
 export const dynamic = "force-dynamic";
-export const metadata = { title: "搜尋目錄" };
+export const metadata = {
+  title: "搜尋目錄",
+  robots: { index: false, follow: true },
+};
 export default async function SearchPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  try {
+    await guardPublicSearch();
+  } catch {
+    return (
+      <div className="container page-heading">
+        <h1>搜尋過於頻繁</h1>
+        <p>請稍候一分鐘再試。</p>
+      </div>
+    );
+  }
   const values = await searchParams;
   const params = new URLSearchParams();
   for (const [k, v] of Object.entries(values))
     if (v)
       for (const item of Array.isArray(v) ? v : [v]) params.append(k, item);
   const taxonomy = await getTaxonomy();
-  const raw = searchFromParams(params);
-  let unknown = false;
-  if (params.has("category")) {
-    raw.categoryId = taxonomy.categories.find(
-      (c) => c.slug === params.get("category"),
-    )?.id;
-    unknown ||= !raw.categoryId;
-  }
-  if (params.has("area")) {
-    raw.areaId = taxonomy.areas.find((a) => a.slug === params.get("area"))?.id;
-    unknown ||= !raw.areaId;
-  }
-  if (params.has("tags")) {
-    const slugs = params.getAll("tags").flatMap((s) => s.split(","));
-    raw.tagIds = slugs.map(
-      (slug) => taxonomy.tags.find((t) => t.slug === slug)?.id ?? 0,
-    );
-    unknown ||= raw.tagIds.includes(0);
-  }
-  if (params.has("preset")) {
-    const preset = taxonomy.navigation.find(
-      (p) => p.id === Number(params.get("preset")),
-    );
-    if (preset)
-      Object.assign(raw, {
-        categoryId: preset.categoryId ?? undefined,
-        areaId: preset.areaId ?? undefined,
-        tagIds: preset.tagIds,
-        tagMatchMode: preset.matchMode,
-        priceMin: preset.priceMin === null ? null : Number(preset.priceMin),
-        priceMax: preset.priceMax === null ? null : Number(preset.priceMax),
-      });
-    else unknown = true;
-  }
-  const parsed = searchSchema.safeParse(raw);
-  if (!parsed.success || unknown)
+  let input: SearchState;
+  try {
+    input = resolveSearchParams(params, taxonomy);
+  } catch {
     return (
       <div className="container page-heading">
         <h1>搜尋條件無效</h1>
         <p>請檢查價格、分類及標籤，然後重新搜尋。</p>
-        <Link href="/search" className="button">
+        <a href="/search" className="button">
           重設搜尋
-        </Link>
+        </a>
       </div>
     );
-  const input = parsed.data;
+  }
   const result = await CatalogSearchService.search(input);
+  const formInput = { ...input, sort: params.get("sort") ? input.sort : undefined };
   const pageUrl = (page: number) => {
-    const copy = new URLSearchParams(params);
+    const copy = searchToParams(formInput);
     copy.set("page", String(page));
     return `/search?${copy}`;
   };
@@ -74,7 +62,7 @@ export default async function SearchPage({
       <div className="page-heading">
         <h1>探索香港生活目錄</h1>
       </div>
-      <form action="/search">
+      <SearchForm key={searchToParams(formInput).toString()} input={formInput}>
         <div className="search-bar">
           <input
             name="q"
@@ -102,30 +90,39 @@ export default async function SearchPage({
                 地區
                 <select name="areaId" defaultValue={input.areaId ?? ""}>
                   <option value="">所有地區 / 網上資源</option>
-                  {taxonomy.areas.map((a) => (
+                  {orderAreaHierarchy(taxonomy.areas).map((a) => (
                     <option key={a.id} value={a.id}>
-                      {a.parentId ? "↳ " : ""}
+                      {"　".repeat(a.depth)}
                       {a.name}
                     </option>
                   ))}
                 </select>
               </label>
-              <fieldset>
-                <legend>標籤（同時符合）</legend>
-                {taxonomy.tags
-                  .filter((t) => t.filterable)
-                  .map((t) => (
-                    <label className="check" key={t.id}>
-                      <input
-                        type="checkbox"
-                        name="tagIds"
-                        value={t.id}
-                        defaultChecked={input.tagIds.includes(t.id)}
-                      />
-                      {t.name}
-                    </label>
-                  ))}
-              </fieldset>
+              <TagPicker
+                key={searchToParams(formInput).toString()}
+                taxonomy={taxonomy}
+                selected={input.tagIds}
+              />
+              <label>
+                標籤配對
+                <select name="tagMatchMode" defaultValue={input.tagMatchMode}>
+                  <option value="and">符合所有標籤</option>
+                  <option value="or">符合任一標籤</option>
+                </select>
+              </label>
+              <label>
+                精選收錄
+                <select
+                  name="featured"
+                  defaultValue={
+                    input.featured === undefined ? "" : String(input.featured)
+                  }
+                >
+                  <option value="">全部</option>
+                  <option value="true">只看精選</option>
+                  <option value="false">非精選</option>
+                </select>
+              </label>
               <label>
                 最低預算（HK$）
                 <input
@@ -146,9 +143,13 @@ export default async function SearchPage({
                   defaultValue={input.priceMax ?? ""}
                 />
               </label>
+              <p className="muted">
+                預算與 HKD 價格範圍重疊即符合，僅供參考，並非最終帳單。
+              </p>
               <label>
                 排序
-                <select name="sort" defaultValue={input.sort}>
+                <select name="sort" defaultValue={formInput.sort ?? ""}>
+                  <option value="">自動（搜尋用相關度，瀏覽用推薦）</option>
                   <option value="manual">推薦排序</option>
                   <option value="relevance">相關程度</option>
                   <option value="newest">最新收錄</option>
@@ -157,9 +158,9 @@ export default async function SearchPage({
                 </select>
               </label>
               <button className="button primary">套用篩選</button>
-              <Link href="/search" className="text-link">
+              <a href="/search" className="text-link">
                 清除全部
-              </Link>
+              </a>
             </div>
           </Filters>
           <section className="results">
@@ -169,25 +170,96 @@ export default async function SearchPage({
                 {input.query && `「${input.query}」`}
               </span>
             </div>
-            <ListingResults items={result.items} />
+            <div className="active-filters" aria-label="已套用篩選">
+              {[
+                ...(input.categoryId
+                  ? [
+                      {
+                        key: "categoryId",
+                        label: taxonomy.categories.find(
+                          (c) => c.id === input.categoryId,
+                        )?.name,
+                      },
+                    ]
+                  : []),
+                ...(input.areaId
+                  ? [
+                      {
+                        key: "areaId",
+                        label: taxonomy.areas.find((a) => a.id === input.areaId)
+                          ?.name,
+                      },
+                    ]
+                  : []),
+                ...(input.featured !== undefined
+                  ? [
+                      {
+                        key: "featured",
+                        label: input.featured ? "精選" : "非精選",
+                      },
+                    ]
+                  : []),
+                ...(input.priceMin !== null
+                  ? [{ key: "priceMin", label: `最低 HK$${input.priceMin}` }]
+                  : []),
+                ...(input.priceMax !== null
+                  ? [{ key: "priceMax", label: `最高 HK$${input.priceMax}` }]
+                  : []),
+              ].map((filter) => {
+                const next = searchToParams(formInput);
+                next.delete(filter.key);
+                next.delete("page");
+                return (
+                  <a
+                    key={filter.key}
+                    className="chip"
+                    href={`/search?${next}`}
+                  >
+                    移除 {filter.label}
+                  </a>
+                );
+              })}
+              {input.tagIds.map((id) => {
+                const next = searchToParams({
+                  ...formInput,
+                  tagIds: input.tagIds.filter((t) => t !== id),
+                  page: 1,
+                });
+                return (
+                  <a key={id} className="chip" href={`/search?${next}`}>
+                    移除 {taxonomy.tags.find((t) => t.id === id)?.name}
+                  </a>
+                );
+              })}
+              {input.tagIds.length > 0 && (
+                <span className="muted">
+                  {input.tagMatchMode === "or"
+                    ? "符合任一標籤"
+                    : "符合所有標籤"}
+                </span>
+              )}
+            </div>
+            {input.page > Math.max(1, result.totalPages) ? (
+              <div className="empty"><h3>這一頁已沒有結果</h3><p className="muted">收錄可能已更新，請返回第一頁繼續瀏覽。</p><a className="button" href={pageUrl(1)}>返回第一頁</a></div>
+            ) : <ListingResults items={result.items} />}
             <nav className="pagination" aria-label="搜尋分頁">
               {input.page > 1 && (
-                <Link className="button" href={pageUrl(input.page - 1)}>
+                <a className="button" href={pageUrl(input.page - 1)}>
                   上一頁
-                </Link>
+                </a>
               )}
               <span>
-                {input.page} / {Math.max(1, result.totalPages)}
+                {input.page > Math.max(1, result.totalPages) ? `所選第 ${input.page} 頁・共 ${result.totalPages} 頁` : `${input.page} / ${Math.max(1, result.totalPages)}`}
               </span>
               {input.page < result.totalPages && (
-                <Link className="button" href={pageUrl(input.page + 1)}>
+                <a className="button" href={pageUrl(input.page + 1)}>
                   下一頁
-                </Link>
+                </a>
               )}
             </nav>
           </section>
         </div>
-      </form>
+      </SearchForm>
     </div>
   );
 }
