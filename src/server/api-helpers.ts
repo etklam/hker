@@ -1,3 +1,4 @@
+import { MAX_RATE_WINDOW_MS } from "@/server/auth-cleanup";
 import { isIP } from 'node:net'
 import { isRetiredPath, retiredResponse } from '@/lib/retired-routes'
 import { NextRequest } from 'next/server'
@@ -6,22 +7,18 @@ import { apiError, AppError } from '@/lib/errors'
 import type { AuthUser } from '@/lib/types'
 import { db } from '@/server/db'
 import { rateLimitEntries, loginFailures } from '@/db/schema/rateLimit'
-import { eq, sql, and, lt, gte } from 'drizzle-orm'
-import { isAdmin } from '@/server/services/permission-service'
+import { eq, sql, and, gte } from 'drizzle-orm'
+import { isAdmin } from '@/server/roles'
 
 // --- Rate limiting (DB-backed sliding window) ---
 
 export function rateLimit(key: string, limit: number, windowMs: number): Promise<{ allowed: boolean; retryAfterMs: number }> {
+  if (!Number.isSafeInteger(windowMs) || windowMs < 1 || windowMs > MAX_RATE_WINDOW_MS) throw new Error("Unsupported rate limit window")
   return rateLimitCheck(key, limit, windowMs)
 }
 
 async function rateLimitCheck(key: string, limit: number, windowMs: number): Promise<{ allowed: boolean; retryAfterMs: number }> {
   const windowStart = new Date(Date.now() - windowMs)
-
-  // Cleanup old entries periodically (1% of requests)
-  if (Math.random() < 0.01) {
-    await db.delete(rateLimitEntries).where(lt(rateLimitEntries.hitAt, windowStart)).catch(() => {})
-  }
 
   return db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'rate-limit:' + key}, 0))`)
@@ -132,7 +129,7 @@ export async function trackLoginFailure(email: string): Promise<void> {
       .select()
       .from(loginFailures)
       .where(eq(loginFailures.email, key))
-      .limit(1)
+      .limit(1).for("update")
 
     if (!existing) {
       await tx.insert(loginFailures).values({
@@ -144,14 +141,15 @@ export async function trackLoginFailure(email: string): Promise<void> {
       return
     }
 
-    const newCount = existing.failCount + 1
+    const expiredWindow = existing.firstFailure.getTime() < now.getTime() - LOCKOUT_DURATION_MS && (!existing.lockedUntil || existing.lockedUntil <= now)
+    const newCount = expiredWindow ? 1 : existing.failCount + 1
     const lockedUntil = newCount >= MAX_LOGIN_FAILURES
       ? new Date(now.getTime() + LOCKOUT_DURATION_MS)
       : null
 
     await tx
       .update(loginFailures)
-      .set({ failCount: newCount, lockedUntil })
+      .set({ failCount: newCount, lockedUntil, firstFailure: expiredWindow ? now : existing.firstFailure })
       .where(eq(loginFailures.email, key))
   })
 }

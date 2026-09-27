@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { lt } from "drizzle-orm";
+import { sql } from "drizzle-orm";
+import { cleanupAuthentication } from "../src/server/auth-cleanup";
 import { db, closeDatabase } from "../src/server/db";
 import { maintenanceRuns } from "../src/db/schema/directoryOperations";
 import { cleanupAnalytics } from "../src/server/catalog/analytics";
@@ -28,14 +29,13 @@ async function run(name: string, operation: () => Promise<Record<string, number>
 }
 
 async function main() {
+  await run("authentication", () => cleanupAuthentication());
   await run("bot", () => cleanupBotState());
   await run("content", () => cleanupContentOperations());
   await run("analytics", () => cleanupAnalytics());
   await run("maintenance", async () => {
     const cutoff = new Date(Date.now() - 90 * 86400000);
-    const removed = await db.delete(maintenanceRuns)
-      .where(lt(maintenanceRuns.finishedAt, cutoff))
-      .returning({ id: maintenanceRuns.id });
+    const removed = await db.execute(sql`delete from directory_maintenance_runs where id in (select id from directory_maintenance_runs where finished_at < ${cutoff} order by finished_at limit 1000 for update skip locked) returning id`);
     return { runs: removed.length };
   });
   const status = errors.length ? "failed" : "succeeded";

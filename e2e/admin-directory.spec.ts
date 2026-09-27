@@ -26,7 +26,7 @@ async function deleteListingByName(
   const deletion = await request.delete("/api/admin/catalog", {
     headers: { origin },
     data: {
-      kind: "listings",
+      kind: "listings", requestKey: crypto.randomUUID(),
       id: current.id,
       revision: current.revision,
     },
@@ -163,7 +163,7 @@ test.describe("directory admin acceptance", () => {
     const createdResponse = await request.post("/api/admin/catalog", {
       headers: { origin },
       data: {
-        kind: "listings",
+        kind: "listings", requestKey: crypto.randomUUID(),
         data: { name, slug: `two-tab-${suffix}` },
       },
     });
@@ -282,7 +282,7 @@ test.describe("directory admin acceptance", () => {
       const response = await request.post("/api/admin/catalog", {
         headers: { origin },
         data: {
-          kind: "listings",
+          kind: "listings", requestKey: crypto.randomUUID(),
           data: {
             name,
             slug: `reorder-${suffix}-${index}`,
@@ -328,7 +328,7 @@ test.describe("directory admin acceptance", () => {
     const names: string[] = [];
     try {
       for (let index = 0; index < 21; index++) {
-        const response = await request.post("/api/admin/catalog", { headers: { origin }, data: { kind: "listings", data: { name: `${prefix} ${index}`, slug: `${prefix}-${index}` } } });
+        const response = await request.post("/api/admin/catalog", { headers: { origin }, data: { kind: "listings", requestKey: crypto.randomUUID(), data: { name: `${prefix} ${index}`, slug: `${prefix}-${index}` } } });
         expect(response.ok()).toBe(true);
         names.push(`${prefix} ${index}`);
       }

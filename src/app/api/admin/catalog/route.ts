@@ -1,3 +1,4 @@
+import { saveListingWithReceipt } from "@/server/catalog/listing-write";
 import { AppError } from "@/lib/errors";
 import { matchingSelection } from "@/server/catalog/content-plans";
 import {
@@ -11,7 +12,6 @@ import { withAdmin } from "@/server/api-helpers";
 import {
   CatalogSearchService,
   getTaxonomy,
-  saveListing,
   deleteListing,
   saveTaxonomy,
   deleteTaxonomy,
@@ -30,6 +30,7 @@ const mutation = z.object({
   ]),
   id: z.number().int().positive().optional(),
   data: z.unknown(),
+  requestKey: z.uuid().optional(),
 });
 export const GET = withAdmin(async (req) =>
   catalogResponse(async () => {
@@ -135,9 +136,10 @@ export const PATCH = withAdmin(async (req, { user }) =>
 );
 export const POST = withAdmin(async (req, { user }) =>
   catalogResponse(async () => {
-    const { kind, id, data } = parseBody(await readJsonBody(req), mutation);
+    const { kind, id, data, requestKey } = parseBody(await readJsonBody(req), mutation);
+    if (kind === "listings" && !requestKey) throw new AppError("INVALID_REQUEST", "儲存收錄需要 requestKey，請重新開啟編輯器。");
     return kind === "listings"
-      ? saveListing(data, id, { actorId: user.id })
+      ? saveListingWithReceipt(data, id, user.id, requestKey!)
       : saveTaxonomy(kind, data, id, { actorId: user.id });
   }),
 );

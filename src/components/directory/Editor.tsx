@@ -57,6 +57,8 @@ export function Editor({
   const [value, setValue] = useState<EditorValue>(initial);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const attempt = useRef<{ data: string; key: string; at: number } | null>(null);
+  const [unknownOutcome, setUnknownOutcome] = useState(false);
   const dirty = JSON.stringify(value) !== JSON.stringify(initial);
   const set = (key: keyof EditorValue, v: unknown) =>
     setValue((old) => ({ ...old, [key]: v }));
@@ -193,12 +195,20 @@ export function Editor({
                 .filter(Boolean);
               delete data.aliasesText;
             }
+            const serialized = JSON.stringify(data);
+            if (!attempt.current || (!unknownOutcome && attempt.current.data !== serialized)) attempt.current = { data: serialized, key: crypto.randomUUID(), at: Date.now() };
+            if (unknownOutcome && (!listing || Date.now() - attempt.current.at > 23 * 3600000)) throw new Error("上次儲存結果未確認，請先在另一分頁核對資料再關閉編輯器。");
+            if (unknownOutcome && attempt.current.data !== serialized) throw new Error("上次儲存結果未確認。請先在另一分頁核對資料；保留原草稿重試才可確認該次操作。");
+            setUnknownOutcome(true);
             const response = await fetch("/api/admin/catalog", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ kind, id: initial.id, data }),
+              body: JSON.stringify({ kind, id: initial.id, data, requestKey: listing ? attempt.current.key : undefined }),
             });
             const result = await response.json();
+            if (response.status >= 500 || (response.ok && listing && !Number.isInteger(result?.id)))
+              throw new Error("儲存結果未確認。草稿已保留；請核對資料或以相同內容重試。");
+            setUnknownOutcome(false);
             if (!response.ok)
               throw new Error(
                 response.status === 409
@@ -209,7 +219,7 @@ export function Editor({
               );
             onSaved();
           } catch (e) {
-            setError(e instanceof Error ? e.message : "儲存失敗");
+            setError(e instanceof TypeError || e instanceof SyntaxError ? "連線中斷，儲存結果未確認。草稿已保留；請核對資料或以相同內容重試。" : e instanceof Error ? e.message : "儲存結果未確認，草稿已保留。");
           } finally {
             setBusy(false);
           }
@@ -297,7 +307,7 @@ export function Editor({
                 {number("priceMax", "最高價格", 0)}
               </div>
               <p className="muted">
-                留空代表沒有指定價格；兩者皆填寫時，上限必須不低於下限。
+                留空代表未知，不代表免費；兩者皆填寫時，上限必須不低於下限。可在公開資料加入「價格說明」，註明按件、按次或其他參考計價方式。
               </p>
             </>
           )}

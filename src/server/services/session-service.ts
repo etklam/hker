@@ -1,5 +1,5 @@
 import { randomBytes, createHmac } from 'node:crypto'
-import { eq } from 'drizzle-orm'
+import { and, eq, gt, isNull, lt, or } from 'drizzle-orm'
 import { db } from '@/server/db'
 import { authSessions } from '@/db/schema/auth'
 import * as userService from '@/server/services/user-service'
@@ -50,13 +50,14 @@ export async function validateSession(token: string) {
     return null
   }
 
-  // Throttle lastSeenAt writes to reduce DB load
+  const now = new Date()
+  // The conditional update also serializes concurrent activity writes.
   const SEEN_THROTTLE_MS = 5 * 60 * 1000
   if (!session.lastSeenAt || session.lastSeenAt.getTime() < Date.now() - SEEN_THROTTLE_MS) {
     await db
       .update(authSessions)
-      .set({ lastSeenAt: new Date() })
-      .where(eq(authSessions.id, session.id))
+      .set({ lastSeenAt: now })
+      .where(and(eq(authSessions.id, session.id), eq(authSessions.tokenHash, tokenHash), gt(authSessions.expiresAt, now), or(isNull(authSessions.lastSeenAt), lt(authSessions.lastSeenAt, new Date(now.getTime() - SEEN_THROTTLE_MS)))))
   }
 
   const user = await userService.findById(session.userId)

@@ -59,7 +59,7 @@ test.describe("Phase 9 release-candidate browser workflows", () => {
     const create = async (name: string, slug: string, links: unknown[]) => {
       const response = await request.post("/api/admin/catalog", {
         headers,
-        data: { kind: "listings", data: { name, slug, links } },
+        data: { kind: "listings", requestKey: crypto.randomUUID(), data: { name, slug, links } },
       });
       expect(response.ok()).toBe(true);
       return response.json();
@@ -311,7 +311,7 @@ test.describe("Phase 9 release-candidate browser workflows", () => {
           await request.delete("/api/admin/catalog", {
             headers,
             data: {
-              kind: "listings",
+              kind: "listings", requestKey: crypto.randomUUID(),
               id: current.id,
               revision: current.revision,
             },

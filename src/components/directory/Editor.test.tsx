@@ -110,4 +110,22 @@ describe("catalog editor conflicts", () => {
     expect(screen.getByLabelText("名稱")).toHaveValue("保留的分類草稿");
     vi.unstubAllGlobals();
   });
+  it.each(["lost response", "gateway failure"])("reuses the operation key after %s", async (failure) => {
+    const fetch = vi.fn();
+    if (failure === "lost response") fetch.mockRejectedValueOnce(new TypeError("offline"));
+    else fetch.mockResolvedValueOnce({ ok: false, status: 502, json: async () => ({ message: "gateway" }) });
+    fetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ id: 8 }) });
+    vi.stubGlobal("fetch", fetch);
+    const saved = vi.fn();
+    render(<Editor kind="listings" initial={{ name: "保留草稿", slug: "draft" }} taxonomy={taxonomy} onClose={vi.fn()} onSaved={saved} />);
+    fireEvent.click(screen.getByRole("button", { name: "儲存" }));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("儲存結果未確認"));
+    expect(saved).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "儲存" }));
+    await waitFor(() => expect(saved).toHaveBeenCalledOnce());
+    expect(fetch.mock.calls[0][1].body).toBe(fetch.mock.calls[1][1].body);
+    expect(JSON.parse(fetch.mock.calls[0][1].body).requestKey).toMatch(/^[0-9a-f-]{36}$/);
+    vi.unstubAllGlobals();
+  });
+
 });

@@ -131,7 +131,7 @@ describe('api-helpers', () => {
       vi.mocked(db.select).mockReturnValue({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([]),
+            limit: vi.fn().mockReturnValue({ for: vi.fn().mockResolvedValue([]) }),
           }),
         }),
       } as any)
@@ -147,7 +147,7 @@ describe('api-helpers', () => {
       vi.mocked(db.select).mockReturnValue({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([{ failCount: 3 }]),
+            limit: vi.fn().mockReturnValue({ for: vi.fn().mockResolvedValue([{ failCount: 3, firstFailure: new Date(), lockedUntil: null }]) }),
           }),
         }),
       } as any)

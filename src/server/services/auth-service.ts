@@ -1,39 +1,9 @@
-import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto'
+import { hashPassword, verifyPassword } from "@/server/password"
 import { eq, and } from 'drizzle-orm'
 import { db } from '@/server/db'
 import { authIdentities } from '@/db/schema/auth'
 import { AppError } from '@/lib/errors'
 import * as userService from '@/server/services/user-service'
-
-const SCRYPT_PARAMS = {
-  N: 65536,
-  r: 8,
-  p: 1,
-  // Node default maxmem is too low for these params in some runtimes.
-  maxmem: parseInt(process.env.AUTH_SCRYPT_MAXMEM ?? String(128 * 1024 * 1024), 10),
-} as const
-
-function hashPassword(password: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const salt = randomBytes(16)
-    scrypt(password, salt, 64, SCRYPT_PARAMS, (err, derivedKey) => {
-      if (err) return reject(err)
-      resolve(`${salt.toString('hex')}:${derivedKey.toString('hex')}`)
-    })
-  })
-}
-
-function verifyPassword(password: string, stored: string): Promise<boolean> {
-  return new Promise((resolve, reject) => {
-    const [saltHex, hashHex] = stored.split(':')
-    const salt = Buffer.from(saltHex, 'hex')
-    const storedHash = Buffer.from(hashHex, 'hex')
-    scrypt(password, salt, 64, SCRYPT_PARAMS, (err, derivedKey) => {
-      if (err) return reject(err)
-      resolve(timingSafeEqual(storedHash, derivedKey))
-    })
-  })
-}
 
 export async function register(email: string, password: string, displayName?: string, role: 'user' | 'admin' = 'user') {
   const normalizedEmail = email.toLowerCase()
@@ -75,17 +45,13 @@ export async function login(email: string, password: string) {
     )
     .limit(1)
 
-  if (!identity || !identity.passwordHash) {
-    throw new AppError('INVALID_CREDENTIALS', 'Invalid email or password')
-  }
-
-  const valid = await verifyPassword(password, identity.passwordHash)
-  if (!valid) {
+  const valid = await verifyPassword(password, identity?.passwordHash)
+  if (!identity || !valid) {
     throw new AppError('INVALID_CREDENTIALS', 'Invalid email or password')
   }
 
   const user = await userService.findById(identity.userId)
-  if (!user) {
+  if (!user || user.banned) {
     throw new AppError('INVALID_CREDENTIALS', 'Invalid email or password')
   }
 

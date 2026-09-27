@@ -409,6 +409,7 @@ export async function recentContentPlans(actorId: number) {
     .where(
       and(
         eq(catalogPlans.actorId, actorId),
+        eq(catalogPlans.kind, "import"),
         gt(catalogPlans.expiresAt, new Date()),
       ),
     )
