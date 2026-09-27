@@ -216,11 +216,27 @@ async function buildImportRows(
     }),
   );
 }
-const summarize = (data: ListingInput | null, taxonomy: Taxonomy) => ({ category: taxonomy.categories.find(item => item.id === data?.categoryId)?.name ?? "無分類", area: taxonomy.areas.find(item => item.id === data?.areaId)?.name ?? "無地區", tags: taxonomy.tags.filter(item => data?.tagIds.includes(item.id)).map(item => item.name) });
-async function importRows(source: string, settings: Settings, tx: CatalogExecutor): Promise<PlanRow[]> {
+const summarize = (data: ListingInput | null, taxonomy: Taxonomy) => ({
+  category:
+    taxonomy.categories.find((item) => item.id === data?.categoryId)?.name ??
+    "無分類",
+  area:
+    taxonomy.areas.find((item) => item.id === data?.areaId)?.name ?? "無地區",
+  tags: taxonomy.tags
+    .filter((item) => data?.tagIds.includes(item.id))
+    .map((item) => item.name),
+});
+async function importRows(
+  source: string,
+  settings: Settings,
+  tx: CatalogExecutor,
+): Promise<PlanRow[]> {
   const rows = await buildImportRows(source, settings, tx);
   const taxonomy = await getTaxonomy("admin", tx);
-  return rows.map(row => ({ ...row, summary: summarize(row.data, taxonomy) }));
+  return rows.map((row) => ({
+    ...row,
+    summary: summarize(row.data, taxonomy),
+  }));
 }
 async function storePlan(
   actorId: number,
@@ -261,9 +277,21 @@ export async function prepareImport(
     )
       throw new AppError("INVALID_REQUEST", "Invalid row decision");
     const sourceRows = parseImportSource(source, settings.columns);
-    const mappingEffects = settings.mappings.map(mapping => ({ ...mapping, affected: sourceRows.filter(sourceRow => {
-      try { const row = normalizeImportRow(sourceRow); return mapping.kind === "tag" ? row.tags?.split("|").some(value => value.trim() === mapping.value) : row[mapping.kind]?.trim() === mapping.value; } catch { return false; }
-    }).length }));
+    const mappingEffects = settings.mappings.map((mapping) => ({
+      ...mapping,
+      affected: sourceRows.filter((sourceRow) => {
+        try {
+          const row = normalizeImportRow(sourceRow);
+          return mapping.kind === "tag"
+            ? row.tags
+                ?.split("|")
+                .some((value) => value.trim() === mapping.value)
+            : row[mapping.kind]?.trim() === mapping.value;
+        } catch {
+          return false;
+        }
+      }).length,
+    }));
     const payload = { source, settings, rows, mappingEffects };
     const id = randomUUID(),
       digest = digestOf(payload);
@@ -372,6 +400,7 @@ export async function recentContentPlans(actorId: number) {
       createdAt: catalogPlans.createdAt,
       expiresAt: catalogPlans.expiresAt,
       result: catalogPlans.result,
+      unresolvedWarnings: sql<number>`(select count(*)::int from jsonb_array_elements(coalesce(${catalogPlans.payload}->'rows','[]'::jsonb)) item where jsonb_array_length(coalesce(item->'warnings','[]'::jsonb)) > 0 and coalesce(${catalogPlans.payload}->'settings'->'decisions'->>(item->>'row'),'') not in ('accept','skip'))`,
     })
     .from(catalogPlans)
     .where(
@@ -489,16 +518,37 @@ export async function commitContentPlan(
     for (const row of [...rows].sort((a, b) => (a.id ?? 0) - (b.id ?? 0))) {
       if (!row.data) throw new AppError("CONFLICT", "Invalid plan row");
       const data = listingSchema.parse(row.data);
-      const reviewedDisabled = plan.kind === "import" && payload.source.replace(/^\uFEFF/, "").trimStart().startsWith("{") && payload.settings.decisions[String(row.row)] === "accept";
+      const reviewedDisabled =
+        plan.kind === "import" &&
+        payload.source
+          .replace(/^\uFEFF/, "")
+          .trimStart()
+          .startsWith("{") &&
+        payload.settings.decisions[String(row.row)] === "accept";
       if (
         (data.categoryId &&
           !taxonomy.categories.some(
-            (t) => t.id === data.categoryId && (t.enabled || reviewedDisabled || row.before?.categoryId === t.id),
+            (t) =>
+              t.id === data.categoryId &&
+              (t.enabled ||
+                reviewedDisabled ||
+                row.before?.categoryId === t.id),
           )) ||
         (data.areaId &&
-          !taxonomy.areas.some((t) => t.id === data.areaId && (t.enabled || reviewedDisabled || row.before?.areaId === t.id))) ||
+          !taxonomy.areas.some(
+            (t) =>
+              t.id === data.areaId &&
+              (t.enabled || reviewedDisabled || row.before?.areaId === t.id),
+          )) ||
         data.tagIds.some(
-          (id) => !taxonomy.tags.some((t) => t.id === id && (t.enabled || reviewedDisabled || row.before?.tagIds.includes(id))),
+          (id) =>
+            !taxonomy.tags.some(
+              (t) =>
+                t.id === id &&
+                (t.enabled ||
+                  reviewedDisabled ||
+                  row.before?.tagIds.includes(id)),
+            ),
         )
       )
         throw new AppError("CONFLICT", "分類、地區或標籤已停用；請重新預覽");

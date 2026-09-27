@@ -28,8 +28,9 @@ async function main() {
     )
   )
     throw new Error("E2E browser target must be loopback");
+  // Repeated acceptance runs must not inherit counters or throttles from earlier fixtures.
   await db.execute(
-    sql`truncate directory_content_plans, directory_content_history, directory_listings, directory_categories, directory_areas, directory_tags, directory_tag_groups, directory_navigation_presets, directory_bot_sessions, directory_bot_updates restart identity cascade`,
+    sql`truncate rate_limit_entries, directory_event_days, directory_event_receipts, directory_content_plans, directory_content_history, directory_listings, directory_categories, directory_areas, directory_tags, directory_tag_groups, directory_navigation_presets, directory_bot_sessions, directory_bot_updates restart identity cascade`,
   );
   const category = await saveTaxonomy("categories", {
     name: "維修服務",

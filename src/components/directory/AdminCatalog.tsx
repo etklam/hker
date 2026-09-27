@@ -55,6 +55,7 @@ export function AdminCatalog({ section }: { section: Section }) {
     [error, setError] = useState(""),
     [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<SelectedListing[]>([]);
+  const [unavailableOnly, setUnavailableOnly] = useState(false);
   const selectionScope = JSON.stringify({ query, filters, section });
   const selectionScopeRef = useRef(selectionScope);
   if (selectionScopeRef.current !== selectionScope) {
@@ -232,7 +233,9 @@ export function AdminCatalog({ section }: { section: Section }) {
       : manageable
         ? section === "areas"
           ? areaTree(taxonomy.areas)
-          : taxonomy[section as keyof Taxonomy]
+          : section === "navigation" && unavailableOnly
+            ? taxonomy.navigation.filter((item) => item.warning)
+            : taxonomy[section as keyof Taxonomy]
         : [];
   return (
     <>
@@ -308,15 +311,15 @@ export function AdminCatalog({ section }: { section: Section }) {
           </div>
         </>
       )}
-          {section === "listings" && (
-            <BulkPanel
-              key={selectionScope}
-              selected={selected}
-              taxonomy={taxonomy}
-              clear={() => setSelected([])}
-              reload={() => void load()}
-            />
-          )}
+      {section === "listings" && (
+        <BulkPanel
+          key={selectionScope}
+          selected={selected}
+          taxonomy={taxonomy}
+          clear={() => setSelected([])}
+          reload={() => void load()}
+        />
+      )}
       {loading ? (
         <p role="status">正在載入…</p>
       ) : manageable ? (
@@ -387,6 +390,16 @@ export function AdminCatalog({ section }: { section: Section }) {
             </div>
           )}
           <div className="table-wrap">
+            {section === "navigation" && (
+              <label>
+                <input
+                  type="checkbox"
+                  checked={unavailableOnly}
+                  onChange={(event) => setUnavailableOnly(event.target.checked)}
+                />
+                只顯示不可用導覽（含原因）
+              </label>
+            )}
             <table className="admin-table">
               <thead>
                 <tr>

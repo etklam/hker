@@ -2,12 +2,34 @@ import { AppError } from "@/lib/errors";
 import { parseNativeCatalog } from "./native-format";
 import { getTaxonomy, saveTaxonomy, type CatalogExecutor } from "./service";
 import type { MutationContext } from "./history";
+import { resolveNavigationPreset } from "@/lib/directory-presets";
 export async function taxonomyImportPreview(
   source: string,
   tx: CatalogExecutor,
 ) {
   const incoming = parseNativeCatalog(source).taxonomy;
   const current = await getTaxonomy("admin", tx);
+  // Resolve portable relationships against the definitions that will actually exist.
+  const effective = {
+    categories: [
+      ...current.categories,
+      ...incoming.categories.filter(
+        (row) => !current.categories.some((item) => item.slug === row.slug),
+      ),
+    ].map((row, index) => ({ ...row, id: index + 1 })),
+    areas: [
+      ...current.areas,
+      ...incoming.areas.filter(
+        (row) => !current.areas.some((item) => item.slug === row.slug),
+      ),
+    ].map((row, index) => ({ ...row, id: index + 1 })),
+    tags: [
+      ...current.tags,
+      ...incoming.tags.filter(
+        (row) => !current.tags.some((item) => item.slug === row.slug),
+      ),
+    ].map((row, index) => ({ ...row, id: index + 1 })),
+  };
   const creates = {
     categories: incoming.categories.filter(
       (row) => !current.categories.some((item) => item.slug === row.slug),
@@ -21,9 +43,39 @@ export async function taxonomyImportPreview(
     tags: incoming.tags.filter(
       (row) => !current.tags.some((item) => item.slug === row.slug),
     ),
-    navigation: incoming.navigation.filter(
-      (row) => !current.navigation.some((item) => item.label === row.label),
-    ),
+    navigation: incoming.navigation
+      .filter(
+        (row) => !current.navigation.some((item) => item.label === row.label),
+      )
+      .map((row) => {
+        const resolution = resolveNavigationPreset(
+          {
+            ...row,
+            categoryId: row.categorySlug
+              ? (effective.categories.find(
+                  (item) => item.slug === row.categorySlug,
+                )?.id ?? -1)
+              : null,
+            areaId: row.areaSlug
+              ? (effective.areas.find((item) => item.slug === row.areaSlug)
+                  ?.id ?? -1)
+              : null,
+            tagIds: row.tagSlugs.map(
+              (slug) =>
+                effective.tags.find((item) => item.slug === slug)?.id ?? -1,
+            ),
+          },
+          effective,
+          "admin",
+        );
+        return row.enabled && !resolution.available
+          ? {
+              ...row,
+              enabled: false,
+              importWarning: `將以停用狀態建立，修正後再手動啟用：${resolution.reason}`,
+            }
+          : row;
+      }),
   };
   for (const kind of ["categories", "groups", "areas", "tags"] as const)
     if (

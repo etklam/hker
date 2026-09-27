@@ -40,36 +40,50 @@ export function observeCatalogEvent(
 export function CatalogEvents() {
   useEffect(() => {
     let receipt: EventReceipt | undefined;
-    let fetchingReceipt = false;
+    let receiptRequest: Promise<EventReceipt | undefined> | undefined;
+    let actionQueue = Promise.resolve();
     let stopped = false;
-    const refillReceipt = async () => {
-      if (receipt || fetchingReceipt || stopped) return;
-      fetchingReceipt = true;
-      try {
-        const response = await fetch("/api/catalog/events", { cache: "no-store" });
-        if (!response.ok) return;
-        const value = await response.json();
-        if (
-          typeof value.actionId === "string" &&
-          typeof value.occurredAt === "string" &&
-          typeof value.signature === "string"
-        )
-          receipt = value;
-      } catch {
-        /* Discovery remains available when measurement is unavailable. */
-      } finally {
-        fetchingReceipt = false;
-      }
+    const refillReceipt = () => {
+      if (receipt) return Promise.resolve(receipt);
+      if (receiptRequest) return receiptRequest;
+      if (stopped) return Promise.resolve(undefined);
+      receiptRequest = (async () => {
+        try {
+          const response = await fetch("/api/catalog/events", {
+            cache: "no-store",
+            keepalive: true,
+          });
+          if (!response.ok) return undefined;
+          const value = await response.json();
+          if (
+            typeof value.actionId === "string" &&
+            typeof value.occurredAt === "string" &&
+            typeof value.signature === "string"
+          ) {
+            receipt = value;
+            return value;
+          }
+        } catch {
+          /* Discovery remains available when measurement is unavailable. */
+        }
+        return undefined;
+      })().finally(() => {
+        receiptRequest = undefined;
+      });
+      return receiptRequest;
     };
     const observe = (
       kind: "search" | "filter" | "preset" | "tag",
       key: string,
       search?: SearchInput,
     ) => {
-      const current = receipt;
-      receipt = undefined;
-      observeCatalogEvent(kind, key, search, current);
-      void refillReceipt();
+      actionQueue = actionQueue.then(async () => {
+        const current = receipt ?? (await refillReceipt());
+        if (!current) return;
+        if (receipt === current) receipt = undefined;
+        observeCatalogEvent(kind, key, search, current);
+        if (!stopped) void refillReceipt();
+      });
     };
     void refillReceipt();
     const submit = (event: SubmitEvent) => {

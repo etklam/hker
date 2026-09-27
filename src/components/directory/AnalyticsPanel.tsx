@@ -149,9 +149,7 @@ export function AnalyticsPanel() {
           <input
             type="date"
             value={range.to}
-            onChange={(event) =>
-              setRange({ ...range, to: event.target.value })
-            }
+            onChange={(event) => setRange({ ...range, to: event.target.value })}
           />
         </label>
         <label>
@@ -170,18 +168,23 @@ export function AnalyticsPanel() {
       </div>
       {loading && <p role="status">正在載入探索統計…</p>}
       {error && <p role="alert">{error}</p>}
-      {statusMessage && <p role="status" className="notice">{statusMessage}</p>}
+      {statusMessage && (
+        <p role="status" className="notice">
+          {statusMessage}
+        </p>
+      )}
       {report?.collection.status === "enabled" && (
         <>
           <p className="muted">
-            香港時間（{report.collection.timeZone}）· 保留 {report.collection.retentionDays} 日
+            香港時間（{report.collection.timeZone}）· 保留{" "}
+            {report.collection.retentionDays} 日
             {report.collection.collectionStart
               ? ` · 開始收集：${report.collection.collectionStart}`
               : " · 尚未收集事件"}
             {report.collection.todayIncomplete ? " · 今日資料未完整" : ""}
           </p>
           <div className="table-wrap">
-            <table>
+            <table className="admin-table">
               <thead>
                 <tr>
                   <th>已提交文字搜尋</th>
@@ -193,21 +196,29 @@ export function AnalyticsPanel() {
               </thead>
               <tbody>
                 <tr>
-                  <td>{number.format(report.summary.searches)}</td>
-                  <td>{number.format(report.summary.zeroResults)}</td>
-                  <td>
+                  <td data-label="已提交文字搜尋">
+                    {number.format(report.summary.searches)}
+                  </td>
+                  <td data-label="零結果">
+                    {number.format(report.summary.zeroResults)}
+                  </td>
+                  <td data-label="零結果率">
                     {report.summary.zeroRate === null
                       ? "沒有分母"
                       : percent.format(report.summary.zeroRate)}
                   </td>
-                  <td>{number.format(report.summary.filteredDiscoveries)}</td>
-                  <td>{number.format(report.summary.suppressedSearches)}</td>
+                  <td data-label="結構化探索">
+                    {number.format(report.summary.filteredDiscoveries)}
+                  </td>
+                  <td data-label="隱藏文字">
+                    {number.format(report.summary.suppressedSearches)}
+                  </td>
                 </tr>
               </tbody>
             </table>
           </div>
           <div className="table-wrap">
-            <table>
+            <table className="admin-table">
               <thead>
                 <tr>
                   <th>類型</th>
@@ -222,7 +233,7 @@ export function AnalyticsPanel() {
               <tbody>
                 {report.rows.map((row) => (
                   <tr key={`${row.source}:${row.kind}:${row.key}`}>
-                    <td>
+                    <td data-label="類型">
                       {{
                         search: "文字搜尋",
                         filter: "結構化探索",
@@ -231,19 +242,21 @@ export function AnalyticsPanel() {
                         outbound: "外部連結",
                       }[row.kind] ?? row.kind}
                     </td>
-                    <td>{row.source === "web" ? "網站" : "Telegram"}</td>
-                    <td>
+                    <td data-label="來源">
+                      {row.source === "web" ? "網站" : "Telegram"}
+                    </td>
+                    <td data-label="搜尋／項目">
                       {row.kind === "search" && row.queryLabelEligible ? (
                         <a href={`/search?q=${encodeURIComponent(row.key)}`}>
                           {row.label ?? row.key}
                         </a>
                       ) : (
-                        row.label ?? row.key
+                        (row.label ?? row.key)
                       )}
                     </td>
-                    <td>{number.format(row.count)}</td>
-                    <td>{number.format(row.zeroCount)}</td>
-                    <td>
+                    <td data-label="操作次數">{number.format(row.count)}</td>
+                    <td data-label="零結果">{number.format(row.zeroCount)}</td>
+                    <td data-label="目前公開結果">
                       {row.kind === "search" && row.queryLabelEligible ? (
                         inspections[row.key] ? (
                           <p role="status">
@@ -266,14 +279,16 @@ export function AnalyticsPanel() {
                             disabled={Boolean(inspecting)}
                             onClick={() => void inspectQuery(row.key)}
                           >
-                            {inspecting === row.key ? "正在檢查…" : "查看目前結果"}
+                            {inspecting === row.key
+                              ? "正在檢查…"
+                              : "查看目前結果"}
                           </button>
                         )
                       ) : (
                         "—"
                       )}
                     </td>
-                    <td>
+                    <td data-label="管理">
                       {row.kind === "search" && row.queryLabelEligible ? (
                         <div className="toolbar">
                           <Link className="button" href="/admin/tags">

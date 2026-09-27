@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ImportMappingPanel, type ImportMapping } from "./ImportMapping";
 import {
   ContentPlanReview,
@@ -19,12 +19,22 @@ export function ImportPanel() {
   );
   const [plan, setPlan] = useState<ContentPlan | null>(null);
   const [recent, setRecent] = useState<
-    { id: string; kind: string; createdAt: string }[]
+    {
+      id: string;
+      kind: string;
+      createdAt: string;
+      unresolvedWarnings?: number;
+    }[]
   >([]);
+  const [warningsOnly, setWarningsOnly] = useState(false);
   const [busy, setBusy] = useState(false),
     [message, setMessage] = useState("");
   const [taxonomyPlan, setTaxonomyPlan] = useState<ContentPlan | null>(null);
   const [dirty, setDirty] = useState(false);
+  const messageRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (message) messageRef.current?.focus();
+  }, [message]);
   useEffect(() => {
     contentRequest()
       .then(setRecent)
@@ -83,6 +93,7 @@ export function ImportPanel() {
         );
         setDirty(false);
       }
+      setRecent(await contentRequest());
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -341,7 +352,7 @@ export function ImportPanel() {
         </section>
       )}
       {message && (
-        <p role="alert" className="notice">
+        <p ref={messageRef} tabIndex={-1} role="alert" className="notice">
           {message}
         </p>
       )}
@@ -411,8 +422,20 @@ export function ImportPanel() {
       )}
       <details>
         <summary>恢復近期計畫</summary>
+        <label>
+          <input
+            type="checkbox"
+            checked={warningsOnly}
+            onChange={(event) => setWarningsOnly(event.target.checked)}
+          />
+          只顯示未處理警告
+        </label>
         {recent
-          .filter((item) => item.kind === "import")
+          .filter(
+            (item) =>
+              item.kind === "import" &&
+              (!warningsOnly || (item.unresolvedWarnings ?? 0) > 0),
+          )
           .map((item) => (
             <p key={item.id}>
               <button
@@ -422,6 +445,9 @@ export function ImportPanel() {
               >
                 {new Date(item.createdAt).toLocaleString("zh-HK")} · 恢復
               </button>
+              {!!item.unresolvedWarnings && (
+                <span> · {item.unresolvedWarnings} 行警告待處理</span>
+              )}
             </p>
           ))}
       </details>

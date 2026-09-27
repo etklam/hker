@@ -7,6 +7,7 @@ import {
   CatalogSearchService,
   saveListing,
   saveTaxonomy,
+  getTaxonomy,
 } from "@/server/catalog/service";
 import {
   commitContentPlan,
@@ -15,6 +16,7 @@ import {
   prepareBulk,
   prepareImport,
   prepareTaxonomyImport,
+  recentContentPlans,
 } from "@/server/catalog/content-plans";
 import { exportCatalog } from "@/server/catalog/export";
 import { nativeCatalogSchema } from "@/server/catalog/native-format";
@@ -145,6 +147,13 @@ describe("Phase 8 reviewed content operations", () => {
     const source =
       "name,slug,website\n另一收錄,phase8-shared-next,https://shared.test/contact";
     const plan = await prepareImport(source, settings("update"), 1);
+    expect(
+      (await recentContentPlans(1)).find((item) => item.id === plan.id)
+        ?.unresolvedWarnings,
+    ).toBe(1);
+    expect(
+      (await recentContentPlans(2)).some((item) => item.id === plan.id),
+    ).toBe(false);
     await expect(
       commitContentPlan(plan.id, plan.digest, 1),
     ).rejects.toMatchObject({ code: "CONFLICT" });
@@ -203,6 +212,13 @@ describe("Phase 8 reviewed content operations", () => {
       slug: "phase8-tag",
       aliases: ["虛構別稱"],
     });
+    await saveTaxonomy("navigation", {
+      label: "虛構失效導覽",
+      placement: "both",
+      tagIds: [tag.id],
+      enabled: true,
+    });
+    await saveTaxonomy("tags", { ...tag, enabled: false }, tag.id);
     const saved = await saveListing({
       name: "可攜內容",
       slug: "phase8-portable",
@@ -231,8 +247,23 @@ describe("Phase 8 reviewed content operations", () => {
     );
     const taxonomyPlan = await prepareTaxonomyImport(source, 1);
     await commitContentPlan(taxonomyPlan.id, taxonomyPlan.digest, 1);
+    expect(
+      (await getTaxonomy("admin")).navigation.find(
+        (row) => row.label === "虛構失效導覽",
+      ),
+    ).toMatchObject({ enabled: false, available: false });
     const plan = await prepareImport(source, settings(), 1);
-    expect(await commitContentPlan(plan.id, plan.digest, 1)).toMatchObject({
+    await expect(
+      commitContentPlan(plan.id, plan.digest, 1),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+    const reviewed = await prepareImport(
+      source,
+      { ...settings(), decisions: { "2": "accept" } },
+      1,
+    );
+    expect(
+      await commitContentPlan(reviewed.id, reviewed.digest, 1),
+    ).toMatchObject({
       created: 1,
     });
     const restored = (await CatalogSearchService.detail(saved.slug, "admin"))!;
@@ -243,5 +274,22 @@ describe("Phase 8 reviewed content operations", () => {
     });
     expect(restored.links).toHaveLength(2);
     expect(restored.tags[0].slug).toBe("phase8-tag");
+    expect(restored.tags[0].enabled).toBe(false);
+    const publish = await prepareBulk(
+      {
+        entries: [{ id: restored.id, revision: restored.revision }],
+        patch: { enabled: true, addTags: [], removeTags: [] },
+      },
+      1,
+    );
+    await commitContentPlan(publish.id, publish.digest, 1);
+    for (const audience of ["public", "bot"] as const) {
+      const visible = await CatalogSearchService.detail(
+        restored.slug,
+        audience,
+      );
+      expect(visible?.tags).toEqual([]);
+      expect(visible?.links).toHaveLength(2);
+    }
   });
 });

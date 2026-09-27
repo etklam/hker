@@ -1,11 +1,11 @@
 # Phase 8 — local evidence and operator handover
 
-Status: implementation and verification in progress. This document is not a staging/live release approval.
+Status: Phase 8 implementation and local verification complete (2026-09-27). Staging verification and live acceptance are not performed; this document is not a release approval.
 Baseline inspected: clean working tree, HEAD `44f2263` (newer than assignment inspection reference `251bb2e`). No reset, push, deployment, production data write, secret rotation, webhook registration or real Telegram delivery.
 
 ## Phase 7 dependency gate
 
-The seven prerequisites are implemented in HEAD and supported by prior committed isolated evidence. This run re-executes the acceptance suite; only the fresh results below count for this change.
+All seven prerequisites are classified **verified locally**, through this run’s unit, isolated integration and required-fixture browser acceptance. Prior committed evidence supplied context; it is not counted as fresh execution. Staging/live verification remains separate.
 
 | Prerequisite | Implementation / acceptance evidence |
 |---|---|
@@ -24,12 +24,13 @@ The seven prerequisites are implemented in HEAD and supported by prior committed
 | Legacy and v2 CSV | `import-format.ts`, `import.ts`; downloadable simple/advanced v2 templates | parser / actual-template unit tests; 200 rows, 500,000 UTF-8 bytes, 24 columns, 24,000 bytes/cell |
 | Column / taxonomy mapping | protected import settings, mapping UI, exact slug/path/name/alias resolver | ambiguity and alias unit tests, mapped browser workflow; create unknown terms separately in taxonomy UI |
 | Reviewed create/update | `content-plans.ts`, `ImportPanel`, `ContentPlanReview` | selected-row atomicity, lost response, stale revisions, stable child ID and warning decisions integration |
+| Maintenance | unpublished/recently changed views, unavailable navigation with reasons, actor-owned pending warning filter | no invented review date; optional missing fields are not defects |
 | Recovery | actor-owned UUID plan, 24-hour pending expiry, 7-day completed result | refresh/recovery browser flow; expired plan rejects before mutation; cleanup skips locked commits |
 | Bulk | exact ID/revision sets; 200-record cap; page, cross-page and server-frozen matching selection | frozen-target integration; preview includes field differences and no-op counts; no bulk hard delete |
 | Portable export | Admin route, explicit selection, repeatable-read snapshot, JSON v1, spreadsheet CSV | JSON fresh-catalog round trip; secrets/operational identities excluded; 500 KB hard rejection |
 | History | transaction-scoped Listing/taxonomy/publication/reorder changes, actor and operation references | rollback/replay integration; compact global/per-listing UI; bounded values, not a restore mechanism |
 | Measurements | explicit actions, server-authoritative search totals, signed Web receipts, HMAC Bot action keys | dedup, expiry, HK day, suppression, concurrent increments, bounded cleanup and degraded behavior integration |
-| Admin discovery | date/source controls, separate inventory/discovery, zero-result denominator, query deletion | UI tests; current-result inspection is a normal result link that emits no submit event |
+| Admin discovery | date/source controls, separate inventory/discovery, zero-result denominator, query deletion | UI tests; explicit current-result inspection has its own timestamp and never rewrites historical counts or emits a public submit event |
 | Runtime cleanup | existing `ops/analytics-cleanup.cjs` bundles analytics + content cleanup | `ops:build` and disabled-collector cleanup checked; Dockerfile copies `.ops` into runtime |
 
 ## Contracts
@@ -40,9 +41,24 @@ Update mode matches only an exact current slug. Missing/blank columns retain cur
 
 Any source/settings/row-decision change requires a new plan. A failed conflict leaves the pending plan available; re-preview before retrying. For a lost response, use “查詢操作狀態” or GET `/api/admin/catalog/operations?id=…`. Retry the same plan ID/digest; do not create another import to guess whether the first committed. Plan IDs are not credentials: actor and Admin authorization are checked. The legacy import API now returns a protected operationId; confirmations require that ID and digest.
 
-Native JSON is `{format:"hker-catalog",version:1,exportedAt,listings,taxonomy}`. Exports include the selected listings, required taxonomy ancestors/groups, and navigation whose criteria fit the exported relationships. Re-import a fresh catalog by explicitly previewing/confirming missing taxonomy, then previewing/confirming listings. Existing same-slug taxonomy is preserved, not overwritten; the operator must reconcile differing definitions. New listings are drafts even if exported enabled. Export is not a full DB backup. Large scopes are rejected rather than truncated; select smaller chunks. Pending payloads are short-lived; committed plans retain only result metadata.
+Native JSON is `{format:"hker-catalog",version:1,exportedAt,listings,taxonomy}`. Exports include the selected listings, required taxonomy ancestors/groups, and navigation whose criteria fit the exported relationships. Re-import a fresh catalog by explicitly previewing/confirming missing taxonomy, then previewing/confirming listings. Existing same-slug taxonomy is preserved, not overwritten; the operator must reconcile differing definitions. Enabled presets whose retained criteria are unavailable are explicitly marked in the taxonomy preview and restored disabled, preserving their criteria for manual repair and re-enable. New listings are drafts even if exported enabled. Disabled native taxonomy can be retained only through an explicit warning decision; this does not enable it or publish the listing. Export is not a full DB backup. Large scopes are rejected rather than truncated; select smaller chunks. Pending payloads are short-lived; committed plans retain only result metadata.
 
 Spreadsheet CSV prefixes formula-like cells (including whitespace/control and Unicode-equivalent prefixes) with an apostrophe and quotes every cell. This intentionally changes the raw text and is not a byte-faithful interchange format or a universal guarantee for all spreadsheet consumers. JSON retains original values. Import never removes that prefix automatically. CSV syntax and escaping are tested; no spreadsheet formulas are executed.
+
+## Reviewable operator examples
+
+Use [simple v2 CSV](../public/directory-import-simple-v2.csv) for ordinary entry and [advanced v2 CSV](../public/directory-import-advanced-v2.csv) for structured links/aliases. All template entities are fictional.
+
+For an existing fictional `fictional-repair` slug, select **update**, leave explicit clearing unchecked, and paste:
+
+```csv
+name,slug,shortDescription,website
+,fictional-repair,虛構更新：新增預約方法,https://example.test/booking
+```
+
+Choose append links, preview the exact target/revision and changed fields, then commit. The blank name and omitted fields stay unchanged; the booking link is appended unless it uniquely matches an existing same-type URL, in which case its ID is retained. If a second editor changes the record, re-preview after the conflict. Never switch to create mode to work around a conflict.
+
+For bulk publication, select explicit rows across pages (or use the bounded server-frozen matching selection), choose publish, and preview. Confirm the displayed names, target count and revisions. Changing filters clears selection. A newly matching row is excluded from an already saved plan. Use the same path with unpublish to remove current public/Bot visibility; already delivered messages cannot be recalled by this operation.
 
 ## Measurements and retention
 
@@ -71,6 +87,40 @@ Spreadsheet CSV prefixes formula-like cells (including whitespace/control and Un
 
 ## Verification ledger
 
-Fresh execution logs live in `/private/tmp/hker-phase8-*.log`. Final counts and screenshot review are appended after completion. Early runs deliberately exposed and then fixed the Zod refinement/omit issue, JSONB key-order digest issue, taxonomy executor self-lock, and an E2E label selector issue.
+Final executed results (not inherited counts):
+
+| Check | Passed | Failed | Skipped | Evidence |
+|---|---:|---:|---:|---|
+| Typecheck | yes | 0 | 0 | `hker-phase8-final-typecheck.log` |
+| Lint | yes | 0 errors | 0 | `hker-phase8-final-lint.log`; 16 existing retired-product warnings |
+| Unit | 569 / 117 files | 0 | 0 | `hker-phase8-complete-final.log` |
+| Isolated integration | 72 / 10 files | 0 | 0 | same log; includes disabled-tag/preset native round trip |
+| Migration | fresh 9; upgrade 4→9 | 0 | 0 | same log; retained Listing/link IDs |
+| Production build | yes | 0 | 0 | same log |
+| Required-fixture Chromium | 36 | 0 | 0 | `hker-phase8-browser-final.log`, 20.3 seconds |
+| Docker build + runtime contents | yes | 0 | 0 | `hker-phase8-image-final.log`, `hker-phase8-image-contents.log` |
+
+Logs are local `/private/tmp/` artifacts. The aggregate acceptance command completed typecheck through production build, then an obsolete screenshot locator failed. After correcting that locator and making fixture resets include rate limits and analytics state, the entire browser stage was rerun in required acceptance mode with mock Telegram and passed. No failed earlier run is counted as a pass. Earlier failures included Zod refinement/omit, JSONB digest ordering, executor self-lock, receipt-fetch timing, a hidden-route locator, inherited browser authentication in an anonymous test, and repeated-run fixture/throttle contamination; all have final passing coverage. A focused second review also found the unavailable-preset restore case, now covered by the round-trip test.
+
+Runtime image: `hker:phase8-local`, SHA `aac16cdb01e58531c99b6b09026d4981276426c8e1565bd2e3dd77c23732c939`, Node 24.21.0. With networking disabled, verified operation-status/export/history route files, both new migration files, and `ops/analytics-cleanup.cjs` containing analytics and content-operation cleanup. Host acceptance used Node 24.15.0.
+
+Visual review: actual 390/768/1440 captures in `.impeccable/review/phase8/` (import, populated preview, selected bulk preview, analytics) and `.impeccable/review/release/` (Public search/detail/empty/invalid/long content, Admin/editor). Inspected mobile import, tablet preview, desktop bulk, mobile/tablet analytics, mobile detail, tablet editor and desktop long content. Fixed a loading-only capture by waiting for a usable preview; changed analytics to the existing mobile labelled-row layout so actions are visible. No remaining visual blocker was observed. The mechanical design scan returned no findings; screenshots and interaction tests supplied the acceptance evidence. Screenshot files are local ignored artifacts, not deployed assets.
+
+Representative captures: [mobile import preview](../.impeccable/review/phase8/preview-390.png), [desktop bulk preview](../.impeccable/review/phase8/bulk-1440.png), [mobile analytics](../.impeccable/review/phase8/analytics-390.png).
 
 External staging/live gates remain: deployed migration ledger reconciliation against a backup, real content ownership, HTTPS/proxy configuration, scheduler operation, authorized Telegram chat/webhook, deployment and restore rehearsal. No local test implies those passed.
+
+
+## Synthetic performance observations
+
+Executed `scripts/phase8-benchmark.ts` on Node 24.15.0, macOS arm64, loopback PostgreSQL 16. One process, concurrency 1, 200 fictional rows / 106,206 UTF-8 bytes. No errors: import preview 124.6 ms; import commit 470.9 ms; bulk preview 305.3 ms; bulk commit 688.0 ms. Twenty reports alternating all/Web source over 9,000 synthetic daily rows: median 6.4 ms, p95 8.3 ms. Process RSS at measurement end 170,065,920 bytes; this is a point-in-time reading, not peak memory. Synthetic benchmark listings and aggregates were removed afterwards. These are local observations, not capacity guarantees for the 200-row/500-KB application limits or concurrent production traffic.
+
+Reproduce after preparing the disposable test database: bundle `scripts/phase8-benchmark.ts` with esbuild (`--bundle --platform=node --packages=external --outfile=.next/phase8-benchmark.cjs`), then run it with Node 24, the isolated loopback `DATABASE_URL`, and `ALLOW_DIRECTORY_TEST_RESET=1`. It rejects other database names/hosts.
+
+
+## External behavior checked
+
+- [PostgreSQL 16 INSERT](https://www.postgresql.org/docs/16/sql-insert.html): `ON CONFLICT` supports atomic counter updates; application transactions still define multi-row import atomicity.
+- [OWASP CSV Injection](https://owasp.org/www-community/attacks/CSV_Injection): quoting alone is insufficient, and spreadsheet behavior differs; the CSV caveat above is intentional.
+- [MDN sendBeacon](https://developer.mozilla.org/en-US/docs/Web/API/Navigator/sendBeacon): queue acceptance is not proof of persistence. This implementation uses small keepalive fetches with server receipts; browser acceptance verifies persisted Admin rows after navigation.
+- [Telegram InlineKeyboardButton](https://core.telegram.org/bots/api#inlinekeyboardbutton): URL and callback buttons are distinct; direct URL clicks do not provide a callback event for our counter.

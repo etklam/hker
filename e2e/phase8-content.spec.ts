@@ -48,7 +48,10 @@ test.describe("Phase 8 content workflow", () => {
     await mkdir(".impeccable/review/phase8", { recursive: true });
     for (const width of [390, 768, 1440]) {
       await page.setViewportSize({ width, height: 900 });
-      await page.screenshot({ path: `.impeccable/review/phase8/preview-${width}.png`, fullPage: true });
+      await page.screenshot({
+        path: `.impeccable/review/phase8/preview-${width}.png`,
+        fullPage: true,
+      });
     }
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.getByRole("button", { name: "確認匯入 1 項" }).click();
@@ -87,6 +90,24 @@ test.describe("Phase 8 content workflow", () => {
     const download = await request.get(url!);
     expect(download.ok()).toBe(true);
     expect((await download.json()).listings[0].slug).toBe(slug);
+    const anonymous = await page
+      .context()
+      .browser()!
+      .newContext({
+        baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000",
+        storageState: { cookies: [], origins: [] },
+      });
+    try {
+      for (const protectedUrl of [
+        url!,
+        "/api/admin/catalog/history",
+        "/api/admin/catalog/operations",
+      ]) {
+        expect((await anonymous.request.get(protectedUrl)).status()).toBe(401);
+      }
+    } finally {
+      await anonymous.close();
+    }
     await page.goto(`/listing/${slug}`);
     await expect(
       page.getByRole("heading", { name, exact: true }),
@@ -95,17 +116,33 @@ test.describe("Phase 8 content workflow", () => {
     for (const width of [390, 768, 1440]) {
       await page.setViewportSize({ width, height: 900 });
       await page.goto("/admin/imports");
+      await expect(page.getByRole("textbox", { name: "或貼上 CSV／JSON", exact: true })).toBeVisible();
       await page.screenshot({
         path: `.impeccable/review/phase8/import-${width}.png`,
         fullPage: true,
       });
       await page.goto("/admin/listings");
+      await expect(
+        page.getByRole("textbox", { name: "搜尋收錄", exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.getByText("正在載入目錄...", { exact: true }),
+      ).toBeHidden();
+      await page
+        .getByRole("checkbox", { name: `選取${name}`, exact: true })
+        .check();
+      await page.getByRole("button", { name: "預覽批次變更" }).click();
+      await expect(
+        page.getByRole("button", { name: "確認變更 1 項" }),
+      ).toBeVisible();
       await page.screenshot({
         path: `.impeccable/review/phase8/bulk-${width}.png`,
         fullPage: true,
       });
       await page.goto("/admin/analytics");
-      await expect(page.getByRole("combobox", { name: "來源", exact: true })).toBeVisible();
+      await expect(
+        page.getByRole("combobox", { name: "來源", exact: true }),
+      ).toBeVisible();
       await page.screenshot({
         path: `.impeccable/review/phase8/analytics-${width}.png`,
         fullPage: true,

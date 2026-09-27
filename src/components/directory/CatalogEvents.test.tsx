@@ -1,4 +1,4 @@
-import { render, fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, render, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CatalogEvents } from "./CatalogEvents";
 
@@ -36,6 +36,7 @@ describe("observed discovery events", () => {
     fireEvent.click(screen.getByText("下一頁"));
     expect(fetch).not.toHaveBeenCalled();
     fireEvent.submit(container.querySelector("form")!);
+    await waitFor(() => expect(posts(fetch)).toHaveLength(1));
     expect(JSON.parse(posts(fetch)[0][1].body)).toMatchObject({
       kind: "search",
       key: "手機",
@@ -43,7 +44,6 @@ describe("observed discovery events", () => {
       search: { categoryId: 1 },
       receipt,
     });
-    await waitFor(() => expect(posts(fetch)).toHaveLength(1));
     fireEvent.click(screen.getByText("手機標籤"));
     await waitFor(() => expect(posts(fetch)).toHaveLength(2));
     expect(JSON.parse(posts(fetch)[1][1].body)).toMatchObject({
@@ -69,10 +69,45 @@ describe("observed discovery events", () => {
     await waitFor(() => expect(fetch).toHaveBeenCalled());
     fetch.mockClear();
     fireEvent.submit(container.querySelector("form")!);
+    await waitFor(() => expect(posts(fetch)).toHaveLength(1));
     expect(JSON.parse(posts(fetch)[0][1].body)).toMatchObject({
       kind: "filter",
       key: "applied",
       search: { query: "", areaId: 9 },
+    });
+  });
+
+  it("keeps a submitted search while its signed receipt is still arriving", async () => {
+    let resolveReceipt: (() => void) | undefined;
+    const fetch = vi.fn().mockImplementation((_url, options) => {
+      if (options?.method === "POST")
+        return Promise.resolve({ ok: true, status: 200 });
+      return new Promise((resolve) => {
+        resolveReceipt = () =>
+          resolve({ ok: true, json: async () => receipt });
+      });
+    });
+    vi.stubGlobal("fetch", fetch);
+    const { container, unmount } = render(
+      <>
+        <CatalogEvents />
+        <form action="/search" onSubmit={(event) => event.preventDefault()}>
+          <input name="q" defaultValue="即時搜尋" />
+        </form>
+      </>,
+    );
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+
+    fireEvent.submit(container.querySelector("form")!);
+    unmount();
+    expect(posts(fetch)).toHaveLength(0);
+    await act(async () => resolveReceipt?.());
+
+    await waitFor(() => expect(posts(fetch)).toHaveLength(1));
+    expect(JSON.parse(posts(fetch)[0][1].body)).toMatchObject({
+      kind: "search",
+      key: "即時搜尋",
+      receipt,
     });
   });
 });

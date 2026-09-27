@@ -403,5 +403,10 @@ export async function enabledOutboundLink(
       ),
     )
     .limit(1);
-  return link ?? null;
+  if (!link) return null;
+  try {
+    const destination = new URL(link.url);
+    if (!["http:", "https:"].includes(destination.protocol) || destination.username || destination.password) return null;
+  } catch { return null; }
+  return link;
 }

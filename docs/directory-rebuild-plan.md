@@ -1,4 +1,4 @@
-> Phase 8 work and current evidence: [content operations / import-export / analytics](directory-phase8-evidence.md). Do not treat in-progress local verification as staging or live acceptance.
+> Phase 8 local implementation and verification complete: [content operations / import-export / analytics](directory-phase8-evidence.md). Fresh results: 569 unit, 72 isolated integration and 36 required-fixture Chromium tests passed, zero skips; migrations, production build and runtime image verified. Staging/live acceptance remains unperformed.
 
 > Latest extended Phase 7 evidence: [extended acceptance matrix](directory-phase7-extended.md) and [performance observations](directory-performance-observations.md). Earlier counts below are historical; the extended final aggregate passed 547 unit / 60 integration / 34 Chromium tests with zero skips. Staging/live gates remain open.
 

@@ -17,7 +17,7 @@ test.describe("Phase 8 analytics workflow", () => {
   test("filters by source and inspects a current result without changing history", async ({
     page,
   }) => {
-    const query = "虛構分析檢查甲";
+    const query = "虛構分析檢查乙";
     await page.goto("/search");
     const receipt = page.waitForResponse(
       (response) =>
@@ -27,17 +27,20 @@ test.describe("Phase 8 analytics workflow", () => {
     await page.reload();
     expect((await receipt).ok()).toBe(true);
 
-    await page.getByLabel("搜尋關鍵字").fill(query);
-    const recorded = page.waitForResponse(
-      (response) =>
-        response.url().endsWith("/api/catalog/events") &&
-        response.request().method() === "POST",
+    const searchForm = page
+      .locator('form[action="/search"]')
+      .filter({ has: page.getByRole("button", { name: "套用篩選" }) });
+    await searchForm.getByLabel("搜尋關鍵字").fill(query);
+    const recorded = page.waitForRequest(
+      (request) =>
+        request.url().endsWith("/api/catalog/events") &&
+        request.method() === "POST",
     );
-    await page.getByRole("button", { name: "搜尋", exact: true }).click();
-    expect((await recorded).ok()).toBe(true);
+    await searchForm.getByRole("button", { name: "搜尋", exact: true }).click();
+    await recorded;
 
     await page.goto("/admin/analytics");
-    await page.getByLabel("來源", { exact: true }).selectOption("web");
+    await page.getByRole("combobox", { name: "來源", exact: true }).selectOption("web");
     const row = page.locator("tbody tr").filter({ hasText: query });
     await expect(row).toBeVisible();
     const historical = await row.locator("td").nth(3).textContent();

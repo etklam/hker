@@ -1,6 +1,7 @@
 import { performance } from "node:perf_hooks";
 import { db, closeDatabase } from "../src/server/db";
 import { sql } from "drizzle-orm";
+import { analyticsReport } from "../src/server/catalog/analytics";
 import {
   prepareImport,
   commitContentPlan,
@@ -39,6 +40,25 @@ async function main() {
   const bulkPreview = performance.now();
   await commitContentPlan(bulk.id, bulk.digest, 1);
   const end = performance.now();
+  // Separate synthetic keys allow cleanup without touching browser fixtures.
+  const metricPrefix = `benchmark-${suffix}-`;
+  await db.execute(sql`insert into directory_event_days(day,source,kind,key,count,zero_count)
+    select current_date - d, s, 'search', ${metricPrefix} || k, 10, 2
+    from generate_series(0,89) d cross join generate_series(1,50) k
+    cross join (values ('web'),('bot')) sources(s)`);
+  const reportSamples: number[] = [];
+  for (let i = 0; i < 20; i++) {
+    const reportStart = performance.now();
+    const report = await analyticsReport(
+      "2020-01-01",
+      "2030-01-01",
+      i % 2 ? "web" : "all",
+    );
+    if (report.collection.status !== "enabled")
+      throw new Error("Report degraded");
+    reportSamples.push(performance.now() - reportStart);
+  }
+  reportSamples.sort((a, b) => a - b);
   console.log(
     JSON.stringify({
       environment: {
@@ -49,6 +69,14 @@ async function main() {
       },
       dataset: { rows: 200, bytes: Buffer.byteLength(source), concurrency: 1 },
       errors: 0,
+      analytics: {
+        syntheticRows: 9000,
+        samples: 20,
+        concurrency: 1,
+        medianMs: reportSamples[10],
+        p95Ms: reportSamples[18],
+      },
+      processMemoryBytes: process.memoryUsage(),
       milliseconds: {
         preview: preview - start,
         commit: commit - preview,
@@ -59,6 +87,9 @@ async function main() {
   );
   await db.execute(
     sql`delete from directory_listings where slug like ${`benchmark-${suffix}-%`}`,
+  );
+  await db.execute(
+    sql`delete from directory_event_days where key like ${`${metricPrefix}%`}`,
   );
 }
 main()
