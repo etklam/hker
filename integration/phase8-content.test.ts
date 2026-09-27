@@ -1,7 +1,8 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/server/db";
-import { catalogHistory } from "@/db/schema/directoryOperations";
+import { cleanupContentOperations } from "@/server/catalog/content-cleanup";
+import { catalogHistory, catalogPlans } from "@/db/schema/directoryOperations";
 import {
   CatalogSearchService,
   saveListing,
@@ -110,6 +111,82 @@ describe("Phase 8 reviewed content operations", () => {
     });
     expect(await CatalogSearchService.detail(c.slug)).toBeNull();
     expect(await CatalogSearchService.detail(a.slug)).not.toBeNull();
+  });
+  it("preserves names and child IDs when a partial update changes a link label", async () => {
+    const row = await saveListing({
+      name: "保留名稱",
+      slug: "phase8-link-label",
+      links: [
+        { type: "website", label: "舊標題", url: "https://unique.test/label" },
+      ],
+    });
+    const before = (await CatalogSearchService.detail(row.slug, "admin"))!;
+    const source =
+      'slug,links\nphase8-link-label,"[{""type"":""website"",""label"":""新標題"",""url"":""https://unique.test/label""}]"';
+    const plan = await prepareImport(source, settings("update"), 1);
+    await commitContentPlan(plan.id, plan.digest, 1);
+    const after = (await CatalogSearchService.detail(row.slug, "admin"))!;
+    expect(after.name).toBe("保留名稱");
+    expect(after.links).toHaveLength(1);
+    expect(after.links[0]).toMatchObject({
+      id: before.links[0].id,
+      label: "新標題",
+    });
+  });
+  it("requires an explicit decision for a new shared URL on update", async () => {
+    await saveListing({
+      name: "原連結",
+      slug: "phase8-shared-original",
+      links: [
+        { type: "website", label: "共用", url: "https://shared.test/contact" },
+      ],
+    });
+    await saveListing({ name: "另一收錄", slug: "phase8-shared-next" });
+    const source =
+      "name,slug,website\n另一收錄,phase8-shared-next,https://shared.test/contact";
+    const plan = await prepareImport(source, settings("update"), 1);
+    await expect(
+      commitContentPlan(plan.id, plan.digest, 1),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+    const accepted = await prepareImport(
+      source,
+      { ...settings("update"), decisions: { "2": "accept" } },
+      1,
+    );
+    expect(
+      await commitContentPlan(accepted.id, accepted.digest, 1),
+    ).toMatchObject({ updated: 1 });
+  });
+  it("cleanup skips a locked operation and expired plans cannot mutate content", async () => {
+    const plan = await prepareImport(
+      "name,slug\n逾期,phase8-expired",
+      settings(),
+      1,
+    );
+    await db.transaction(async (tx) => {
+      await tx
+        .select()
+        .from(catalogPlans)
+        .where(eq(catalogPlans.id, plan.id))
+        .for("update");
+      await cleanupContentOperations(db, new Date(Date.now() + 2 * 86400000));
+      expect(
+        await tx
+          .select()
+          .from(catalogPlans)
+          .where(eq(catalogPlans.id, plan.id)),
+      ).toHaveLength(1);
+    });
+    await db
+      .update(catalogPlans)
+      .set({ expiresAt: new Date(0) })
+      .where(eq(catalogPlans.id, plan.id));
+    await expect(
+      commitContentPlan(plan.id, plan.digest, 1),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(
+      await CatalogSearchService.detail("phase8-expired", "admin"),
+    ).toBeNull();
   });
   it("exports portable content without identities and restores taxonomy + unpublished listings", async () => {
     const parent = await saveTaxonomy("areas", {

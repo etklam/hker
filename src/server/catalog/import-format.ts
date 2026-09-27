@@ -255,3 +255,10 @@ export type ImportMapping = {
   value: string;
   id: number;
 };
+
+export function importDecimal(value: string | undefined, column: string): number | null {
+  const text = value?.trim();
+  if (!text) return null;
+  if (!/^\d+(?:\.\d{1,2})?$/.test(text)) throw new AppError("INVALID_REQUEST", `${column}: use a nonnegative decimal with at most two decimal places`);
+  return Number(text);
+}

@@ -6,6 +6,7 @@ export type ContentPlan = {
   expiresAt: string;
   payload: {
     source?: string;
+    mappingEffects?: { kind: string; value: string; id: number; affected: number }[];
     settings?: {
       mappings?: import("./ImportMapping").ImportMapping[];
       columns?: Record<string, string>;
@@ -16,6 +17,7 @@ export type ContentPlan = {
       clear: string[];
     };
     rows?: {
+      summary?: { category: string; area: string; tags: string[] };
       candidates?: {
         id: number;
         name: string;
@@ -78,6 +80,7 @@ export function ContentPlanReview({ plan }: { plan: ContentPlan }) {
         計畫有效至 {new Date(plan.expiresAt).toLocaleString("zh-HK")}
         。確認時仍會檢查最新版本；衝突時整批不會寫入。
       </p>
+      {plan.payload.mappingEffects?.map(mapping => <p key={`${mapping.kind}:${mapping.value}`}>{mapping.kind}「{mapping.value}」對照影響 {mapping.affected} 行。</p>)}
       <div className="table-wrap">
         <table>
           <thead>
@@ -96,13 +99,12 @@ export function ContentPlanReview({ plan }: { plan: ContentPlan }) {
                   <small>{row.slug}</small>
                 </td>
                 <td data-label="內容摘要">
-                  分類 {row.data?.categoryId ?? "無"} · 地區{" "}
-                  {row.data?.areaId ?? "無"}
+                  {row.summary?.category ?? "無分類"} · {row.summary?.area ?? "無地區"}
                   <br />
                   {row.data?.priceCurrency} {row.data?.priceMin ?? "未填"} –{" "}
                   {row.data?.priceMax ?? "未填"}
                   <br />
-                  {row.data?.tagIds.length ?? 0} 個標籤 ·{" "}
+                  {row.summary?.tags.join("、") || "無標籤"} ·{" "}
                   {row.data?.links.length ?? 0} 個連結
                 </td>
                 <td data-label="驗證與變更">

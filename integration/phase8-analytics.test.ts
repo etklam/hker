@@ -113,6 +113,47 @@ describe("Phase 8 discovery analytics", () => {
     expect(report.rows.some((row) => row.key === "2147483647")).toBe(false);
   });
 
+  it("rejects a preset whose shared resolver marks its criteria unavailable", async () => {
+    const suffix = Date.now();
+    const category = await saveTaxonomy("categories", {
+      name: `統計分類 ${suffix}`,
+      slug: `phase8-preset-category-${suffix}`,
+    });
+    const preset = await saveTaxonomy("navigation", {
+      label: `統計導覽 ${suffix}`,
+      placement: "public",
+      categoryId: category.id,
+      tagIds: [],
+      enabled: true,
+    });
+    await saveTaxonomy(
+      "categories",
+      {
+        name: category.name,
+        slug: category.slug,
+        enabled: false,
+      },
+      category.id,
+    );
+
+    expect(
+      await recordCatalogEvent(
+        {
+          kind: "preset",
+          source: "web",
+          key: String(preset.id),
+          actionId: "unavailable-preset",
+          occurredAt: at,
+        },
+        db,
+        { now: at },
+      ),
+    ).toBe("ignored");
+    expect(
+      (await analyticsReport("2026-09-28", "2026-09-28", "web")).rows,
+    ).toHaveLength(0);
+  });
+
   it("lets an administrator service delete an eligible stored query label", async () => {
     await recordCatalogEvent(
       { kind: "search", source: "web", key: "需要移除", actionId: "remove-me", occurredAt: at },

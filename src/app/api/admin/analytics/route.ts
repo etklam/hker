@@ -5,10 +5,31 @@ import {
   analyticsReport,
   deleteStoredQuery,
   hongKongDay,
+  privateQueryKey,
 } from "@/server/catalog/analytics";
+import { CatalogSearchService } from "@/server/catalog/service";
 import { parseBody } from "@/schemas/parse-body";
+import { AppError } from "@/lib/errors";
 export const GET = withAdmin(async (req) =>
   catalogResponse(async () => {
+    const inspection = req.nextUrl.searchParams.get("inspect");
+    if (inspection !== null) {
+      const query = privateQueryKey(inspection);
+      if (!query)
+        throw new AppError(
+          "INVALID_REQUEST",
+          "Only eligible stored queries can be inspected",
+        );
+      const result = await CatalogSearchService.search(
+        { query, page: 1, pageSize: 1 },
+        "public",
+      );
+      return {
+        query,
+        total: result.total,
+        inspectedAt: new Date().toISOString(),
+      };
+    }
     const today = new Date();
     const from =
         req.nextUrl.searchParams.get("from") ??

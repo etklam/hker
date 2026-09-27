@@ -21,6 +21,7 @@ import { generateListingSlug } from "@/lib/directory";
 
 import {
   normalizeImportRow,
+  importDecimal,
   resolveImportTerm,
   normalizeName,
   normalizeUrl,
@@ -45,6 +46,7 @@ export async function previewImport(
   } = {},
 ) {
   const rows = parseImportSource(csv, mapping.columns);
+  const native = csv.replace(/^\uFEFF/, "").trimStart().startsWith("{");
   const taxonomy = await getTaxonomy("admin", executor);
   const areaChoices = taxonomy.areas.map((area) => {
     const names = [area.name];
@@ -107,6 +109,10 @@ export async function previewImport(
             state: "invalid-mapping",
           }
         : resolveImportTerm(value, choices);
+      if (native && result.state === "disabled" && "candidates" in result) {
+        warnings.push(`${label}「${value}」已停用；接受後只保留關聯，不會啟用分類或發佈收錄`);
+        return result.candidates[0].id;
+      }
       if (result.id === null)
         errors.push(`${label}：找不到或名稱不唯一 (${value}; ${result.state})`);
       return result.id;
@@ -141,8 +147,8 @@ export async function previewImport(
               ?.split("|")
               .filter(Boolean)
               .map((v) => resolve(v, taxonomy.tags, "標籤")) ?? []),
-        priceMin: numeric("priceMin"),
-        priceMax: numeric("priceMax"),
+        priceMin: importDecimal(row.priceMin, "priceMin"),
+        priceMax: importDecimal(row.priceMax, "priceMax"),
         priceCurrency: row.priceCurrency || "HKD",
         aliases: row.aliases ? JSON.parse(row.aliases) : [],
         attrs: row.attrs ? JSON.parse(row.attrs) : {},
@@ -166,18 +172,18 @@ export async function previewImport(
         if (
           data.categoryId &&
           !taxonomy.categories.some(
-            (c) => c.id === data!.categoryId && c.enabled,
+            (c) => c.id === data!.categoryId && (c.enabled || native),
           )
         )
           errors.push("分類 ID 不存在或已停用");
         if (
           data.areaId &&
-          !taxonomy.areas.some((c) => c.id === data!.areaId && c.enabled)
+          !taxonomy.areas.some((c) => c.id === data!.areaId && (c.enabled || native))
         )
           errors.push("地區 ID 不存在或已停用");
         if (
           data.tagIds.some(
-            (id) => !taxonomy.tags.some((t) => t.id === id && t.enabled),
+            (id) => !taxonomy.tags.some((t) => t.id === id && (t.enabled || native)),
           )
         )
           errors.push("標籤 ID 不存在或已停用");

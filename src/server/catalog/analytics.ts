@@ -8,7 +8,11 @@ import {
   navigationPresets,
   tags,
 } from "@/db/schema/directory";
-import { publicVisibility, type CatalogExecutor } from "./service";
+import {
+  getTaxonomy,
+  publicVisibility,
+  type CatalogExecutor,
+} from "./service";
 
 const HONG_KONG_TIME_ZONE = "Asia/Hong_Kong";
 const ACTION_MAX_AGE_MS = 10 * 60 * 1000;
@@ -130,18 +134,8 @@ async function validEntityEvent(event: CatalogEvent, executor: CatalogExecutor) 
   }
   if (event.kind === "preset") {
     const placement = event.source === "web" ? "public" : "bot";
-    const rows = await executor
-      .select({ id: navigationPresets.id })
-      .from(navigationPresets)
-      .where(
-        and(
-          eq(navigationPresets.id, id),
-          eq(navigationPresets.enabled, true),
-          inArray(navigationPresets.placement, [placement, "both"]),
-        ),
-      )
-      .limit(1);
-    return rows.length === 1;
+    const taxonomy = await getTaxonomy(placement, executor);
+    return taxonomy.navigation.some((preset) => preset.id === id);
   }
   if (event.source !== "web") return false;
   return Boolean(await enabledOutboundLink(id, executor));

@@ -57,6 +57,13 @@
       "when": 1790503059434,
       "tag": "0007_yielding_iron_patriot",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790504771682,
+      "tag": "0008_remarkable_sumo",
+      "breakpoints": true
     }
   ]
 }

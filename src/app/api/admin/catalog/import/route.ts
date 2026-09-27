@@ -1,40 +1,42 @@
 import { AppError } from "@/lib/errors";
 import { z } from "zod";
 import { withAdmin } from "@/server/api-helpers";
-import { parseBody } from "@/schemas/parse-body";
 import { catalogResponse, readJsonBody } from "@/server/catalog/http";
-import { previewImport, confirmImport } from "@/server/catalog/import";
+import {
+  commitContentPlan,
+  importSettingsSchema,
+  prepareImport,
+} from "@/server/catalog/content-plans";
+// Preserve legacy CSV fields while using the same expiring, actor-bound reviewed plans.
 export const POST = withAdmin(async (req, { user }) =>
   catalogResponse(async () => {
-    const body = parseBody(
-      await readJsonBody(req, 1_500_000),
-      z.object({
+    const body = z
+      .object({
         csv: z.string().max(500000),
         digest: z.string().length(64).optional(),
-        requestKey: z.string().uuid().optional(),
-        decisions: z.record(z.string(), z.enum(["accept", "skip"])).optional(),
+        operationId: z.uuid().optional(),
+        decisions: z.record(z.string(), z.enum(["accept", "skip"])).default({}),
         confirm: z.boolean().default(false),
-      }),
-    );
+      })
+      .parse(await readJsonBody(req, 1500000));
     if (body.confirm) {
-      if (!body.digest)
-        throw new AppError("INVALID_REQUEST", "Preview digest required");
-      if (!body.requestKey)
-        throw new AppError("INVALID_REQUEST", "Import operation key required");
-      return confirmImport(body.csv, body.digest, {
-        actorId: user.id,
-        requestKey: body.requestKey,
-        decisions: body.decisions,
-      });
+      if (!body.operationId || !body.digest)
+        throw new AppError(
+          "INVALID_REQUEST",
+          "Preview operationId and digest required; changed decisions require a new preview",
+        );
+      return commitContentPlan(body.operationId, body.digest, user.id);
     }
-    const result = await previewImport(body.csv);
+    const plan = await prepareImport(
+      body.csv,
+      importSettingsSchema.parse({ decisions: body.decisions }),
+      user.id,
+    );
     return {
-      ...result,
-      items: result.items.map(({ data, ...item }) => ({
-        ...item,
-        priceMin: data?.priceMin ?? null,
-        priceMax: data?.priceMax ?? null,
-      })),
+      operationId: plan.id,
+      digest: plan.digest,
+      expiresAt: plan.expiresAt,
+      ...plan.payload,
     };
   }),
 );

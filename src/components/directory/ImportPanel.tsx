@@ -228,6 +228,7 @@ export function ImportPanel() {
                 await file.arrayBuffer(),
               );
               setSource(decoded);
+              setTaxonomyPlan(null);
               setPlan(null);
               setDecisions({});
               setDirty(true);
@@ -247,6 +248,7 @@ export function ImportPanel() {
           disabled={busy}
           onChange={(e) => {
             setSource(e.target.value);
+            setTaxonomyPlan(null);
             setDirty(true);
           }}
         />

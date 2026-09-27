@@ -1,3 +1,5 @@
+> Phase 8 work and current evidence: [content operations / import-export / analytics](directory-phase8-evidence.md). Do not treat in-progress local verification as staging or live acceptance.
+
 > Latest extended Phase 7 evidence: [extended acceptance matrix](directory-phase7-extended.md) and [performance observations](directory-performance-observations.md). Earlier counts below are historical; the extended final aggregate passed 547 unit / 60 integration / 34 Chromium tests with zero skips. Staging/live gates remain open.
 
 > Phase 7 current scope and fresh evidence: [Phase 7 checklist](directory-phase7-checklist.md). The worktree already contained uncommitted hardening when this Phase 7 pass began; historical completion claims below are not new execution evidence. Advanced import formats and behavioral analytics remain outside Phase 7 acceptance/backlog; existing implementations were preserved, not newly requested or certified as complete.

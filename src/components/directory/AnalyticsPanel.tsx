@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import Link from "next/link";
 
 type Row = {
   source: string;
@@ -28,6 +29,7 @@ type Report = {
   };
   meaning: string;
 };
+type Inspection = { query: string; total: number; inspectedAt: string };
 
 const day = (date: Date) =>
   new Intl.DateTimeFormat("en-CA", {
@@ -46,6 +48,8 @@ export function AnalyticsPanel() {
   const [report, setReport] = useState<Report | null>(null),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(true),
+    [inspecting, setInspecting] = useState(""),
+    [inspections, setInspections] = useState<Record<string, Inspection>>({}),
     [refresh, setRefresh] = useState(0),
     [range, setRange] = useState({
       from: day(new Date(Date.now() - 30 * 86400000)),
@@ -94,6 +98,25 @@ export function AnalyticsPanel() {
       setError(
         `${cause instanceof Error ? cause.message : "無法刪除搜尋統計"}。請稍後重試。`,
       );
+    }
+  };
+
+  const inspectQuery = async (query: string) => {
+    setInspecting(query);
+    setError("");
+    try {
+      const response = await fetch(
+        `/api/admin/analytics?inspect=${encodeURIComponent(query)}`,
+      );
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message ?? "無法檢查目前結果");
+      setInspections((current) => ({ ...current, [query]: data }));
+    } catch (cause) {
+      setError(
+        `${cause instanceof Error ? cause.message : "無法檢查目前結果"}。請稍後重試。`,
+      );
+    } finally {
+      setInspecting("");
     }
   };
 
@@ -192,6 +215,7 @@ export function AnalyticsPanel() {
                   <th>搜尋／項目</th>
                   <th>操作次數</th>
                   <th>零結果</th>
+                  <th>目前公開結果</th>
                   <th>管理</th>
                 </tr>
               </thead>
@@ -221,14 +245,52 @@ export function AnalyticsPanel() {
                     <td>{number.format(row.zeroCount)}</td>
                     <td>
                       {row.kind === "search" && row.queryLabelEligible ? (
-                        <button
-                          className="button danger"
-                          disabled={loading}
-                          onClick={() => void deleteQuery(row.key)}
-                          aria-label={`刪除「${row.label ?? row.key}」的搜尋統計`}
-                        >
-                          刪除統計
-                        </button>
+                        inspections[row.key] ? (
+                          <p role="status">
+                            {number.format(inspections[row.key].total)} 項
+                            <br />
+                            <small>
+                              檢查時間：
+                              <time dateTime={inspections[row.key].inspectedAt}>
+                                {new Date(
+                                  inspections[row.key].inspectedAt,
+                                ).toLocaleString("zh-HK", {
+                                  timeZone: "Asia/Hong_Kong",
+                                })}
+                              </time>
+                            </small>
+                          </p>
+                        ) : (
+                          <button
+                            className="button"
+                            disabled={Boolean(inspecting)}
+                            onClick={() => void inspectQuery(row.key)}
+                          >
+                            {inspecting === row.key ? "正在檢查…" : "查看目前結果"}
+                          </button>
+                        )
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td>
+                      {row.kind === "search" && row.queryLabelEligible ? (
+                        <div className="toolbar">
+                          <Link className="button" href="/admin/tags">
+                            編輯相關標籤
+                          </Link>
+                          <Link className="button" href="/admin/listings">
+                            建立收錄草稿
+                          </Link>
+                          <button
+                            className="button danger"
+                            disabled={loading}
+                            onClick={() => void deleteQuery(row.key)}
+                            aria-label={`刪除「${row.label ?? row.key}」的搜尋統計`}
+                          >
+                            刪除統計
+                          </button>
+                        </div>
                       ) : (
                         "—"
                       )}

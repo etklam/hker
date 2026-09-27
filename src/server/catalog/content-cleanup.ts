@@ -8,10 +8,10 @@ export async function cleanupContentOperations(
 ) {
   const cap = Math.max(1, Math.min(5000, Math.floor(batchSize)));
   const plans = await executor.execute(
-    sql`delete from directory_content_plans where id in (select id from directory_content_plans where expires_at <= ${now} order by expires_at limit ${cap}) returning id`,
+    sql`delete from directory_content_plans where id in (select id from directory_content_plans where expires_at <= ${now} order by expires_at limit ${cap} for update skip locked) returning id`,
   );
   const history = await executor.execute(
-    sql`delete from directory_content_history where id in (select id from directory_content_history where created_at < ${new Date(now.getTime() - 90 * 86400000)} order by created_at limit ${cap}) returning id`,
+    sql`delete from directory_content_history where id in (select id from directory_content_history where created_at < ${new Date(now.getTime() - 90 * 86400000)} order by created_at limit ${cap} for update skip locked) returning id`,
   );
   return { plans: plans.length, history: history.length };
 }

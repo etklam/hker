@@ -295,7 +295,8 @@ export async function saveListingInTransaction(tx: CatalogExecutor, raw: unknown
     }
     await tx.delete(s.listingTags).where(eq(s.listingTags.listingId, row.id));
     if (tagIds.length) await tx.insert(s.listingTags).values([...new Set(tagIds)].map(tagId => ({ listingId: row.id, tagId })));
-    await recordContentChange(tx, "listing", row.id, old ? { ...old, links: existing.map(({ id, type, label, url, sortOrder, enabled }) => ({ id, type, label, url, sortOrder, enabled })), tagIds: oldTags.map(t => t.tagId).sort((a,b) => a-b) } : {}, { ...row, links: replaceLinks ? links : existing.map(({ id, type, label, url, sortOrder, enabled }) => ({ id, type, label, url, sortOrder, enabled })), tagIds: [...new Set(tagIds)].sort((a,b) => a-b) }, context);
+    const finalLinks = (await tx.select().from(s.listingLinks).where(eq(s.listingLinks.listingId, row.id)).orderBy(asc(s.listingLinks.sortOrder), asc(s.listingLinks.id))).map(({ id, type, label, url, sortOrder, enabled }) => ({ id, type, label, url, sortOrder, enabled }));
+    await recordContentChange(tx, "listing", row.id, old ? { ...old, links: existing.map(({ id, type, label, url, sortOrder, enabled }) => ({ id, type, label, url, sortOrder, enabled })), tagIds: oldTags.map(t => t.tagId).sort((a,b) => a-b) } : {}, { ...row, links: finalLinks, tagIds: [...new Set(tagIds)].sort((a,b) => a-b) }, context);
     return row;
 }
 export async function saveListing(raw: unknown, id?: number, context: MutationContext = {}) {

@@ -1,0 +1,2 @@
+ALTER TABLE "directory_event_days" ADD CONSTRAINT "directory_event_counter_valid" CHECK ("directory_event_days"."count" >= 0 and "directory_event_days"."zero_count" >= 0 and "directory_event_days"."zero_count" <= "directory_event_days"."count");--> statement-breakpoint
+ALTER TABLE "directory_event_days" ADD CONSTRAINT "directory_event_dimensions_valid" CHECK ("directory_event_days"."source" in ('web','bot') and "directory_event_days"."kind" in ('search','filter','preset','tag','outbound') and length("directory_event_days"."key") between 1 and 80);

@@ -11,6 +11,7 @@ if (
   throw new Error("Phase 8 requires isolated fixture");
 test.describe("Phase 8 content workflow", () => {
   test.skip(!enabled, "Requires isolated fixture");
+  test.setTimeout(60000);
   test.use({ storageState: enabled ? state : undefined });
   test("maps import, restores plan, publishes exact selection, exports and reads history", async ({
     page,
@@ -22,7 +23,7 @@ test.describe("Phase 8 content workflow", () => {
     await page
       .getByLabel("或貼上 CSV／JSON")
       .fill(
-        `名稱,slug,category,area,website\n${name},${slug},來源分類,旺角,https://example.test/Exact#section`,
+        `名稱,slug,category,area,website\n${name},${slug},來源分類,旺角,https://example.test/${slug}/Exact#section`,
       );
     await page
       .getByText("欄位與分類對照（修改後須重新預覽）", { exact: true })
@@ -31,7 +32,7 @@ test.describe("Phase 8 content workflow", () => {
     await page.getByRole("button", { name: "加入欄位對照" }).click();
     await page.getByLabel("來源值（精確比對）").fill("來源分類");
     await page
-      .getByLabel("現有項目", { exact: true })
+      .getByRole("combobox", { name: "現有項目", exact: true })
       .selectOption({ label: "維修服務 · repair" });
     await page.getByRole("button", { name: "加入分類對照" }).click();
     await page.getByRole("button", { name: "解析及預覽", exact: true }).click();
@@ -41,7 +42,15 @@ test.describe("Phase 8 content workflow", () => {
     await page.reload();
     await page.getByText("恢復近期計畫", { exact: true }).click();
     await page.getByRole("button", { name: /恢復$/ }).first().click();
-    await expect(page.getByLabel("或貼上 CSV／JSON")).toContainText(name);
+    await expect(page.getByLabel("或貼上 CSV／JSON")).toHaveValue(
+      new RegExp(name),
+    );
+    await mkdir(".impeccable/review/phase8", { recursive: true });
+    for (const width of [390, 768, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.screenshot({ path: `.impeccable/review/phase8/preview-${width}.png`, fullPage: true });
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
     await page.getByRole("button", { name: "確認匯入 1 項" }).click();
     await expect(
       page.getByRole("status").filter({ hasText: "已完成" }),
@@ -68,7 +77,7 @@ test.describe("Phase 8 content workflow", () => {
     ).toContainText("更新 1");
     const row = page.locator("table.admin-table tr").filter({ hasText: name });
     await row.getByText("近期變更", { exact: true }).click();
-    await expect(row.getByText(/publish/)).toBeVisible();
+    await expect(row.getByText(/ · publish · v1 → v2/).first()).toBeVisible();
     await page
       .getByRole("checkbox", { name: `選取${name}`, exact: true })
       .check();
@@ -96,7 +105,7 @@ test.describe("Phase 8 content workflow", () => {
         fullPage: true,
       });
       await page.goto("/admin/analytics");
-      await expect(page.getByLabel("來源", { exact: true })).toBeVisible();
+      await expect(page.getByRole("combobox", { name: "來源", exact: true })).toBeVisible();
       await page.screenshot({
         path: `.impeccable/review/phase8/analytics-${width}.png`,
         fullPage: true,

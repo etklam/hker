@@ -18,6 +18,7 @@ import {
   getTaxonomy,
   saveListingInTransaction,
   type CatalogExecutor,
+  type Taxonomy,
 } from "./service";
 import { previewImport } from "./import";
 import { normalizeImportRow } from "./import-format";
@@ -57,6 +58,7 @@ export const importSettingsSchema = z.object({
 });
 type Settings = z.infer<typeof importSettingsSchema>;
 type PlanRow = {
+  summary?: { category: string; area: string; tags: string[] };
   row: number;
   name: string;
   slug: string;
@@ -90,7 +92,7 @@ export const asListingInput = (
     tagIds: row.tags.map((t) => t.id),
   });
 
-async function importRows(
+async function buildImportRows(
   source: string,
   settings: Settings,
   tx: CatalogExecutor,
@@ -151,20 +153,31 @@ async function importRows(
         sourceRows[index][key]?.trim(),
       );
       if (hasLinks && item.data) {
-        if (item.data.links.some(link => link.id && !before.links.some(old => old.id === link.id))) errors.push("外部連結 ID 不屬於此項目");
-      const links = item.data.links.map((link) => ({
-          ...link,
-          id: link.id ?? before.links.find(
-            (old) =>
-              old.type === link.type &&
-              old.url === link.url &&
-              old.label === link.label,
-          )?.id,
-        }));
+        const links = item.data.links.map((link) => {
+          if (link.id && !before.links.some((old) => old.id === link.id))
+            errors.push("外部連結 ID 不屬於此項目");
+          const matches = before.links.filter(
+            (old) => old.type === link.type && old.url === link.url,
+          );
+          if (!link.id && matches.length > 1)
+            errors.push("相同類型及 URL 有多個既有連結；請指定該收錄的連結 ID");
+          return {
+            ...link,
+            id: link.id ?? (matches.length === 1 ? matches[0].id : undefined),
+          };
+        });
+        const retained = links.flatMap((link) => (link.id ? [link.id] : []));
+        if (new Set(retained).size !== retained.length)
+          errors.push("重複指定同一連結 ID");
         next.links =
           settings.linksMode === "replace"
             ? links
-            : [...before.links, ...links.filter((link) => !link.id)];
+            : [
+                ...before.links.map(
+                  (old) => links.find((link) => link.id === old.id) ?? old,
+                ),
+                ...links.filter((link) => !link.id),
+              ];
       }
       if (hasTags && item.data)
         next.tagIds =
@@ -193,11 +206,21 @@ async function importRows(
         before,
         data: parsed.success ? parsed.data : null,
         errors,
-        warnings: [],
+        warnings: item.candidates.some(
+          (candidate) => candidate.id !== target.id,
+        )
+          ? item.warnings
+          : item.warnings.filter((warning) => warning.includes("此收錄含")),
         diff: parsed.success ? contentDiff(before, parsed.data) : {},
       };
     }),
   );
+}
+const summarize = (data: ListingInput | null, taxonomy: Taxonomy) => ({ category: taxonomy.categories.find(item => item.id === data?.categoryId)?.name ?? "無分類", area: taxonomy.areas.find(item => item.id === data?.areaId)?.name ?? "無地區", tags: taxonomy.tags.filter(item => data?.tagIds.includes(item.id)).map(item => item.name) });
+async function importRows(source: string, settings: Settings, tx: CatalogExecutor): Promise<PlanRow[]> {
+  const rows = await buildImportRows(source, settings, tx);
+  const taxonomy = await getTaxonomy("admin", tx);
+  return rows.map(row => ({ ...row, summary: summarize(row.data, taxonomy) }));
 }
 async function storePlan(
   actorId: number,
@@ -237,7 +260,11 @@ export async function prepareImport(
       )
     )
       throw new AppError("INVALID_REQUEST", "Invalid row decision");
-    const payload = { source, settings, rows };
+    const sourceRows = parseImportSource(source, settings.columns);
+    const mappingEffects = settings.mappings.map(mapping => ({ ...mapping, affected: sourceRows.filter(sourceRow => {
+      try { const row = normalizeImportRow(sourceRow); return mapping.kind === "tag" ? row.tags?.split("|").some(value => value.trim() === mapping.value) : row[mapping.kind]?.trim() === mapping.value; } catch { return false; }
+    }).length }));
+    const payload = { source, settings, rows, mappingEffects };
     const id = randomUUID(),
       digest = digestOf(payload);
     const [plan] = await tx
@@ -283,6 +310,7 @@ export async function prepareBulk(
   if (new Set(input.entries.map((e) => e.id)).size !== input.entries.length)
     throw new AppError("INVALID_REQUEST", "Duplicate target");
   const rows: PlanRow[] = [];
+  const taxonomy = await getTaxonomy("admin");
   for (const entry of [...input.entries].sort((a, b) => a.id - b.id)) {
     const [identity] = await db
       .select({ slug: listings.slug })
@@ -308,6 +336,7 @@ export async function prepareBulk(
       slug: target.slug,
       before,
       data,
+      summary: summarize(data, taxonomy),
       errors: [],
       warnings: [],
       diff: contentDiff(before, data),
@@ -319,8 +348,9 @@ export async function getContentPlan(
   id: string,
   actorId: number,
   tx: CatalogExecutor = db,
+  lock = false,
 ) {
-  const [plan] = await tx
+  const query = tx
     .select()
     .from(catalogPlans)
     .where(
@@ -330,6 +360,7 @@ export async function getContentPlan(
         gt(catalogPlans.expiresAt, new Date()),
       ),
     );
+  const [plan] = lock ? await query.for("update") : await query;
   if (!plan) throw new AppError("NOT_FOUND", "計畫不存在或已過期；請重新預覽");
   return plan;
 }
@@ -360,7 +391,7 @@ export async function commitContentPlan(
   return db.transaction(async (tx) => {
     await configureCatalogTransaction(tx);
     await tx.execute(sql`select pg_advisory_xact_lock(724111)`);
-    const plan = await getContentPlan(id, actorId, tx);
+    const plan = await getContentPlan(id, actorId, tx, true);
     if (plan.digest !== digest)
       throw new AppError("CONFLICT", "計畫已改變，請重新預覽");
     if (plan.result) return { ...plan.result, replayed: true };
@@ -394,7 +425,11 @@ export async function commitContentPlan(
     let rows = payload.rows;
     if (plan.kind === "import") {
       const current = await importRows(payload.source, payload.settings, tx);
-      if (digestOf(current) !== digestOf(rows))
+      const selected = (items: PlanRow[]) =>
+        items.filter(
+          (row) => payload.settings.decisions[String(row.row)] !== "skip",
+        );
+      if (digestOf(selected(current)) !== digestOf(selected(rows)))
         throw new AppError(
           "CONFLICT",
           "資料、配對或版本已改變；未寫入任何項目，請重新預覽",
@@ -454,15 +489,16 @@ export async function commitContentPlan(
     for (const row of [...rows].sort((a, b) => (a.id ?? 0) - (b.id ?? 0))) {
       if (!row.data) throw new AppError("CONFLICT", "Invalid plan row");
       const data = listingSchema.parse(row.data);
+      const reviewedDisabled = plan.kind === "import" && payload.source.replace(/^\uFEFF/, "").trimStart().startsWith("{") && payload.settings.decisions[String(row.row)] === "accept";
       if (
         (data.categoryId &&
           !taxonomy.categories.some(
-            (t) => t.id === data.categoryId && t.enabled,
+            (t) => t.id === data.categoryId && (t.enabled || reviewedDisabled || row.before?.categoryId === t.id),
           )) ||
         (data.areaId &&
-          !taxonomy.areas.some((t) => t.id === data.areaId && t.enabled)) ||
+          !taxonomy.areas.some((t) => t.id === data.areaId && (t.enabled || reviewedDisabled || row.before?.areaId === t.id))) ||
         data.tagIds.some(
-          (id) => !taxonomy.tags.some((t) => t.id === id && t.enabled),
+          (id) => !taxonomy.tags.some((t) => t.id === id && (t.enabled || reviewedDisabled || row.before?.tagIds.includes(id))),
         )
       )
         throw new AppError("CONFLICT", "分類、地區或標籤已停用；請重新預覽");
