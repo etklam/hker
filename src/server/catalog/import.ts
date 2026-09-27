@@ -1,15 +1,16 @@
+import { parseImportSource } from "./native-format";
 import { createHash } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
 import { db, type DB } from "@/server/db";
 import {
   listings,
   listingLinks,
-  listingTags,
   listingSlugAliases,
 } from "@/db/schema/directory";
 import { listingSchema, type ListingInput } from "@/schemas/directory";
 import {
   configureCatalogTransaction,
+  saveListingInTransaction,
   getTaxonomy,
   type CatalogExecutor,
 } from "./service";
@@ -18,125 +19,73 @@ import { AppError } from "@/lib/errors";
 import { catalogImportJobs } from "@/db/schema/directoryOperations";
 import { generateListingSlug } from "@/lib/directory";
 
-export function parseCsv(text: string): Record<string, string>[] {
-  if (Buffer.byteLength(text, "utf8") > 500000)
-    throw new AppError("INVALID_REQUEST", "CSV must be under 500 KB");
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let cell = "",
-    quoted = false,
-    closed = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (quoted) {
-      if (c === '"') {
-        if (text[i + 1] === '"') {
-          cell += '"';
-          i++;
-        } else {
-          quoted = false;
-          closed = true;
-        }
-      } else cell += c;
-    } else if (c === '"') {
-      if (cell || closed)
-        throw new AppError("INVALID_REQUEST", "Unexpected CSV quote");
-      quoted = true;
-    } else if (c === "," || c === "\n" || c === "\r") {
-      row.push(cell);
-      cell = "";
-      closed = false;
-      if (c !== ",") {
-        if (c === "\r" && text[i + 1] === "\n") i++;
-        if (row.some((v) => v.trim())) rows.push(row);
-        row = [];
-      }
-    } else {
-      if (closed)
-        throw new AppError(
-          "INVALID_REQUEST",
-          "Unexpected text after quoted field",
-        );
-      cell += c;
-    }
-  }
-  if (quoted) throw new AppError("INVALID_REQUEST", "Unclosed CSV quote");
-  row.push(cell);
-  if (row.some((v) => v.trim())) rows.push(row);
-  if (rows.length < 2 || rows.length > 201)
-    throw new AppError(
-      "INVALID_REQUEST",
-      "CSV requires a header and 1–200 rows",
-    );
-  const headers = rows.shift()!.map((h) => h.replace(/^\uFEFF/, "").trim());
-  if (
-    headers.length > 24 ||
-    headers.some((header) => Buffer.byteLength(header, "utf8") > 200)
-  )
-    throw new AppError("INVALID_REQUEST", "CSV has too many or oversized columns");
-  if (new Set(headers).size !== headers.length || !headers.includes("name"))
-    throw new AppError(
-      "INVALID_REQUEST",
-      "Unique headers including name are required",
-    );
-  const allowed = [
-    "name",
-    "slug",
-    "shortDescription",
-    "description",
-    "priceMin",
-    "priceMax",
-    "priceCurrency",
-    "categoryId",
-    "areaId",
-    "tagIds",
-    "website",
-    "category",
-    "area",
-    "tags",
-    "links",
-    "aliases",
-    "attrs",
-  ];
-  if (headers.some((h) => !allowed.includes(h)))
-    throw new AppError("INVALID_REQUEST", "Unsupported CSV column");
-  return rows.map((r) => {
-    if (
-      r.some((cell) => Buffer.byteLength(cell, "utf8") > 24000) ||
-      r.length !== headers.length
-    )
-      throw new AppError("INVALID_REQUEST", "CSV column count mismatch");
-    return Object.fromEntries(headers.map((h, i) => [h, r[i]]));
-  });
-}
-export const normalizeName = (name: string) =>
-  name.normalize("NFKC").toLocaleLowerCase().replace(/\s+/g, "").trim();
-export function normalizeUrl(value: string) {
-  try {
-    return new URL(value).toString();
-  } catch {
-    return value;
-  }
-}
+import {
+  normalizeImportRow,
+  resolveImportTerm,
+  normalizeName,
+  normalizeUrl,
+  type ImportMapping,
+} from "./import-format";
+export {
+  parseCsv,
+  normalizeName,
+  normalizeUrl,
+  type ImportMapping,
+} from "./import-format";
 const hash = (value: string) =>
   createHash("sha256").update(value).digest("hex");
 export async function previewImport(
   csv: string,
   executor: CatalogExecutor = db,
+  mapping: {
+    mappings?: ImportMapping[];
+    columns?: Record<string, string>;
+    decisions?: Record<string, "accept" | "skip">;
+    mode?: "create" | "update";
+  } = {},
 ) {
-  const rows = parseCsv(csv);
+  const rows = parseImportSource(csv, mapping.columns);
   const taxonomy = await getTaxonomy("admin", executor);
+  const areaChoices = taxonomy.areas.map((area) => {
+    const names = [area.name];
+    let parentId = area.parentId;
+    const seen = new Set([area.id]);
+    while (parentId && !seen.has(parentId)) {
+      seen.add(parentId);
+      const parent = taxonomy.areas.find((item) => item.id === parentId);
+      if (!parent) break;
+      names.unshift(parent.name);
+      parentId = parent.parentId;
+    }
+    return { ...area, path: names.join(" / ") };
+  });
   const [existing, links, oldSlugs] = await Promise.all([
     executor
-      .select({ name: listings.name, slug: listings.slug })
+      .select({
+        id: listings.id,
+        name: listings.name,
+        slug: listings.slug,
+        revision: listings.revision,
+        areaId: listings.areaId,
+      })
       .from(listings),
-    executor.select({ url: listingLinks.url }).from(listingLinks),
+    executor
+      .select({ url: listingLinks.url, listingId: listingLinks.listingId })
+      .from(listingLinks),
     executor.select({ slug: listingSlugAliases.slug }).from(listingSlugAliases),
   ]);
   const names = new Set(existing.map((r) => normalizeName(r.name)));
   const slugs = new Set([...existing, ...oldSlugs].map((r) => r.slug));
   const urls = new Set(links.map((r) => normalizeUrl(r.url)));
-  const items = rows.map((row, index) => {
+  const items = rows.map((source, index) => {
+    let row = source;
+    if (mapping.mode === "update" && !source.name?.trim())
+      row = {
+        ...source,
+        name:
+          existing.find((item) => item.slug === source.slug?.trim())?.name ??
+          "",
+      };
     const errors: string[] = [],
       warnings: string[] = [];
     const resolve = (
@@ -145,38 +94,47 @@ export async function previewImport(
       label: string,
     ) => {
       if (!value?.trim()) return null;
-      const matches = choices.filter(
-        (c) =>
-          c.enabled &&
-          (c.slug === value.trim() ||
-            normalizeName(c.name) === normalizeName(value)),
+      const kind =
+        label === "分類" ? "category" : label === "地區" ? "area" : "tag";
+      const chosen = mapping.mappings?.find(
+        (item) => item.kind === kind && item.value.trim() === value.trim(),
       );
-      const unique = [...new Set(matches.map((c) => c.id))];
-      if (unique.length !== 1)
-        errors.push(`${label}：找不到或名稱不唯一 (${value})`);
-      return unique[0] ?? null;
+      const result = chosen
+        ? {
+            id: choices.some((item) => item.id === chosen.id && item.enabled)
+              ? chosen.id
+              : null,
+            state: "invalid-mapping",
+          }
+        : resolveImportTerm(value, choices);
+      if (result.id === null)
+        errors.push(`${label}：找不到或名稱不唯一 (${value}; ${result.state})`);
+      return result.id;
     };
     const numeric = (key: string) =>
       row[key]?.trim() ? Number(row[key]) : null;
     let slug = row.slug?.trim();
     if (!slug) {
-      const base = generateListingSlug(row.name);
+      const base = generateListingSlug(row.name ?? "");
       slug = base;
       let suffix = 2;
       while (slugs.has(slug)) slug = `${base}-${suffix++}`;
     }
     let data: ListingInput | null = null;
     try {
+      row = normalizeImportRow(row);
       const parsed = listingSchema.safeParse({
         ...row,
         slug,
         enabled: false,
+        featured: row.featured === "true",
+        sortOrder: row.sortOrder ? Number(row.sortOrder) : 0,
         categoryId: row.categoryId?.trim()
           ? numeric("categoryId")
           : resolve(row.category, taxonomy.categories, "分類"),
         areaId: row.areaId?.trim()
           ? numeric("areaId")
-          : resolve(row.area, taxonomy.areas, "地區"),
+          : resolve(row.area, areaChoices, "地區"),
         tagIds: row.tagIds?.trim()
           ? row.tagIds.split("|").map(Number)
           : (row.tags
@@ -203,7 +161,7 @@ export async function previewImport(
         );
       else {
         data = parsed.data;
-        if (data.links.some((l) => l.id !== undefined))
+        if (mapping.mode !== "update" && data.links.some((l) => l.id !== undefined))
           errors.push("匯入連結不可指定既有 ID");
         if (
           data.categoryId &&
@@ -228,14 +186,55 @@ export async function previewImport(
           warnings.push("名稱與既有或同批收錄相同，請確認是否不同分店／項目");
         if (data.links.some((l) => urls.has(normalizeUrl(l.url))))
           warnings.push("外部連結與既有或同批收錄相同");
-        names.add(normalizeName(data.name));
-        data.links.forEach((l) => urls.add(normalizeUrl(l.url)));
+        if (mapping.decisions?.[String(index + 2)] !== "skip") {
+          names.add(normalizeName(data.name));
+          data.links.forEach((l) => urls.add(normalizeUrl(l.url)));
+        }
+        if (
+          new Set(data.links.map((link) => `${link.type}:${link.url}`)).size !==
+          data.links.length
+        )
+          warnings.push("此收錄含相同類型及 URL 的重複連結；確認後將保留");
       }
-    } catch {
-      errors.push("links、aliases 或 attrs JSON 格式不正確");
+    } catch (error) {
+      errors.push(
+        error instanceof AppError
+          ? error.message
+          : "links、aliases 或 attrs JSON 格式不正確",
+      );
     }
-    slugs.add(slug);
-    return { row: index + 2, name: row.name, slug, errors, warnings, data };
+    if (mapping.decisions?.[String(index + 2)] !== "skip") slugs.add(slug);
+    const candidates = data
+      ? existing
+          .filter(
+            (candidate) =>
+              normalizeName(candidate.name) === normalizeName(data!.name) ||
+              links.some(
+                (link) =>
+                  link.listingId === candidate.id &&
+                  data!.links.some(
+                    (proposed) =>
+                      normalizeUrl(proposed.url) === normalizeUrl(link.url),
+                  ),
+              ),
+          )
+          .slice(0, 10)
+          .map((candidate) => ({
+            ...candidate,
+            area:
+              taxonomy.areas.find((area) => area.id === candidate.areaId)
+                ?.name ?? null,
+          }))
+      : [];
+    return {
+      candidates,
+      row: index + 2,
+      name: row.name,
+      slug,
+      errors,
+      warnings,
+      data,
+    };
   });
   return {
     digest: hash(JSON.stringify({ csv, items })),
@@ -301,33 +300,11 @@ export async function confirmImport(
       );
     const ids: number[] = [];
     for (const item of selected) {
-      const { tagIds, links, ...data } = item.data!;
-      const [row] = await tx
-        .insert(listings)
-        .values({
-          ...data,
-          revision: undefined,
-          priceMin: data.priceMin?.toFixed(2) ?? null,
-          priceMax: data.priceMax?.toFixed(2) ?? null,
-        })
-        .returning({ id: listings.id });
+      const row = await saveListingInTransaction(tx, item.data!, undefined, {
+        actorId: options.actorId,
+        operationId: key,
+      });
       ids.push(row.id);
-      if (links.length)
-        await tx
-          .insert(listingLinks)
-          .values(
-            links.map((link) => ({
-              ...link,
-              id: undefined,
-              listingId: row.id,
-            })),
-          );
-      if (tagIds.length)
-        await tx
-          .insert(listingTags)
-          .values(
-            [...new Set(tagIds)].map((tagId) => ({ tagId, listingId: row.id })),
-          );
     }
     const result = {
       imported: ids.length,

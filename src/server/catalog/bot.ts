@@ -425,8 +425,11 @@ export async function handleCatalogUpdate(update: Update, database = db, options
                     else
                         invalid = true;
                 }
-                else if (action === "results")
+                else if (action === "results") {
+                    if (state.search.query || state.search.categoryId || state.search.areaId || state.search.tagIds.length || state.search.priceMin !== null || state.search.priceMax !== null || state.search.featured !== undefined)
+                        event = { kind: state.search.query ? "search" : "filter", key: state.search.query || "applied", source: "bot", actionId: `telegram:${update.update_id}` };
                     await results();
+                }
             }
         }
         else if (parsedInput) {

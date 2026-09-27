@@ -6,6 +6,8 @@ import { formatPrice } from "@/lib/directory";
 import { Editor, type EditorValue } from "./Editor";
 import { orderAreaHierarchy as areaTree } from "@/lib/directory";
 import { AnalyticsPanel } from "./AnalyticsPanel";
+import { HistoryPanel } from "./HistoryPanel";
+import { BulkPanel, type SelectedListing } from "./BulkPanel";
 import { ImportPanel } from "./ImportPanel";
 type Section =
   | "listings"
@@ -47,10 +49,15 @@ export function AdminCatalog({ section }: { section: Section }) {
       areaId: "",
       tagIds: "",
       status: "all",
+      sort: "manual",
     }),
     [editing, setEditing] = useState<EditorValue | null>(null),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState<SelectedListing[]>([]);
+  const selectionScope = JSON.stringify({ query, filters, section });
+  const selectionScopeRef = useRef(selectionScope);
+  if (selectionScopeRef.current !== selectionScope) { selectionScopeRef.current = selectionScope; if (selected.length) setSelected([]); }
   const manageable = !["imports", "analytics", "settings"].includes(section);
   const activeRequest = useRef<AbortController | null>(null);
   const load = useCallback(async () => {
@@ -308,10 +315,16 @@ export function AdminCatalog({ section }: { section: Section }) {
             </p>
           )}
           {preview && <p role="status">{preview}</p>}
+          {section === "listings" && <HistoryPanel />}
+          {section === "listings" && <button className="button" disabled={mutationBusy} onClick={async () => { try { const response = await fetch(`/api/admin/catalog?${new URLSearchParams({ q: query, ...filters, selection: "1" })}`); const data = await response.json(); if (!response.ok) throw new Error(data.message); setSelected(data); } catch (error) { setError(error instanceof Error ? error.message : "選取失敗"); } }}>選取所有符合項目（上限 200）</button>}
+          {section === "listings" && <BulkPanel key={selectionScope} selected={selected} taxonomy={taxonomy} clear={() => setSelected([])} reload={() => void load()} />}
+          {section === "listings" && selected.length > 0 && <p><a href={`/api/admin/catalog/export?format=json&ids=${selected.map(row => row.id).join(",")}`}>匯出所選 JSON</a> · <a href={`/api/admin/catalog/export?format=csv&ids=${selected.map(row => row.id).join(",")}`}>匯出所選 CSV（試算表檢視）</a></p>}
+          {section === "listings" && <div className="toolbar"><button className="button" onClick={() => { setFilters({ ...filters, status: "disabled" }); setPage(1); }}>未發佈內容</button><button className="button" onClick={() => { setFilters({ ...filters, sort: "updated" }); setPage(1); }}>最近變更</button></div>}
           <div className="table-wrap">
             <table className="admin-table">
               <thead>
                 <tr>
+                  {section === "listings" && <th><input type="checkbox" aria-label="選取此頁" checked={items.length > 0 && items.every(item => selected.some(row => row.id === item.id))} onChange={e => setSelected(e.target.checked ? [...selected, ...items.filter(item => !selected.some(row => row.id === item.id)).map(({id, revision, name}) => ({id, revision, name}))] : selected.filter(row => !items.some(item => item.id === row.id)))} disabled={selected.length + items.filter(item => !selected.some(row => row.id === item.id)).length > 200} /></th>}
                   <th>名稱</th>
                   {section === "listings" && (
                     <>
@@ -333,6 +346,7 @@ export function AdminCatalog({ section }: { section: Section }) {
                   };
                   return (
                     <tr key={r.id}>
+                      {section === "listings" && <td data-label="選取"><input type="checkbox" aria-label={`選取${r.name}`} checked={selected.some(row => row.id === r.id)} disabled={selected.length >= 200 && !selected.some(row => row.id === r.id)} onChange={e => setSelected(e.target.checked ? [...selected, { id: r.id, name: r.name, revision: r.revision }] : selected.filter(row => row.id !== r.id))} /></td>}
                       <td data-label="名稱">
                         <strong
                           style={
@@ -409,6 +423,7 @@ export function AdminCatalog({ section }: { section: Section }) {
                         </td>
                       )}
                       <td data-label="操作">
+                        {section === "listings" && <HistoryPanel id={r.id} />}
                         <button
                           className="button"
                           onClick={() => start(row as unknown as EditorValue)}

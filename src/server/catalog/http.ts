@@ -60,7 +60,10 @@ export async function readJsonBody(
       }
       chunks.push(value);
     }
-    return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    let decoded: string;
+    try { decoded = new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks)); }
+    catch { throw new AppError("INVALID_REQUEST", "Request must use UTF-8"); }
+    return JSON.parse(decoded);
   } finally {
     reader.releaseLock();
   }

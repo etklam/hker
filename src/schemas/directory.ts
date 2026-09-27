@@ -140,9 +140,9 @@ export const searchSchema = z
     priceMax: price,
     page: z.number().int().min(1).max(10000).default(1),
     pageSize: z.number().int().min(1).max(100).default(12),
-    requestedSort: z.enum(["auto", "relevance", "manual", "newest", "price-asc", "price-desc"]).optional(),
+    requestedSort: z.enum(["auto", "relevance", "manual", "newest", "updated", "price-asc", "price-desc"]).optional(),
     sort: z
-      .enum(["auto", "relevance", "manual", "newest", "price-asc", "price-desc"])
+      .enum(["auto", "relevance", "manual", "newest", "updated", "price-asc", "price-desc"])
       .optional(),
     featured: z.boolean().optional(),
     status: z.enum(["all", "enabled", "disabled"]).default("all"),

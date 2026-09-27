@@ -50,6 +50,13 @@
       "when": 1790495569919,
       "tag": "0006_rapid_sebastian_shaw",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790503059434,
+      "tag": "0007_yielding_iron_patriot",
+      "breakpoints": true
     }
   ]
 }

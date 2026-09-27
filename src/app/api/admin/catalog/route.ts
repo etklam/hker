@@ -1,3 +1,4 @@
+import { matchingSelection } from "@/server/catalog/content-plans";
 import {
   reorderVisible,
   setPublication,
@@ -32,6 +33,7 @@ const mutation = z.object({
 export const GET = withAdmin(async (req) =>
   catalogResponse(async () => {
     const params = req.nextUrl.searchParams;
+    if (params.get("selection") === "1") return matchingSelection(searchFromParams(params));
     if (params.get("slugName")) {
       const kind = parseBody(
         params.get("kind"),
@@ -74,7 +76,7 @@ export const GET = withAdmin(async (req) =>
       : CatalogSearchService.search(searchFromParams(params), "admin");
   }),
 );
-export const PATCH = withAdmin(async (req) =>
+export const PATCH = withAdmin(async (req, { user }) =>
   catalogResponse(async () => {
     const value = parseBody(
       await readJsonBody(req),
@@ -109,6 +111,7 @@ export const PATCH = withAdmin(async (req) =>
         value.id,
         value.enabled,
         value.revision,
+        { actorId: user.id },
       );
     parseBody(
       value,
@@ -126,15 +129,15 @@ export const PATCH = withAdmin(async (req) =>
           "排序項目不一致",
         ),
     );
-    return reorderVisible(value.kind, value.entries, value.ids);
+    return reorderVisible(value.kind, value.entries, value.ids, { actorId: user.id });
   }),
 );
-export const POST = withAdmin(async (req) =>
+export const POST = withAdmin(async (req, { user }) =>
   catalogResponse(async () => {
     const { kind, id, data } = parseBody(await readJsonBody(req), mutation);
     return kind === "listings"
-      ? saveListing(data, id)
-      : saveTaxonomy(kind, data, id);
+      ? saveListing(data, id, { actorId: user.id })
+      : saveTaxonomy(kind, data, id, { actorId: user.id });
   }),
 );
 export const DELETE = withAdmin(async (req) =>

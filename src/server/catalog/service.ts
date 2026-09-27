@@ -1,3 +1,4 @@
+import { recordContentChange, type MutationContext } from "./history";
 import { and, asc, desc, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { db, type DB } from "@/server/db";
 import * as s from "@/db/schema/directory";
@@ -201,7 +202,7 @@ export type CatalogListing = Awaited<ReturnType<typeof hydrate>>[number];
 export const CatalogSearchService = {
   async search(raw: SearchInput = {}, audience: Audience = "public", executor: CatalogExecutor = db) {
     const input = parseBody(raw, searchSchema);
-    if (audience !== "admin" && input.status !== "all") throw new AppError("INVALID_REQUEST", "公開搜尋不支援管理員狀態篩選。");
+    if (audience !== "admin" && (input.status !== "all" || input.sort === "updated")) throw new AppError("INVALID_REQUEST", "公開搜尋不支援管理員狀態篩選。");
     if (audience !== "admin") {
       const [categories, areas, tags] = await Promise.all([
         input.categoryId ? executor.select({ id: s.categories.id }).from(s.categories).where(and(eq(s.categories.id, input.categoryId), eq(s.categories.enabled, true))) : [],
@@ -217,7 +218,7 @@ export const CatalogSearchService = {
       else 0 end`;
     const rank = sql`ts_rank(to_tsvector('simple', ${s.listings.name} || ' ' || ${s.listings.description}), plainto_tsquery('simple', ${input.query}))`;
     const order =
-      input.sort === "newest"
+      input.sort === "updated" ? [desc(s.listings.updatedAt)] : input.sort === "newest"
         ? [desc(s.listings.createdAt)]
         : input.sort === "price-asc"
           ? [
@@ -265,10 +266,9 @@ export const CatalogSearchService = {
     return (await hydrate(rows, audience, executor))[0] ?? null;
   },
 };
-export async function saveListing(raw: unknown, id?: number) {
+export async function saveListingInTransaction(tx: CatalogExecutor, raw: unknown, id?: number, context: MutationContext = {}) {
   const { links, tagIds, revision, ...data } = parseBody(raw, listingSchema);
   const replaceLinks = typeof raw === "object" && raw !== null && Object.hasOwn(raw, "links");
-  return db.transaction(async tx => {
     await configureCatalogTransaction(tx);
     // ponytail: serialize listing writes to protect the shared slug namespace; use ordered per-slug locks if write throughput requires it.
     await tx.execute(sql`select pg_advisory_xact_lock(724111)`);
@@ -281,6 +281,7 @@ export async function saveListing(raw: unknown, id?: number) {
     const existing = id ? await tx.select().from(s.listingLinks).where(eq(s.listingLinks.listingId, id)) : [];
     const submittedIds = links.flatMap(l => l.id ? [l.id] : []);
     if (new Set(submittedIds).size !== submittedIds.length || submittedIds.some(childId => !existing.some(l => l.id === childId))) throw new AppError("INVALID_REQUEST", "外部連結不屬於此項目或重複提交。");
+    const oldTags = old ? await tx.select().from(s.listingTags).where(eq(s.listingTags.listingId, old.id)) : [];
     const values = { ...data, aliases: [...new Set(data.aliases)], priceMin: data.priceMin?.toFixed(2) ?? null, priceMax: data.priceMax?.toFixed(2) ?? null, updatedAt: new Date() };
     const [row] = old
       ? await tx.update(s.listings).set({ ...values, revision: old.revision + 1 }).where(and(eq(s.listings.id, old.id), eq(s.listings.revision, revision!))).returning()
@@ -294,8 +295,11 @@ export async function saveListing(raw: unknown, id?: number) {
     }
     await tx.delete(s.listingTags).where(eq(s.listingTags.listingId, row.id));
     if (tagIds.length) await tx.insert(s.listingTags).values([...new Set(tagIds)].map(tagId => ({ listingId: row.id, tagId })));
+    await recordContentChange(tx, "listing", row.id, old ? { ...old, links: existing.map(({ id, type, label, url, sortOrder, enabled }) => ({ id, type, label, url, sortOrder, enabled })), tagIds: oldTags.map(t => t.tagId).sort((a,b) => a-b) } : {}, { ...row, links: replaceLinks ? links : existing.map(({ id, type, label, url, sortOrder, enabled }) => ({ id, type, label, url, sortOrder, enabled })), tagIds: [...new Set(tagIds)].sort((a,b) => a-b) }, context);
     return row;
-  });
+}
+export async function saveListing(raw: unknown, id?: number, context: MutationContext = {}) {
+  return db.transaction(tx => saveListingInTransaction(tx, raw, id, context));
 }
 export async function deleteListing(id: number) {
   const rows = await db
@@ -325,15 +329,16 @@ export async function validateNavigationPresetForSave(
       }
 }
 
-export async function saveTaxonomy(
+async function writeTaxonomy(
   kind: TaxonomyKind,
   raw: unknown,
-  id?: number,
+  id: number | undefined,
+  database: CatalogExecutor,
 ) {
   if (kind === "areas") {
     const data = parseBody(raw, taxonomySchemas.areas);
     // Serialize hierarchy edits to prevent concurrent cycle creation.
-    return db.transaction(async (tx) => {
+    return database.transaction(async (tx) => {
       await configureCatalogTransaction(tx);
       await tx.execute(sql`select pg_advisory_xact_lock(724110)`);
       if (id && data.parentId) {
@@ -363,7 +368,7 @@ export async function saveTaxonomy(
   }
   if (kind === "tags") {
     const { aliases, ...data } = parseBody(raw, taxonomySchemas.tags);
-    return db.transaction(async (tx) => {
+    return database.transaction(async (tx) => {
       await configureCatalogTransaction(tx);
       const [row] = id
         ? await tx.update(s.tags).set(data).where(eq(s.tags.id, id)).returning()
@@ -386,7 +391,7 @@ export async function saveTaxonomy(
       priceMin: data.priceMin?.toFixed(2) ?? null,
       priceMax: data.priceMax?.toFixed(2) ?? null,
     };
-    return db.transaction(async (tx) => {
+    return database.transaction(async (tx) => {
       await configureCatalogTransaction(tx);
       await validateNavigationPresetForSave(tx, { ...data, tagIds }, allowBroad);
       const [row] = id
@@ -412,25 +417,39 @@ export async function saveTaxonomy(
   if (kind === "categories") {
     const data = parseBody(raw, taxonomySchemas.categories);
     const [row] = id
-      ? await db
+      ? await database
           .update(s.categories)
           .set(data)
           .where(eq(s.categories.id, id))
           .returning()
-      : await db.insert(s.categories).values(data).returning();
+      : await database.insert(s.categories).values(data).returning();
     if (!row) throw new AppError("NOT_FOUND", "Category not found");
     return row;
   }
   const data = parseBody(raw, taxonomySchemas.groups);
   const [row] = id
-    ? await db
+    ? await database
         .update(s.tagGroups)
         .set(data)
         .where(eq(s.tagGroups.id, id))
         .returning()
-    : await db.insert(s.tagGroups).values(data).returning();
+    : await database.insert(s.tagGroups).values(data).returning();
   if (!row) throw new AppError("NOT_FOUND", "Group not found");
   return row;
+}
+export async function saveTaxonomy(kind: TaxonomyKind, raw: unknown, id?: number, context: MutationContext = {}, database: CatalogExecutor = db) {
+  return database.transaction(async tx => {
+    await configureCatalogTransaction(tx);
+    const table = tables[kind];
+    const [before] = id ? await tx.select().from(table).where(eq(table.id, id)).for("update") : [];
+    const previous = before ? { ...before } as Record<string, unknown> : {};
+    if (id && kind === "tags") previous.aliases = (await tx.select().from(s.tagAliases).where(eq(s.tagAliases.tagId, id))).map(row => row.alias);
+    if (id && kind === "navigation") previous.tagIds = (await tx.select().from(s.navigationPresetTags).where(eq(s.navigationPresetTags.presetId, id))).map(row => row.tagId);
+    const row = await writeTaxonomy(kind, raw, id, tx);
+    const validated = taxonomySchemas[kind].parse(raw);
+    await recordContentChange(tx, kind, row.id, previous, { ...row, ...validated }, context);
+    return row;
+  });
 }
 async function removeTaxonomy(kind: TaxonomyKind, id: number, executor: CatalogExecutor) {
   const table = tables[kind];

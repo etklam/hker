@@ -1,3 +1,5 @@
+import { recordContentChange, type MutationContext } from "./history";
+import type { CatalogExecutor } from "./service";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/server/db";
 import {
@@ -50,14 +52,15 @@ export async function suggestSlug(
   throw new AppError("CONFLICT", "未能產生可用網址代稱，請手動輸入");
 }
 
-export async function setPublication(
+async function writePublication(
   kind: AdminKind,
   id: number,
   enabled: boolean,
-  revision?: number,
+  revision: number | undefined,
+  database: CatalogExecutor,
 ) {
   if (kind === "navigation" && enabled) {
-    await db.transaction(async tx => {
+    await database.transaction(async tx => {
       await configureCatalogTransaction(tx);
       const [preset] = await tx.select().from(navigationPresets).where(eq(navigationPresets.id, id)).for("update");
       if (!preset) throw new AppError("NOT_FOUND", "找不到項目");
@@ -67,7 +70,7 @@ export async function setPublication(
     });
   } else if (kind === "listings") {
     if (!revision) throw new AppError("CONFLICT", "請重新載入最新收錄");
-    const [row] = await db
+    const [row] = await database
       .update(listings)
       .set({
         enabled,
@@ -79,7 +82,7 @@ export async function setPublication(
     if (!row) throw new AppError("CONFLICT", "收錄已更新，請重新載入");
   } else {
     const table = tables[kind];
-    const [row] = await db
+    const [row] = await database
       .update(table)
       .set({ enabled })
       .where(eq(table.id, id))
@@ -89,11 +92,24 @@ export async function setPublication(
   return { ok: true };
 }
 
+export async function setPublication(kind: AdminKind, id: number, enabled: boolean, revision?: number, context: MutationContext = {}) {
+  return db.transaction(async tx => {
+    await configureCatalogTransaction(tx);
+    const table = tables[kind];
+    const [before] = await tx.select().from(table).where(eq(table.id, id)).for("update");
+    const result = await writePublication(kind, id, enabled, revision, tx);
+    const [after] = await tx.select().from(table).where(eq(table.id, id));
+    if (before && after) await recordContentChange(tx, kind === "listings" ? "listing" : kind, id, before, after, context);
+    return result;
+  });
+}
+
 // Only swap positions of the submitted visible rows; never renumber unseen records.
 export async function reorderVisible(
   kind: "listings" | "navigation",
   entries: { id: number; sortOrder: number; revision?: number }[],
   ids: number[],
+  context: MutationContext = {},
 ) {
   return db.transaction(async (tx) => {
     await configureCatalogTransaction(tx);
@@ -133,6 +149,10 @@ export async function reorderVisible(
           .update(navigationPresets)
           .set({ sortOrder: positions[index] })
           .where(eq(navigationPresets.id, ids[index]));
+    }
+    for (const before of rows) {
+      const [after] = await tx.select().from(table).where(eq(table.id, before.id));
+      await recordContentChange(tx, kind === "listings" ? "listing" : kind, before.id, before, after, context);
     }
     return { ok: true };
   });

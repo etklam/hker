@@ -363,9 +363,9 @@ test.describe("directory admin acceptance", () => {
     await page.goto("/admin/imports");
     await page.getByLabel("或貼上 CSV").fill(csv);
     await page.getByRole("button", { name: "解析及預覽" }).click();
-    await expect(page.getByRole("cell", { name, exact: true })).toBeVisible();
+    await expect(page.getByRole("cell").filter({ hasText: name })).toBeVisible();
     await page.getByRole("button", { name: "確認匯入 1 項" }).click();
-    await expect(page.getByRole("status")).toContainText("已匯入 1 項草稿");
+    await expect(page.getByRole("status")).toContainText("新增 1");
     const row = (
       await (
         await request.get(`/api/admin/catalog?q=${encodeURIComponent(name)}`)

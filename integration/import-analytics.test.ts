@@ -94,7 +94,8 @@ describe("directory import and analytics acceptance", () => {
     expect(privateQueryKey("電話 91234567")).toBeNull();
   });
   it("bounds concurrent daily cardinality and retains active data during cleanup", async () => {
-    await db.execute(sql`insert into directory_event_days(day,source,kind,key,count,zero_count) select current_date,'web','search','seed-' || n,1,0 from generate_series(1,1998) n on conflict do nothing`);
+    // Three bounded rows already exist: eligible search, suppressed-search total and tag.
+    await db.execute(sql`insert into directory_event_days(day,source,kind,key,count,zero_count) select current_date,'web','search','seed-' || n,1,0 from generate_series(1,1997) n on conflict do nothing`);
     await Promise.all(Array.from({ length: 20 }, (_, index) => recordCatalogEvent({ kind: "search", source: "web", key: `獨特搜尋${String.fromCharCode(65 + index)}`, actionId: `cap-${index}` })));
     const [{ count }] = await db.select({ count: sql<number>`count(*)::int` }).from(catalogEventDays);
     expect(count).toBeLessThanOrEqual(2001);

@@ -1,0 +1,2 @@
+formatVersion,name,slug,categorySlug,areaSlug,priceMin,priceMax,priceCurrency,tagSlugs,website,telegram,instagram,shortDescription,linksJson,aliasesJson,attrsJson
+2,虛構示例服務,fictional-example,,,,,HKD,,,,,僅供隔離測試，請替換內容,"[{""type"": ""website"", ""label"": ""頁面一"", ""url"": ""https://example.test/Case#one"", ""sortOrder"": 0, ""enabled"": true}, {""type"": ""website"", ""label"": ""頁面二"", ""url"": ""https://example.test/Case#two"", ""sortOrder"": 1, ""enabled"": true}]","[""示例別名""]","{""備註"":""虛構內容""}"
