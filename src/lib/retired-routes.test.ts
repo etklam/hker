@@ -1,21 +1,29 @@
-import { describe, expect, it, vi } from 'vitest';
-import { isRetiredPath, retiredPaths } from './retired-routes';
-import { POST as register } from '@/app/api/auth/register/route';
-import { GET as featured } from '@/app/api/featured/route';
-vi.mock('next/navigation', () => ({ notFound: () => { throw new Error('NEXT_NOT_FOUND'); } }));
-import BillsLayout from '@/app/(main)/bills/layout';
-import RegistrationLayout from '@/app/(auth)/register/layout';
-describe('retired server entry points', () => {
-  it('covers every retired subtree without blocking similarly named paths', () => {
-    for (const path of retiredPaths) { expect(isRetiredPath(path)).toBe(true); expect(isRetiredPath(`${path}/child`)).toBe(true); expect(isRetiredPath(`${path}-new`)).toBe(false); }
-    expect(isRetiredPath('/api/admin/catalog')).toBe(false);
+import { describe, expect, it } from "vitest";
+import { isRetiredPath, retiredPaths } from "./retired-routes";
+import * as registration from "@/app/api/auth/register/[[...path]]/route";
+import * as bills from "@/app/(retired)/bills/[[...path]]/route";
+import * as featured from "@/app/api/featured/[[...path]]/route";
+import { db } from "@/server/db";
+
+describe("retired server entry points", () => {
+  it("denies every retired subtree without intercepting active siblings", () => {
+    for (const path of retiredPaths) {
+      expect(isRetiredPath(path)).toBe(true);
+      expect(isRetiredPath(`${path}/child/deep`)).toBe(true);
+      expect(isRetiredPath(`${path}-new`)).toBe(false);
+    }
+    for (const path of ["/api/admin/catalog", "/api/auth/login", "/api/catalog", "/api/telegram/webhook"])
+      expect(isRetiredPath(path)).toBe(false);
   });
-  it('disables registration and featured data without middleware', () => {
-    expect(register().status).toBe(410);
-    expect(featured().status).toBe(410);
-  });
-  it('rejects retired page trees at server rendering', () => {
-    expect(() => BillsLayout()).toThrow('NEXT_NOT_FOUND');
-    expect(() => RegistrationLayout()).toThrow('NEXT_NOT_FOUND');
+  it("all methods deny directly without database access", () => {
+    const previous = vi.mocked(db.select).mock.calls.length;
+    for (const route of [registration, bills, featured]) {
+      for (const method of ["GET", "HEAD", "OPTIONS", "POST", "PUT", "PATCH", "DELETE"] as const) {
+        const response = route[method]();
+        expect(response.status).toBe(410);
+        expect(response.headers.get("cache-control")).toBe("no-store");
+      }
+    }
+    expect(vi.mocked(db.select).mock.calls.length).toBe(previous);
   });
 });

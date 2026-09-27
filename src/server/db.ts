@@ -5,11 +5,6 @@ import * as operationsSchema from '@/db/schema/directoryOperations'
 import * as directorySchema from '@/db/schema/directory'
 import * as usersSchema from '@/db/schema/users'
 import * as authSchema from '@/db/schema/auth'
-import * as collectionsSchema from '@/db/schema/collections'
-import * as marketplaceSchema from '@/db/schema/marketplace'
-import * as collaborationSchema from '@/db/schema/collaboration'
-import * as spaceSchema from '@/db/schema/space'
-import * as monthlyBillsSchema from '@/db/schema/monthlyBills'
 import * as rateLimitSchema from '@/db/schema/rateLimit'
 import { installPostgresSerializerGuards } from '@/server/postgres-serializers'
 
@@ -27,11 +22,6 @@ const database = drizzle(client, {
     ...directorySchema,
     ...operationsSchema,
     ...authSchema,
-    ...collectionsSchema,
-    ...marketplaceSchema,
-    ...collaborationSchema,
-    ...spaceSchema,
-    ...monthlyBillsSchema,
     ...rateLimitSchema,
   },
 })

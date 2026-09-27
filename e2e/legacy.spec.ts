@@ -1,2 +1,11 @@
-import {test,expect} from '@playwright/test'
-for(const path of ['/bills','/spaces','/me/collections','/tools','/marketplace','/api/featured','/api/me/subscriptions','/api/admin/collections/1'])test(`legacy route ${path} is retired`,async({request})=>{expect((await request.get(path)).status()).toBe(410)})
+import { test, expect } from "@playwright/test";
+import { retiredPaths } from "../src/lib/retired-routes";
+for (const path of retiredPaths) test(`retired boundary ${path}`, async ({ request }) => {
+  for (const suffix of ["", "/child/deep"]) {
+    for (const method of ["GET", "POST", "PATCH", "DELETE"]) {
+      const response = await request.fetch(`${path}${suffix}`, { method });
+      expect(response.status()).toBe(410);
+      expect(response.headers()["cache-control"]).toBe("no-store");
+    }
+  }
+});

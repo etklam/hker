@@ -1,4 +1,4 @@
-import type { AuthUser, Collection, Link as LinkType } from '@/lib/types'
+import type { AuthUser } from '@/lib/types'
 
 export const mockUser: AuthUser = {
   id: 1,
@@ -16,30 +16,7 @@ export const mockAdmin: AuthUser = {
   role: 'admin',
 }
 
-export const mockCollection: Collection = {
-  id: 1,
-  title: 'Test Collection',
-  description: 'A test collection',
-  icon: null,
-  visibility: 'private',
-  sortOrder: 0,
-  linkCount: 3,
-  access: 'owner',
-  createdAt: '2025-01-01T00:00:00.000Z',
-  updatedAt: '2025-01-01T00:00:00.000Z',
-}
 
-export const mockLink: LinkType = {
-  id: 1,
-  collectionId: 1,
-  title: 'Test Link',
-  url: 'https://example.com',
-  description: 'A test link',
-  faviconUrl: null,
-  sortOrder: 0,
-  createdAt: '2025-01-01T00:00:00.000Z',
-  updatedAt: '2025-01-01T00:00:00.000Z',
-}
 
 export const mockAuthIdentity = {
   id: 1,
@@ -63,58 +40,10 @@ export const mockSession = {
   lastSeenAt: new Date('2025-01-01'),
 }
 
-export const mockCollectionMember = {
-  id: 1,
-  collectionId: 1,
-  userId: 2,
-  role: 'editor' as const,
-  joinedAt: new Date('2025-01-01'),
-}
 
-export const mockMarketplaceListing = {
-  id: 1,
-  collectionId: 1,
-  publisherId: 1,
-  title: 'Test Collection',
-  description: null,
-  publishedAt: new Date('2025-01-01'),
-  subscriberCount: 5,
-  forkCount: 2,
-  publisherAnonymous: false,
-}
 
-export const mockSpace = {
-  id: 1,
-  name: 'Family Space',
-  ownerId: 1,
-  createdAt: new Date('2025-01-01'),
-  updatedAt: new Date('2025-01-01'),
-}
 
-export const mockFamilyTodoList = {
-  id: 1,
-  spaceId: 1,
-  title: 'Todo List',
-  sortOrder: 0,
-  createdAt: new Date('2025-01-01'),
-}
 
-export const mockFamilyTodo = {
-  id: 1,
-  listId: 1,
-  title: 'Test Todo',
-  description: null,
-  assignedTo: null,
-  priority: 'medium' as const,
-  dueDate: null,
-  completed: false,
-  completedAt: null,
-  completedBy: null,
-  sortOrder: 0,
-  createdBy: 1,
-  createdAt: new Date('2025-01-01'),
-  updatedAt: new Date('2025-01-01'),
-}
 
 export const mockDbUser = {
   id: 1,
