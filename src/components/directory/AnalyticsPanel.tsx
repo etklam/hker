@@ -133,7 +133,7 @@ export function AnalyticsPanel() {
         只計算獲准的明確操作，不代表獨立訪客、推薦、成交或商戶品質。敏感搜尋只加入隱藏總數，不保存文字；Telegram
         直接 URL 按鈕點擊不可觀測。
       </p>
-      <div className="form-grid">
+      <div className="form-grid field-row">
         <label>
           由
           <input

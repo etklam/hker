@@ -1,6 +1,6 @@
 export const metadata = { title: "私隱與資料使用", alternates: { canonical: "/privacy" } };
 export default function Privacy() {
-  return <article className="container detail"><h1>私隱與資料使用</h1>
+  return <article className="container prose"><h1>私隱與資料使用</h1>
     <p>瀏覽目錄不需要訪客帳戶。管理員登入使用伺服器 session 及 HttpOnly cookie；登出會撤銷該 session。限流與登入失敗紀錄用於保護服務。</p>
     <h2>目錄統計</h2><p>系統可收集搜尋、篩選、導覽、標籤及受保護外部連結的操作次數。搜尋內容經規則篩選，疑似電郵、電話等敏感內容會隱藏；這些規則不能保證辨識所有敏感內容，請勿在搜尋輸入私人資料。</p>
     <p>統計不是獨立訪客或成交數。每日鍵數有上限，超額歸入其他；統計收集失敗不代表主要操作失敗。去重收據保留約 7 日，彙總約 90 日，由分批維護清除，可能稍有延後。</p>

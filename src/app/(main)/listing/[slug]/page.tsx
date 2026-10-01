@@ -1,4 +1,5 @@
 import { ExternalActions } from "@/components/directory/ExternalActions";
+import { presentListingLink } from "@/lib/directory-links";
 import { notFound, permanentRedirect } from "next/navigation";
 import Link from "next/link";
 import { publicListingDetail } from "@/server/catalog/public-detail";
@@ -37,6 +38,7 @@ export default async function ListingDetail({
   const listing = await publicListingDetail(slug);
   if (!listing) notFound();
   if (listing.slug !== slug) permanentRedirect(`/listing/${listing.slug}${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`);
+  const visibleLinks = listing.links.filter((link) => presentListingLink(link));
   return (
     <div className="container">
       <article className="detail">
@@ -51,36 +53,48 @@ export default async function ListingDetail({
           </div>
           <h1>{listing.name}</h1>
           <p className="muted">{listing.shortDescription}</p>
-          <div className="price">{formatPrice(listing)}</div>
-          <div className="tag-list">
-            {listing.tags.map((t) => (
-              <span key={t.id}>
-                {t.filterable ? (
-                  <Link
-                    href={`/search?tags=${t.slug}`}
-                    data-catalog-kind="tag"
-                    data-catalog-key={t.id}
-                  >
-                    #{t.name}
-                  </Link>
-                ) : (
-                  `#${t.name}`
-                )}
-              </span>
-            ))}
-          </div>
+          {formatPrice(listing) && (
+            <div className="price">{formatPrice(listing)}</div>
+          )}
+          {listing.tags.length > 0 && (
+            <ul className="tag-list">
+              {listing.tags.map((t) => (
+                <li key={t.id}>
+                  {t.filterable ? (
+                    <Link
+                      href={`/search?tags=${t.slug}`}
+                      data-catalog-kind="tag"
+                      data-catalog-key={t.id}
+                    >
+                      #{t.name}
+                    </Link>
+                  ) : (
+                    `#${t.name}`
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
         </header>
         <div className="detail-body">{listing.description}</div>
-        <ExternalActions links={listing.links} />
+        {visibleLinks.length > 0 && (
+          <section className="detail-section">
+            <h2>外部連結</h2>
+            <ExternalActions links={visibleLinks} />
+          </section>
+        )}
         {Object.keys(listing.attrs).length > 0 && (
-          <dl className="attributes">
-            {Object.entries(listing.attrs).map(([key, value]) => (
-              <div key={key}>
-                <dt className="muted">{key}</dt>
-                <dd>{value}</dd>
-              </div>
-            ))}
-          </dl>
+          <section className="detail-section">
+            <h2>詳細資料</h2>
+            <dl className="attributes">
+              {Object.entries(listing.attrs).map(([key, value]) => (
+                <div key={key}>
+                  <dt className="muted">{key}</dt>
+                  <dd>{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
         )}
       </article>
     </div>

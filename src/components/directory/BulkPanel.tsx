@@ -81,8 +81,8 @@ export function BulkPanel({
         ? taxonomy.areas
         : taxonomy.tags;
   return (
-    <section aria-label="批次操作">
-      <p>
+    <section className="bulk-panel" aria-label="批次操作">
+      <p className="bulk-count">
         已選取 {selected.length} 項（含其他頁面，最多 200
         項）。更改搜尋或篩選會清除選取。
       </p>
@@ -170,32 +170,36 @@ export function BulkPanel({
           預覽批次變更
         </button>
       </div>
-      {message && <p role="alert">{message}</p>}
+      {message && <p role="alert" className="error-message">{message}</p>}
       {plan && (
         <>
           <ContentPlanReview plan={plan} />
-          {!plan.result && (
+          <div className="toolbar">
+            {!plan.result && (
+              <button
+                className="button primary"
+                disabled={busy}
+                onClick={() => void commit()}
+              >
+                確認變更 {plan.payload.rows?.length} 項
+              </button>
+            )}
             <button
-              className="button primary"
+              className="button"
               disabled={busy}
-              onClick={() => void commit()}
+              onClick={async () => {
+                try {
+                  setPlan(await contentRequest(undefined, plan.id));
+                } catch (error) {
+                  setMessage(
+                    error instanceof Error ? error.message : "查詢失敗",
+                  );
+                }
+              }}
             >
-              確認變更 {plan.payload.rows?.length} 項
+              查詢操作狀態
             </button>
-          )}
-          <button
-            className="button"
-            disabled={busy}
-            onClick={async () => {
-              try {
-                setPlan(await contentRequest(undefined, plan.id));
-              } catch (error) {
-                setMessage(error instanceof Error ? error.message : "查詢失敗");
-              }
-            }}
-          >
-            查詢操作狀態
-          </button>
+          </div>
         </>
       )}
     </section>

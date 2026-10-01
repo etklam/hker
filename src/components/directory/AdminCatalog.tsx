@@ -256,7 +256,7 @@ export function AdminCatalog({ section }: { section: Section }) {
       {error && (
         <p role="alert" className="error-message">
           {error}{" "}
-          <button className="button" onClick={() => void load()}>
+          <button className="button sm" onClick={() => void load()}>
             重試
           </button>
         </p>
@@ -327,56 +327,19 @@ export function AdminCatalog({ section }: { section: Section }) {
         />
       )}
       {loading ? (
-        <p role="status">正在載入…</p>
+        <div className="skeleton-table" role="status">
+          <span className="vh">正在載入…</span>
+          {Array.from({ length: 6 }, (_, i) => (
+            <span key={i} className="skeleton-row" aria-hidden="true" />
+          ))}
+        </div>
       ) : manageable ? (
         <>
-          {(section === "listings" || section === "navigation") && (
-            <p className="muted">
-              上移／下移只更新此頁可見項目，其他頁面與篩選外項目的排序數字保持不變。
-            </p>
-          )}
-          {preview && <p role="status">{preview}</p>}
-          {section === "listings" && <HistoryPanel />}
-          {section === "listings" && (
-            <button
-              className="button"
-              disabled={mutationBusy}
-              onClick={async () => {
-                try {
-                  const response = await fetch(
-                    `/api/admin/catalog?${new URLSearchParams({ q: query, ...filters, selection: "1" })}`,
-                  );
-                  const data = await response.json();
-                  if (!response.ok) throw new Error(data.message);
-                  setSelected(data);
-                } catch (error) {
-                  setError(error instanceof Error ? error.message : "選取失敗");
-                }
-              }}
-            >
-              選取所有符合項目（上限 200）
-            </button>
-          )}
-
-          {section === "listings" && selected.length > 0 && (
-            <p>
-              <a
-                href={`/api/admin/catalog/export?format=json&ids=${selected.map((row) => row.id).join(",")}`}
-              >
-                匯出所選 JSON
-              </a>{" "}
-              ·{" "}
-              <a
-                href={`/api/admin/catalog/export?format=csv&ids=${selected.map((row) => row.id).join(",")}`}
-              >
-                匯出所選 CSV（試算表檢視）
-              </a>
-            </p>
-          )}
+          {preview && <p role="status" className="notice">{preview}</p>}
           {section === "listings" && (
             <div className="toolbar">
               <button
-                className="button"
+                className="button sm"
                 onClick={() => {
                   setFilters({ ...filters, status: "disabled" });
                   setPage(1);
@@ -385,7 +348,7 @@ export function AdminCatalog({ section }: { section: Section }) {
                 未發佈內容
               </button>
               <button
-                className="button"
+                className="button sm"
                 onClick={() => {
                   setFilters({ ...filters, sort: "updated" });
                   setPage(1);
@@ -393,7 +356,50 @@ export function AdminCatalog({ section }: { section: Section }) {
               >
                 最近變更
               </button>
+              <button
+                className="button sm"
+                disabled={mutationBusy}
+                onClick={async () => {
+                  try {
+                    const response = await fetch(
+                      `/api/admin/catalog?${new URLSearchParams({ q: query, ...filters, selection: "1" })}`,
+                    );
+                    const data = await response.json();
+                    if (!response.ok) throw new Error(data.message);
+                    setSelected(data);
+                  } catch (error) {
+                    setError(
+                      error instanceof Error ? error.message : "選取失敗",
+                    );
+                  }
+                }}
+              >
+                選取所有符合項目（上限 200）
+              </button>
             </div>
+          )}
+          {section === "listings" && selected.length > 0 && (
+            <p className="selection-bar">
+              已選 <span className="num">{selected.length}</span> 項 ·{" "}
+              <a
+                className="text-link"
+                href={`/api/admin/catalog/export?format=json&ids=${selected.map((row) => row.id).join(",")}`}
+              >
+                匯出所選 JSON
+              </a>{" "}
+              ·{" "}
+              <a
+                className="text-link"
+                href={`/api/admin/catalog/export?format=csv&ids=${selected.map((row) => row.id).join(",")}`}
+              >
+                匯出所選 CSV（試算表檢視）
+              </a>
+            </p>
+          )}
+          {(section === "listings" || section === "navigation") && (
+            <p className="hint">
+              上移／下移只更新此頁可見項目，其他頁面與篩選外項目的排序數字保持不變。
+            </p>
           )}
           <div className="table-wrap">
             {section === "navigation" && (
@@ -536,12 +542,13 @@ export function AdminCatalog({ section }: { section: Section }) {
                         </span>
                       </td>
                       <td data-label="排序">
-                        {r.sortOrder}
+                        <span className="sort-cell">
+                        <span className="num">{r.sortOrder}</span>
                         {(section === "listings" || section === "navigation") &&
                           [-1, 1].map((direction) => (
                             <button
                               key={direction}
-                              className="button"
+                              className="button sm quiet"
                               aria-label={`${direction < 0 ? "上移" : "下移"}${r.name ?? r.label}`}
                               disabled={
                                 mutationBusy ||
@@ -569,9 +576,10 @@ export function AdminCatalog({ section }: { section: Section }) {
                                 });
                               }}
                             >
-                              {direction < 0 ? "上移" : "下移"}
+                              {direction < 0 ? "↑" : "↓"}
                             </button>
                           ))}
+                        </span>
                       </td>
                       {section === "listings" && (
                         <td data-label="更新">
@@ -579,9 +587,9 @@ export function AdminCatalog({ section }: { section: Section }) {
                         </td>
                       )}
                       <td data-label="操作">
-                        {section === "listings" && <HistoryPanel id={r.id} />}
+                        <div className="row-actions">
                         <button
-                          className="button"
+                          className="button sm"
                           onClick={(event) =>
                             start(
                               row as unknown as EditorValue,
@@ -590,9 +598,9 @@ export function AdminCatalog({ section }: { section: Section }) {
                           }
                         >
                           編輯
-                        </button>{" "}
+                        </button>
                         <button
-                          className="button"
+                          className="button sm"
                           disabled={mutationBusy}
                           onClick={() =>
                             void mutate({
@@ -611,12 +619,12 @@ export function AdminCatalog({ section }: { section: Section }) {
                             : r.enabled
                               ? "停用"
                               : "啟用"}
-                        </button>{" "}
+                        </button>
                         {section === "navigation" &&
                           (["public", "bot"] as const).map((audience) => (
                             <button
                               key={audience}
-                              className="button"
+                              className="button sm"
                               onClick={async () => {
                                 try {
                                   const response = await fetch(
@@ -645,11 +653,13 @@ export function AdminCatalog({ section }: { section: Section }) {
                             </button>
                           ))}
                         <button
-                          className="button danger"
+                          className="button sm danger"
                           onClick={() => void remove(r.id)}
                         >
                           刪除
                         </button>
+                        {section === "listings" && <HistoryPanel id={r.id} />}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -657,7 +667,14 @@ export function AdminCatalog({ section }: { section: Section }) {
               </tbody>
             </table>
             {!rows.length && (
-              <p className="empty">未有項目。新增第一個{labels[section]}。</p>
+              <div className="empty">
+                <h3>未有項目</h3>
+                <p>
+                  {section === "listings"
+                    ? "目前沒有符合條件的收錄。清除搜尋與篩選，或新增第一筆收錄。"
+                    : `${labels[section]}仍是空的。新增第一個項目後，公開目錄與 Telegram 便會同步採用。`}
+                </p>
+              </div>
             )}
           </div>
           {section === "listings" && (
@@ -681,6 +698,12 @@ export function AdminCatalog({ section }: { section: Section }) {
               </button>
             </div>
           )}
+          {section === "listings" && (
+            <div className="log-block">
+              <HistoryPanel />
+            </div>
+          )}
+
         </>
       ) : null}
       {section === "imports" && <ImportPanel />}
@@ -689,7 +712,7 @@ export function AdminCatalog({ section }: { section: Section }) {
         <>
           <h2>部署設定狀態</h2>
           {deployment ? (
-            <dl>
+            <dl className="spec-list">
               <dt>公開網站網址</dt>
               <dd>{deployment.publicUrlConfigured ? "已設定" : "尚未設定"}</dd>
               <dt>Telegram Bot</dt>

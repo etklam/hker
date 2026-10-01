@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getServerUser } from "@/server/auth";
-const sections = [
+import { AdminNav } from "@/components/directory/AdminNav";
+const sections: [string, string][] = [
   ["", "概覽"],
   ["listings", "收錄管理"],
   ["categories", "分類"],
@@ -21,21 +21,14 @@ export default async function AdminLayout({
   const user = await getServerUser();
   if (!user) redirect("/login");
   if (!["admin", "superadmin"].includes(user.role)) redirect("/");
-  const nav = (
-    <nav aria-label="管理導覽">
-      {sections.map(([path, name]) => (
-        <Link key={path} href={`/admin${path ? `/${path}` : ""}`}>
-          {name}
-        </Link>
-      ))}
-    </nav>
-  );
   return (
     <div className="admin-shell">
-      <aside className="admin-sidebar">{nav}</aside>
+      <aside className="admin-sidebar">
+        <AdminNav sections={sections} />
+      </aside>
       <details className="admin-menu">
         <summary>管理選單</summary>
-        {nav}
+        <AdminNav sections={sections} />
       </details>
       <div className="admin-content">{children}</div>
     </div>

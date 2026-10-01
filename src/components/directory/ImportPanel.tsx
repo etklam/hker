@@ -112,17 +112,17 @@ export function ImportPanel() {
       (!row.warnings.length || decisions[row.row] === "accept"),
   );
   return (
-    <>
+    <div className="import-panel">
       <p>
         上傳或貼上 → 預覽及處理警告 → 重新預覽選取內容 →
         確認。新收錄一律建立草稿。上限 200 行／500 KB，僅接受 UTF-8。
       </p>
       <p>
-        <a href="/directory-import-simple-v2.csv" download>
+        <a className="text-link" href="/directory-import-simple-v2.csv" download>
           簡易 CSV 範本
         </a>{" "}
         ·{" "}
-        <a href="/directory-import-advanced-v2.csv" download>
+        <a className="text-link" href="/directory-import-advanced-v2.csv" download>
           進階 CSV 範本
         </a>
       </p>
@@ -451,6 +451,6 @@ export function ImportPanel() {
             </p>
           ))}
       </details>
-    </>
+    </div>
   );
 }
