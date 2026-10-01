@@ -17,7 +17,7 @@ export default async function RootLayout({
     <html lang="zh-HK">
       <body>
         {deployment === "staging" && (
-          <div className="border-b border-amber-300 bg-amber-50 px-4 py-2 text-center text-sm font-medium text-amber-950" role="status">
+          <div className="deploy-banner" role="status">
             測試環境 · 資料可能會重設，內容不代表正式目錄
           </div>
         )}

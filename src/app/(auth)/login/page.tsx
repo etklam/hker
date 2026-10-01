@@ -1,4 +1,71 @@
-'use client'
-import {useState} from 'react'
-import Link from 'next/link'
-export default function Login(){const[error,setError]=useState('');const[busy,setBusy]=useState(false);return <div className="login-panel"><Link className="brand" href="/">HKER</Link><h1>管理員登入</h1><p className="muted">登入以管理香港生活目錄。</p><form onSubmit={async e=>{e.preventDefault();setBusy(true);setError('');const form=new FormData(e.currentTarget);try{const response=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:form.get('email'),password:form.get('password')})});const result=await response.json();if(!response.ok)throw new Error(result.message??'登入失敗');if(!['admin','superadmin'].includes(result.user.role))throw new Error('此帳戶沒有管理員權限');window.location.assign('/admin')}catch(e){setError(e instanceof Error?e.message:'登入失敗，請重試')}finally{setBusy(false)}}}><label>電郵<input name="email" type="email" autoComplete="username" required/></label><label>密碼<input name="password" type="password" autoComplete="current-password" required/></label>{error&&<p className="error-message" role="alert">{error}</p>}<button disabled={busy} className="button primary">{busy?'登入中…':'登入'}</button></form></div>}
+"use client";
+import { useState } from "react";
+import Link from "next/link";
+
+export default function Login() {
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="login-panel">
+      <Link className="brand" href="/">
+        HKER<span>香港生活目錄</span>
+      </Link>
+      <h1>管理員登入</h1>
+      <p>登入以管理香港生活目錄。此頁只供管理員使用，目錄本身無需帳戶即可瀏覽。</p>
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setBusy(true);
+          setError("");
+          const form = new FormData(e.currentTarget);
+          try {
+            const response = await fetch("/api/auth/login", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                email: form.get("email"),
+                password: form.get("password"),
+              }),
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.message ?? "登入失敗");
+            if (!["admin", "superadmin"].includes(result.user.role))
+              throw new Error("此帳戶沒有管理員權限");
+            window.location.assign("/admin");
+          } catch (e) {
+            setError(e instanceof Error ? e.message : "登入失敗，請重試");
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <label>
+          電郵
+          <input name="email" type="email" autoComplete="username" required />
+        </label>
+        <label>
+          密碼
+          <input
+            name="password"
+            type="password"
+            autoComplete="current-password"
+            required
+          />
+        </label>
+        {error && (
+          <p className="error-message" role="alert">
+            {error}
+          </p>
+        )}
+        <button disabled={busy} className="button primary">
+          {busy ? "登入中…" : "登入"}
+        </button>
+      </form>
+      <p className="login-foot">
+        <Link href="/" className="text-link">
+          返回公開目錄
+        </Link>
+      </p>
+    </div>
+  );
+}

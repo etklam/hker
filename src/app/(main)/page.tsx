@@ -3,11 +3,12 @@ import { CatalogSearchService, getTaxonomy } from "@/server/catalog/service";
 import { ListingResults } from "@/components/directory/ListingCard";
 export const dynamic = "force-dynamic";
 export default async function HomePage() {
-  const [featured, taxonomy] = await Promise.all([
+  const [featured, newest, taxonomy] = await Promise.all([
     CatalogSearchService.search({ featured: true, pageSize: 6 }),
+    CatalogSearchService.search({ sort: "newest", pageSize: 6 }),
     getTaxonomy(),
   ]);
-  const result = featured.total ? featured : await CatalogSearchService.search({ sort: "newest", pageSize: 6 });
+  const result = featured.total ? featured : newest;
   return (
     <div className="container">
       <section className="hero">
@@ -25,12 +26,11 @@ export default async function HomePage() {
           />
           <button className="button primary">搜尋</button>
         </form>
-        <div className="chips">
+        <nav className="quicklinks" aria-label="快速瀏覽">
           {taxonomy.navigation
             .filter((p) => p.available)
             .map((p) => (
               <Link
-                className="chip"
                 key={p.id}
                 href={`/search?preset=${p.id}`}
                 data-catalog-kind="preset"
@@ -40,24 +40,24 @@ export default async function HomePage() {
               </Link>
             ))}
           {taxonomy.categories.slice(0, 6).map((c) => (
-            <Link
-              className="chip"
-              href={`/search?category=${c.slug}`}
-              key={c.id}
-            >
+            <Link href={`/search?category=${c.slug}`} key={c.id}>
               {c.name}
             </Link>
           ))}
-        </div>
+        </nav>
       </section>
       <section>
         <div className="section-heading">
           <h2>{featured.total ? "精選推薦" : "最新收錄"}</h2>
-          <Link href="/search" className="text-link">
-            瀏覽全部 →
-          </Link>
+          {newest.total > 0 && (
+            <Link href="/search" className="text-link">
+              <span className="num">{newest.total}</span> 項收錄 · 全部瀏覽
+            </Link>
+          )}
         </div>
-        {result.total ? <ListingResults items={result.items} /> : (
+        {result.total ? (
+          <ListingResults items={result.items} markFeatured={!featured.total} />
+        ) : (
           <div className="empty"><h3>目錄準備中</h3><p className="muted">我們正在整理值得推薦的地方與服務，請稍後再來看看。</p></div>
         )}
       </section>

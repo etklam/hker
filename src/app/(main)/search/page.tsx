@@ -89,6 +89,7 @@ export default async function SearchPage({
       />
       <div className="page-heading">
         <h1>探索香港生活目錄</h1>
+        <p>直接搜尋關鍵字，或用分類、地區同標籤收窄範圍。</p>
       </div>
       <SearchForm key={searchToParams(formInput).toString()} input={formInput}>
         <div className="search-bar">
@@ -194,9 +195,7 @@ export default async function SearchPage({
           <section className="results">
             <div className="results-count">
               <span>{result.total} 個結果</span>
-              <span className="muted">
-                {input.query && `「${input.query}」`}
-              </span>
+              {input.query && <span className="muted">「{input.query}」</span>}
             </div>
             <div className="active-filters" aria-label="已套用篩選">
               {[
