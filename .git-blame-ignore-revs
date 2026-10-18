@@ -6,3 +6,5 @@
 # Add the SHA of any commit that only reformats. When the repo-wide Prettier
 # adoption lands, append its commit SHA below with a one-line comment, e.g.
 #   <sha>  style: adopt Prettier across the repo
+
+d42f30170383e86cb5325b05f1ae2d6c908efdbe  style: adopt Prettier across the repo
