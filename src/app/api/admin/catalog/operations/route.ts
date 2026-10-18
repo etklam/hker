@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { withAdmin } from "@/server/api-helpers";
 import { catalogResponse, readJsonBody } from "@/server/catalog/http";
+import { catalogMutation } from "@/server/catalog/cache";
 import {
   bulkSchema,
   commitContentPlan,
@@ -22,7 +23,7 @@ export const GET = withAdmin(async (req, { user }) =>
   ),
 );
 export const POST = withAdmin(async (req, { user }) =>
-  catalogResponse(async () => {
+  catalogMutation(async () => {
     const body = z
       .discriminatedUnion("action", [
         z.object({

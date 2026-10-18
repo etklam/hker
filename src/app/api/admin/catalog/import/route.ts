@@ -1,7 +1,8 @@
 import { AppError } from "@/lib/errors";
 import { z } from "zod";
 import { withAdmin } from "@/server/api-helpers";
-import { catalogResponse, readJsonBody } from "@/server/catalog/http";
+import { readJsonBody } from "@/server/catalog/http";
+import { catalogMutation } from "@/server/catalog/cache";
 import {
   commitContentPlan,
   importSettingsSchema,
@@ -9,7 +10,7 @@ import {
 } from "@/server/catalog/content-plans";
 // Preserve legacy CSV fields while using the same expiring, actor-bound reviewed plans.
 export const POST = withAdmin(async (req, { user }) =>
-  catalogResponse(async () => {
+  catalogMutation(async () => {
     const body = z
       .object({
         csv: z.string().max(500000),

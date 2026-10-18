@@ -18,6 +18,7 @@ import {
 } from "@/server/catalog/service";
 import { searchFromParams } from "@/lib/directory";
 import { catalogResponse, readJsonBody } from "@/server/catalog/http";
+import { catalogMutation } from "@/server/catalog/cache";
 import { parseBody } from "@/schemas/parse-body";
 const mutation = z.object({
   kind: z.enum([
@@ -35,7 +36,8 @@ const mutation = z.object({
 export const GET = withAdmin(async (req) =>
   catalogResponse(async () => {
     const params = req.nextUrl.searchParams;
-    if (params.get("selection") === "1") return matchingSelection(searchFromParams(params));
+    if (params.get("selection") === "1")
+      return matchingSelection(searchFromParams(params));
     if (params.get("slugName")) {
       const kind = parseBody(
         params.get("kind"),
@@ -64,11 +66,21 @@ export const GET = withAdmin(async (req) =>
           message: "此導覽未啟用、網站不可見，或包含停用條件；請檢查設定。",
         };
       const resolved = resolveNavigationPreset(preset, taxonomy, audience);
-      if (!resolved.available) return { available: false, message: resolved.reason };
-      const result = await CatalogSearchService.search(resolved.search, audience);
+      if (!resolved.available)
+        return { available: false, message: resolved.reason };
+      const result = await CatalogSearchService.search(
+        resolved.search,
+        audience,
+      );
       return {
         available: true,
-        summary: { ...resolved.search, matchDescription: resolved.search.tagMatchMode === "or" ? "符合任一標籤" : "符合所有標籤" },
+        summary: {
+          ...resolved.search,
+          matchDescription:
+            resolved.search.tagMatchMode === "or"
+              ? "符合任一標籤"
+              : "符合所有標籤",
+        },
         total: result.total,
         items: result.items.slice(0, 3).map((item) => item.name),
       };
@@ -79,7 +91,7 @@ export const GET = withAdmin(async (req) =>
   }),
 );
 export const PATCH = withAdmin(async (req, { user }) =>
-  catalogResponse(async () => {
+  catalogMutation(async () => {
     const value = parseBody(
       await readJsonBody(req),
       z.discriminatedUnion("action", [
@@ -131,29 +143,40 @@ export const PATCH = withAdmin(async (req, { user }) =>
           "排序項目不一致",
         ),
     );
-    return reorderVisible(value.kind, value.entries, value.ids, { actorId: user.id });
+    return reorderVisible(value.kind, value.entries, value.ids, {
+      actorId: user.id,
+    });
   }),
 );
 export const POST = withAdmin(async (req, { user }) =>
-  catalogResponse(async () => {
-    const { kind, id, data, requestKey } = parseBody(await readJsonBody(req), mutation);
-    if (kind === "listings" && !requestKey) throw new AppError("INVALID_REQUEST", "儲存收錄需要 requestKey，請重新開啟編輯器。");
+  catalogMutation(async () => {
+    const { kind, id, data, requestKey } = parseBody(
+      await readJsonBody(req),
+      mutation,
+    );
+    if (kind === "listings" && !requestKey)
+      throw new AppError(
+        "INVALID_REQUEST",
+        "儲存收錄需要 requestKey，請重新開啟編輯器。",
+      );
     return kind === "listings"
       ? saveListingWithReceipt(data, id, user.id, requestKey!)
       : saveTaxonomy(kind, data, id, { actorId: user.id });
   }),
 );
 export const DELETE = withAdmin(async (req, { user }) =>
-  catalogResponse(async () => {
+  catalogMutation(async () => {
     const { kind, id, revision } = parseBody(
       await readJsonBody(req),
-      mutation.omit({ data: true }).extend({ id: z.number().int().positive(), revision: z.number().int().positive().optional() }),
+      mutation.omit({ data: true }).extend({
+        id: z.number().int().positive(),
+        revision: z.number().int().positive().optional(),
+      }),
     );
     if (kind === "listings") {
       if (!revision) throw new AppError("CONFLICT", "請重新載入最新收錄");
       await deleteListing(id, revision, { actorId: user.id });
-    }
-    else await deleteTaxonomy(kind, id, { actorId: user.id });
+    } else await deleteTaxonomy(kind, id, { actorId: user.id });
     return { ok: true };
   }),
 );
