@@ -76,7 +76,17 @@ Earlier browser attempts were20/23, then25/26: selectors accidentally included R
 
 `scripts/bot-explain.sql` measures a10,000-row synthetic Bot journal EXPLAIN used the new due/conversation indexes: due query0.117ms and prior-conversation lookup0.054ms. All inserted rows rolled back. 0005 adds only supporting delivery/retention/alias lookup indexes; existing migrations remain immutable. Run ANALYZE after a large import in operations planning.
 
-Inspected actual PNG artifacts (local, ignored by Git): `.impeccable/review/release/{public,search,admin,editor}-{390,768,1440}.png`. Public blue/white hierarchy, real data-only cards, mobile full-screen editor, readable focus rings, long-name containment and no page-width overflow checked. Reference images were not available, so no pixel-level match claim is made. Screenshot evidence is synthetic, not real Hong Kong business data.
+Inspected actual PNG artifacts (local, ignored by Git): `.impeccable/review/release/{public,search,admin,editor}-{390,768,1440}.png`. Public enamel/plate hierarchy, real data-only index rows, mobile full-screen editor, readable focus rings, long-name containment and no page-width overflow checked. Reference images were not available, so no pixel-level match claim is made. Screenshot evidence is synthetic, not real Hong Kong business data.
+
+## Public read caching
+
+Public reads now go through `src/server/catalog/cache.ts` (`unstable_cache`, tag `catalog`) instead of hitting Postgres per request: taxonomy on home/categories/tags/search and the public catalog API, the home board's two fixed queries, and listing detail. Pages stay `force-dynamic` — the image is built without database access, so nothing can be statically generated and the route was never the right cache layer.
+
+Only the default `public` audience with the default executor is cached. Admin and bot reads pass an explicit audience and transactional reads pass an executor, so neither can populate or read a shared entry. Invalidation is attached to `catalogMutation`, which wraps the five writing admin catalog handlers (`PATCH`/`POST`/`DELETE` on `/api/admin/catalog`, `POST` on `operations` and `import`) and drops the tag only after the work resolves; `src/server/catalog/cache.test.ts` covers fire-on-success and no-fire on both `AppError` and driver-code failures. A 300s `revalidate` bounds any missed invalidation.
+
+Behavioural consequence to accept or reject at review: a public reader can see catalog state up to 300s stale if a tag drop is ever missed, and cache entries are per-instance for a multi-replica deployment. **Cache behaviour under a real server was not executed** — no live Postgres locally — so hit/miss and post-write freshness still need confirming in the fixture run.
+
+The street-plate surface replacing the signage index was reviewed on a standalone static harness rendering the shipped `globals.css` against representative markup, not on the fixture app: all 31 token pairs were computed from OKLCH to WCAG contrast (every pair at or above its 4.5:1 / 3:1 floor), and `scrollWidth <= innerWidth` was confirmed at 320/390/768/1024/1440 for home, search, detail, categories and admin. Typecheck, lint, the 221-test unit suite and a production build pass. The Playwright fixture suite was **not** re-run for this change — it needs a live Postgres, which was unavailable locally — so the e2e contract was preserved by inspection of the specs' selectors rather than by execution. Re-run `npm run test:acceptance` on Node 24 before release.
 
 ## Dependency applicability
 
