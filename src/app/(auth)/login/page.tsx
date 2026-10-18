@@ -8,10 +8,13 @@ export default function Login() {
   return (
     <div className="login-panel">
       <Link className="brand" href="/">
-        HKER<span>香港生活目錄</span>
+        <span className="brand-plate">HKER</span>
+        <span className="brand-name">香港生活目錄</span>
       </Link>
       <h1>管理員登入</h1>
-      <p>登入以管理香港生活目錄。此頁只供管理員使用，目錄本身無需帳戶即可瀏覽。</p>
+      <p>
+        登入以管理香港生活目錄。此頁只供管理員使用，目錄本身無需帳戶即可瀏覽。
+      </p>
       <form
         onSubmit={async (e) => {
           e.preventDefault();

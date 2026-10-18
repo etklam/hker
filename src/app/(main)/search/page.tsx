@@ -2,7 +2,8 @@ import { AppError } from "@/lib/errors";
 import { guardPublicSearch } from "@/server/catalog/abuse";
 import { SearchForm } from "@/components/directory/SearchForm";
 import { Filters } from "@/components/directory/Filters";
-import { CatalogSearchService, getTaxonomy } from "@/server/catalog/service";
+import { CatalogSearchService } from "@/server/catalog/service";
+import { cachedTaxonomy } from "@/server/catalog/cache";
 import { ListingResults } from "@/components/directory/ListingCard";
 import { TagPicker } from "@/components/directory/TagPicker";
 import { CatalogSearchObservation } from "@/components/directory/CatalogEvents";
@@ -30,8 +31,12 @@ export default async function SearchPage({
     return (
       <div className="container page-heading">
         <h1>{limited ? "搜尋過於頻繁" : "搜尋服務暫時無法使用"}</h1>
-        <p>{limited ? "請稍候一分鐘再試。" : "目前未能載入資料，請稍後重試。"}</p>
-        <a href="" className="button">重試目前搜尋</a>
+        <p>
+          {limited ? "請稍候一分鐘再試。" : "目前未能載入資料，請稍後重試。"}
+        </p>
+        <a href="" className="button">
+          重試目前搜尋
+        </a>
       </div>
     );
   }
@@ -40,7 +45,7 @@ export default async function SearchPage({
   for (const [k, v] of Object.entries(values))
     if (v)
       for (const item of Array.isArray(v) ? v : [v]) params.append(k, item);
-  const taxonomy = await getTaxonomy();
+  const taxonomy = await cachedTaxonomy();
   let input: SearchState;
   try {
     input = resolveSearchParams(params, taxonomy);
@@ -89,6 +94,7 @@ export default async function SearchPage({
       />
       <div className="page-heading">
         <h1>探索香港生活目錄</h1>
+        <p className="latin-lead">Browse the Directory</p>
         <p>直接搜尋關鍵字，或用分類、地區同標籤收窄範圍。</p>
       </div>
       <SearchForm key={searchToParams(formInput).toString()} input={formInput}>
@@ -132,6 +138,7 @@ export default async function SearchPage({
                 taxonomy={taxonomy}
                 selected={input.tagIds}
               />
+              {/* Full width: these option labels truncate in a half column. */}
               <label>
                 標籤配對
                 <select name="tagMatchMode" defaultValue={input.tagMatchMode}>
@@ -152,33 +159,60 @@ export default async function SearchPage({
                   <option value="false">非精選</option>
                 </select>
               </label>
-              <label>
-                最低預算（HK$）
-                <input
-                  type="number"
-                  name="priceMin"
-                  min="0"
-                  step="0.01"
-                  defaultValue={input.priceMin ?? ""}
-                />
-              </label>
-              <label>
-                最高預算（HK$）
-                <input
-                  type="number"
-                  name="priceMax"
-                  min="0"
-                  step="0.01"
-                  defaultValue={input.priceMax ?? ""}
-                />
-              </label>
-              <p className="muted">
-                預算與 HKD 價格範圍重疊即符合，僅供參考，並非最終帳單。
+              {/* Min and max are one range, so they read as one control. */}
+              <fieldset className="price-range">
+                <legend>預算（HK$）</legend>
+                <div className="field-pair">
+                  <label>
+                    最低<span className="vh">預算（HK$）</span>
+                    <input
+                      type="number"
+                      name="priceMin"
+                      min="0"
+                      step="0.01"
+                      inputMode="decimal"
+                      placeholder="0"
+                      defaultValue={input.priceMin ?? ""}
+                    />
+                  </label>
+                  <label>
+                    最高<span className="vh">預算（HK$）</span>
+                    <input
+                      type="number"
+                      name="priceMax"
+                      min="0"
+                      step="0.01"
+                      inputMode="decimal"
+                      placeholder="不限"
+                      defaultValue={input.priceMax ?? ""}
+                    />
+                  </label>
+                </div>
+                <p className="muted">
+                  預算與 HKD 價格範圍重疊即符合，僅供參考，並非最終帳單。
+                </p>
+              </fieldset>
+              <div className="filter-apply">
+                <button className="button primary">套用篩選</button>
+                <a href="/search" className="text-link">
+                  清除全部
+                </a>
+              </div>
+            </div>
+          </Filters>
+          <section className="results">
+            {/* Sort orders results, so it belongs over the results. */}
+            <div className="results-count">
+              <p>
+                <span className="num">{result.total}</span> 個結果
+                {input.query && (
+                  <span className="muted">　「{input.query}」</span>
+                )}
               </p>
-              <label>
+              <label className="sort-control">
                 排序
                 <select name="sort" defaultValue={formInput.sort ?? ""}>
-                  <option value="">自動（搜尋用相關度，瀏覽用推薦）</option>
+                  <option value="">自動（相關度／推薦）</option>
                   <option value="manual">推薦排序</option>
                   <option value="relevance">相關程度</option>
                   <option value="newest">最新收錄</option>
@@ -186,16 +220,6 @@ export default async function SearchPage({
                   <option value="price-desc">價格由高至低</option>
                 </select>
               </label>
-              <button className="button primary">套用篩選</button>
-              <a href="/search" className="text-link">
-                清除全部
-              </a>
-            </div>
-          </Filters>
-          <section className="results">
-            <div className="results-count">
-              <span>{result.total} 個結果</span>
-              {input.query && <span className="muted">「{input.query}」</span>}
             </div>
             <div className="active-filters" aria-label="已套用篩選">
               {[
@@ -238,7 +262,8 @@ export default async function SearchPage({
                 next.delete("page");
                 return (
                   <a key={filter.key} className="chip" href={`/search?${next}`}>
-                    移除 {filter.label}
+                    <span className="vh">移除 </span>
+                    {filter.label}
                   </a>
                 );
               })}
@@ -250,7 +275,8 @@ export default async function SearchPage({
                 });
                 return (
                   <a key={id} className="chip" href={`/search?${next}`}>
-                    移除 {taxonomy.tags.find((t) => t.id === id)?.name}
+                    <span className="vh">移除 </span>
+                    {taxonomy.tags.find((t) => t.id === id)?.name}
                   </a>
                 );
               })}
@@ -271,7 +297,10 @@ export default async function SearchPage({
                 </a>
               </div>
             ) : (
-              <ListingResults returnTo={pageUrl(input.page)} items={result.items} />
+              <ListingResults
+                returnTo={pageUrl(input.page)}
+                items={result.items}
+              />
             )}
             <nav className="pagination" aria-label="搜尋分頁">
               {input.page > 1 && (

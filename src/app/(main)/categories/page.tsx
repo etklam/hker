@@ -1,13 +1,14 @@
 import Link from "next/link";
-import { getTaxonomy } from "@/server/catalog/service";
+import { cachedTaxonomy } from "@/server/catalog/cache";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "分類" };
 export default async function Categories() {
-  const { categories } = await getTaxonomy();
+  const { categories } = await cachedTaxonomy();
   return (
     <div className="container">
       <div className="page-heading">
         <h1>按分類探索</h1>
+        <p className="latin-lead">Categories</p>
         <p>找到你需要的地方、服務與資源。</p>
       </div>
       {categories.length ? (
@@ -22,8 +23,12 @@ export default async function Categories() {
       ) : (
         <div className="empty">
           <h3>分類整理中</h3>
-          <p className="muted">管理員仍在編排分類。你可以先用關鍵字搜尋整個目錄。</p>
-          <Link href="/search" className="button">瀏覽全部收錄</Link>
+          <p className="muted">
+            管理員仍在編排分類。你可以先用關鍵字搜尋整個目錄。
+          </p>
+          <Link href="/search" className="button">
+            瀏覽全部收錄
+          </Link>
         </div>
       )}
     </div>

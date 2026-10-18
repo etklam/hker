@@ -5,6 +5,7 @@ import Link from "next/link";
 import { publicListingDetail } from "@/server/catalog/public-detail";
 import { searchReturnPath } from "@/lib/search-return";
 import { formatPrice } from "@/lib/directory";
+import { areaPlate, isPlateAttr, latinName } from "@/lib/plate";
 export const dynamic = "force-dynamic";
 export async function generateMetadata({
   params,
@@ -37,8 +38,16 @@ export default async function ListingDetail({
   const { slug } = await params;
   const listing = await publicListingDetail(slug);
   if (!listing) notFound();
-  if (listing.slug !== slug) permanentRedirect(`/listing/${listing.slug}${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`);
+  if (listing.slug !== slug)
+    permanentRedirect(
+      `/listing/${listing.slug}${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`,
+    );
   const visibleLinks = listing.links.filter((link) => presentListingLink(link));
+  const plate = areaPlate(listing.area);
+  const latin = latinName(listing.attrs);
+  const attributes = Object.entries(listing.attrs).filter(
+    ([key]) => !isPlateAttr(key),
+  );
   return (
     <div className="container">
       <article className="detail">
@@ -46,12 +55,27 @@ export default async function ListingDetail({
           ← 返回目錄
         </Link>
         <header className="detail-header">
-          <div className="listing-meta">
-            {[listing.area?.name, listing.category?.name]
-              .filter(Boolean)
-              .join(" · ")}
+          <div className="detail-plate">
+            {/* No featured variant here: with nothing to compare against, a
+                red plate reads as a claim about the district. */}
+            <span
+              className="plate"
+              data-fit={plate.fit}
+              data-online={plate.online || undefined}
+            >
+              {plate.label}
+            </span>
+            <div>
+              {(listing.featured || listing.category) && (
+                <div className="listing-meta">
+                  {listing.featured && <b className="featured-mark">精選</b>}
+                  {listing.category?.name}
+                </div>
+              )}
+              <h1>{listing.name}</h1>
+              {latin && <p className="latin">{latin}</p>}
+            </div>
           </div>
-          <h1>{listing.name}</h1>
           <p className="muted">{listing.shortDescription}</p>
           {formatPrice(listing) && (
             <div className="price">{formatPrice(listing)}</div>
@@ -66,10 +90,10 @@ export default async function ListingDetail({
                       data-catalog-kind="tag"
                       data-catalog-key={t.id}
                     >
-                      #{t.name}
+                      {t.name}
                     </Link>
                   ) : (
-                    `#${t.name}`
+                    t.name
                   )}
                 </li>
               ))}
@@ -83,11 +107,11 @@ export default async function ListingDetail({
             <ExternalActions links={visibleLinks} />
           </section>
         )}
-        {Object.keys(listing.attrs).length > 0 && (
+        {attributes.length > 0 && (
           <section className="detail-section">
             <h2>詳細資料</h2>
             <dl className="attributes">
-              {Object.entries(listing.attrs).map(([key, value]) => (
+              {attributes.map(([key, value]) => (
                 <div key={key}>
                   <dt className="muted">{key}</dt>
                   <dd>{value}</dd>
