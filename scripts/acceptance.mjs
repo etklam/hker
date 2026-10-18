@@ -6,7 +6,10 @@ import os from "node:os";
 import { join } from "node:path";
 import postgres from "postgres";
 import { chromium } from "@playwright/test";
-const runId = `${new Date().toISOString().replace(/[^0-9]/g, "").slice(0, 14)}-${randomBytes(3).toString("hex")}`;
+const runId = `${new Date()
+  .toISOString()
+  .replace(/[^0-9]/g, "")
+  .slice(0, 14)}-${randomBytes(3).toString("hex")}`;
 const evidence = join("artifacts/release-candidate/acceptance", runId);
 mkdirSync(evidence, { recursive: true });
 const git = (...args) =>

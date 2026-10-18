@@ -16,13 +16,40 @@ describe("deployment configuration contract", () => {
     expect(() => validateRuntimeEnv(local)).not.toThrow();
   });
   it("requires an explicit non-mock mode for production", () => {
-    expect(() => validateRuntimeEnv({ ...local, NODE_ENV: "production", APP_BASE_URL: "https://directory.example.test", AUTH_SESSION_COOKIE_NAME: "__Host-hker_session", TRUST_PROXY_HEADERS: "false", TELEGRAM_DELIVERY_MODE: undefined })).toThrow(/explicitly set/);
-    expect(() => validateRuntimeEnv({ ...local, NODE_ENV: "production", APP_BASE_URL: "https://directory.example.test", AUTH_SESSION_COOKIE_NAME: "__Host-hker_session", TRUST_PROXY_HEADERS: "false", TELEGRAM_DELIVERY_MODE: "mock" })).toThrow(/restricted/);
+    expect(() =>
+      validateRuntimeEnv({
+        ...local,
+        NODE_ENV: "production",
+        APP_BASE_URL: "https://directory.example.test",
+        AUTH_SESSION_COOKIE_NAME: "__Host-hker_session",
+        TRUST_PROXY_HEADERS: "false",
+        TELEGRAM_DELIVERY_MODE: undefined,
+      }),
+    ).toThrow(/explicitly set/);
+    expect(() =>
+      validateRuntimeEnv({
+        ...local,
+        NODE_ENV: "production",
+        APP_BASE_URL: "https://directory.example.test",
+        AUTH_SESSION_COOKIE_NAME: "__Host-hker_session",
+        TRUST_PROXY_HEADERS: "false",
+        TELEGRAM_DELIVERY_MODE: "mock",
+      }),
+    ).toThrow(/restricted/);
   });
   it("allows a worker without the web session secret but never permits an unknown mode", () => {
-    const worker = { DATABASE_URL: local.DATABASE_URL, APP_BASE_URL: "http://localhost:3000", TELEGRAM_DELIVERY_MODE: "disabled" };
+    const worker = {
+      DATABASE_URL: local.DATABASE_URL,
+      APP_BASE_URL: "http://localhost:3000",
+      TELEGRAM_DELIVERY_MODE: "disabled",
+    };
     expect(() => validateRuntimeEnv(worker, { role: "worker" })).not.toThrow();
-    expect(() => validateRuntimeEnv({ ...worker, TELEGRAM_DELIVERY_MODE: "mokk" }, { role: "worker" })).toThrow(/must be explicitly set/);
+    expect(() =>
+      validateRuntimeEnv(
+        { ...worker, TELEGRAM_DELIVERY_MODE: "mokk" },
+        { role: "worker" },
+      ),
+    ).toThrow(/must be explicitly set/);
   });
   it("requires webhook credentials only in the Web process for live delivery", () => {
     const staging = {
@@ -38,6 +65,11 @@ describe("deployment configuration contract", () => {
     };
     expect(() => validateRuntimeEnv(staging, { role: "worker" })).not.toThrow();
     expect(() => validateRuntimeEnv(staging)).toThrow(/webhook secret/);
-    expect(() => validateRuntimeEnv({ ...staging, TELEGRAM_WEBHOOK_SECRET: "test-secret" })).not.toThrow();
+    expect(() =>
+      validateRuntimeEnv({
+        ...staging,
+        TELEGRAM_WEBHOOK_SECRET: "test-secret",
+      }),
+    ).not.toThrow();
   });
 });

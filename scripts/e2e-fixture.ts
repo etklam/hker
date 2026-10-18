@@ -111,13 +111,56 @@ async function main() {
     tagIds: [tag.id, tag2.id],
     sortOrder: 20,
   });
-  const hiddenTag = await saveTaxonomy("tags", { name: "內部測試", slug: "internal-fixture", publicVisible: false, botVisible: false });
-  const displayTag = await saveTaxonomy("tags", { name: "展示標籤", slug: "display-fixture", filterable: false });
-  await saveListing({ name: "網站專用資源", slug: "website-only", enabled: true, priceMin: 0, priceMax: 0, tagIds: [hiddenTag.id, displayTag.id], links: [{ type: "website", label: "資源網站", url: "https://example.test/resource" }] });
-  await saveListing({ name: "外幣參考資源", slug: "foreign-currency", enabled: true, priceMin: 25, priceCurrency: "USD" });
-  await saveListing({ name: "同名資源", slug: "duplicate-name-one", enabled: true });
-  await saveListing({ name: "同名資源", slug: "duplicate-name-two", enabled: true });
-  await saveListing({ name: "長內容測試資源", slug: "long-content", enabled: true, description: "這是一段詳細的服務介紹，包含營業方式與使用須知。".repeat(100), shortDescription: "提供清楚的介紹與使用方法。".repeat(10) });
+  const hiddenTag = await saveTaxonomy("tags", {
+    name: "內部測試",
+    slug: "internal-fixture",
+    publicVisible: false,
+    botVisible: false,
+  });
+  const displayTag = await saveTaxonomy("tags", {
+    name: "展示標籤",
+    slug: "display-fixture",
+    filterable: false,
+  });
+  await saveListing({
+    name: "網站專用資源",
+    slug: "website-only",
+    enabled: true,
+    priceMin: 0,
+    priceMax: 0,
+    tagIds: [hiddenTag.id, displayTag.id],
+    links: [
+      {
+        type: "website",
+        label: "資源網站",
+        url: "https://example.test/resource",
+      },
+    ],
+  });
+  await saveListing({
+    name: "外幣參考資源",
+    slug: "foreign-currency",
+    enabled: true,
+    priceMin: 25,
+    priceCurrency: "USD",
+  });
+  await saveListing({
+    name: "同名資源",
+    slug: "duplicate-name-one",
+    enabled: true,
+  });
+  await saveListing({
+    name: "同名資源",
+    slug: "duplicate-name-two",
+    enabled: true,
+  });
+  await saveListing({
+    name: "長內容測試資源",
+    slug: "long-content",
+    enabled: true,
+    description: "這是一段詳細的服務介紹，包含營業方式與使用須知。".repeat(100),
+    shortDescription: "提供清楚的介紹與使用方法。".repeat(10),
+  });
   const preset = await saveTaxonomy("navigation", {
     label: "手機或即日",
     tagIds: [tag.id, tag2.id],

@@ -171,7 +171,14 @@ export function AdminCatalog({ section }: { section: Section }) {
       const res = await fetch("/api/admin/catalog", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind: section, id, revision: section === "listings" ? items.find(item => item.id === id)?.revision : undefined }),
+        body: JSON.stringify({
+          kind: section,
+          id,
+          revision:
+            section === "listings"
+              ? items.find((item) => item.id === id)?.revision
+              : undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok)
@@ -335,7 +342,11 @@ export function AdminCatalog({ section }: { section: Section }) {
         </div>
       ) : manageable ? (
         <>
-          {preview && <p role="status" className="notice">{preview}</p>}
+          {preview && (
+            <p role="status" className="notice">
+              {preview}
+            </p>
+          )}
           {section === "listings" && (
             <div className="toolbar">
               <button
@@ -543,42 +554,43 @@ export function AdminCatalog({ section }: { section: Section }) {
                       </td>
                       <td data-label="排序">
                         <span className="sort-cell">
-                        <span className="num">{r.sortOrder}</span>
-                        {(section === "listings" || section === "navigation") &&
-                          [-1, 1].map((direction) => (
-                            <button
-                              key={direction}
-                              className="button sm quiet"
-                              aria-label={`${direction < 0 ? "上移" : "下移"}${r.name ?? r.label}`}
-                              disabled={
-                                mutationBusy ||
-                                rowIndex + direction < 0 ||
-                                rowIndex + direction >= rows.length
-                              }
-                              onClick={() => {
-                                const ids = rows.map((item) => item.id);
-                                [ids[rowIndex], ids[rowIndex + direction]] = [
-                                  ids[rowIndex + direction],
-                                  ids[rowIndex],
-                                ];
-                                void mutate({
-                                  action: "reorder",
-                                  kind: section,
-                                  ids,
-                                  entries: rows.map((item) => ({
-                                    id: item.id,
-                                    sortOrder: item.sortOrder,
-                                    revision:
-                                      "revision" in item
-                                        ? item.revision
-                                        : undefined,
-                                  })),
-                                });
-                              }}
-                            >
-                              {direction < 0 ? "↑" : "↓"}
-                            </button>
-                          ))}
+                          <span className="num">{r.sortOrder}</span>
+                          {(section === "listings" ||
+                            section === "navigation") &&
+                            [-1, 1].map((direction) => (
+                              <button
+                                key={direction}
+                                className="button sm quiet"
+                                aria-label={`${direction < 0 ? "上移" : "下移"}${r.name ?? r.label}`}
+                                disabled={
+                                  mutationBusy ||
+                                  rowIndex + direction < 0 ||
+                                  rowIndex + direction >= rows.length
+                                }
+                                onClick={() => {
+                                  const ids = rows.map((item) => item.id);
+                                  [ids[rowIndex], ids[rowIndex + direction]] = [
+                                    ids[rowIndex + direction],
+                                    ids[rowIndex],
+                                  ];
+                                  void mutate({
+                                    action: "reorder",
+                                    kind: section,
+                                    ids,
+                                    entries: rows.map((item) => ({
+                                      id: item.id,
+                                      sortOrder: item.sortOrder,
+                                      revision:
+                                        "revision" in item
+                                          ? item.revision
+                                          : undefined,
+                                    })),
+                                  });
+                                }}
+                              >
+                                {direction < 0 ? "↑" : "↓"}
+                              </button>
+                            ))}
                         </span>
                       </td>
                       {section === "listings" && (
@@ -588,77 +600,79 @@ export function AdminCatalog({ section }: { section: Section }) {
                       )}
                       <td data-label="操作">
                         <div className="row-actions">
-                        <button
-                          className="button sm"
-                          onClick={(event) =>
-                            start(
-                              row as unknown as EditorValue,
-                              event.currentTarget,
-                            )
-                          }
-                        >
-                          編輯
-                        </button>
-                        <button
-                          className="button sm"
-                          disabled={mutationBusy}
-                          onClick={() =>
-                            void mutate({
-                              action: "publish",
-                              kind: section,
-                              id: r.id,
-                              enabled: !r.enabled,
-                              revision: r.revision,
-                            })
-                          }
-                        >
-                          {section === "listings"
-                            ? r.enabled
-                              ? "取消發佈"
-                              : "發佈"
-                            : r.enabled
-                              ? "停用"
-                              : "啟用"}
-                        </button>
-                        {section === "navigation" &&
-                          (["public", "bot"] as const).map((audience) => (
-                            <button
-                              key={audience}
-                              className="button sm"
-                              onClick={async () => {
-                                try {
-                                  const response = await fetch(
-                                    `/api/admin/catalog?preview=${r.id}&audience=${audience}`,
-                                  );
-                                  const data = await response.json();
-                                  if (!response.ok)
-                                    throw new Error(data.message ?? "預覽失敗");
-                                  setPreview(
-                                    data.available
-                                      ? `${audience === "bot" ? "Telegram" : "網站"}預覽：${data.total} 個結果${data.items.length ? ` · ${data.items.join("、")}` : ""}`
-                                      : data.message,
-                                  );
-                                } catch (error) {
-                                  setError(
-                                    error instanceof Error
-                                      ? error.message
-                                      : "預覽失敗",
-                                  );
-                                }
-                              }}
-                            >
-                              {audience === "bot"
-                                ? "預覽 Telegram"
-                                : "預覽網站"}
-                            </button>
-                          ))}
-                        <button
-                          className="button sm danger"
-                          onClick={() => void remove(r.id)}
-                        >
-                          刪除
-                        </button>
-                        {section === "listings" && <HistoryPanel id={r.id} />}
+                          <button
+                            className="button sm"
+                            onClick={(event) =>
+                              start(
+                                row as unknown as EditorValue,
+                                event.currentTarget,
+                              )
+                            }
+                          >
+                            編輯
+                          </button>
+                          <button
+                            className="button sm"
+                            disabled={mutationBusy}
+                            onClick={() =>
+                              void mutate({
+                                action: "publish",
+                                kind: section,
+                                id: r.id,
+                                enabled: !r.enabled,
+                                revision: r.revision,
+                              })
+                            }
+                          >
+                            {section === "listings"
+                              ? r.enabled
+                                ? "取消發佈"
+                                : "發佈"
+                              : r.enabled
+                                ? "停用"
+                                : "啟用"}
+                          </button>
+                          {section === "navigation" &&
+                            (["public", "bot"] as const).map((audience) => (
+                              <button
+                                key={audience}
+                                className="button sm"
+                                onClick={async () => {
+                                  try {
+                                    const response = await fetch(
+                                      `/api/admin/catalog?preview=${r.id}&audience=${audience}`,
+                                    );
+                                    const data = await response.json();
+                                    if (!response.ok)
+                                      throw new Error(
+                                        data.message ?? "預覽失敗",
+                                      );
+                                    setPreview(
+                                      data.available
+                                        ? `${audience === "bot" ? "Telegram" : "網站"}預覽：${data.total} 個結果${data.items.length ? ` · ${data.items.join("、")}` : ""}`
+                                        : data.message,
+                                    );
+                                  } catch (error) {
+                                    setError(
+                                      error instanceof Error
+                                        ? error.message
+                                        : "預覽失敗",
+                                    );
+                                  }
+                                }}
+                              >
+                                {audience === "bot"
+                                  ? "預覽 Telegram"
+                                  : "預覽網站"}
+                              </button>
+                            ))}
+                          <button
+                            className="button sm danger"
+                            onClick={() => void remove(r.id)}
+                          >
+                            刪除
+                          </button>
+                          {section === "listings" && <HistoryPanel id={r.id} />}
                         </div>
                       </td>
                     </tr>
@@ -703,7 +717,6 @@ export function AdminCatalog({ section }: { section: Section }) {
               <HistoryPanel />
             </div>
           )}
-
         </>
       ) : null}
       {section === "imports" && <ImportPanel />}

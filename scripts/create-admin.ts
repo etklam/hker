@@ -24,11 +24,14 @@ async function main() {
   await register(input.email, input.password, input.name, "admin");
   console.log("Administrator created");
 }
-main().catch((error) => {
-  console.error(
-    error instanceof Error && error.message === "Account already exists; no changes made"
-      ? error.message
-      : "Administrator creation failed. Check credentials, database and whether the account already exists.",
-  );
-  process.exitCode = 1;
-}).finally(closeDatabase);
+main()
+  .catch((error) => {
+    console.error(
+      error instanceof Error &&
+        error.message === "Account already exists; no changes made"
+        ? error.message
+        : "Administrator creation failed. Check credentials, database and whether the account already exists.",
+    );
+    process.exitCode = 1;
+  })
+  .finally(closeDatabase);

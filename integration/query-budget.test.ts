@@ -49,7 +49,10 @@ describe("catalog query budgets", () => {
               sortOrder: -10_000 + index,
             })),
           )
-          .returning({ id: directory.listings.id, slug: directory.listings.slug });
+          .returning({
+            id: directory.listings.id,
+            slug: directory.listings.slug,
+          });
         await tx.insert(directory.listingLinks).values(
           listings.map((listing) => ({
             listingId: listing.id,
@@ -59,7 +62,10 @@ describe("catalog query budgets", () => {
           })),
         );
         await tx.insert(directory.listingTags).values(
-          listings.map((listing) => ({ listingId: listing.id, tagId: tag.id })),
+          listings.map((listing) => ({
+            listingId: listing.id,
+            tagId: tag.id,
+          })),
         );
 
         const executor = tx as unknown as CatalogExecutor;

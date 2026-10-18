@@ -14,8 +14,7 @@ vi.mock("@/server/catalog/analytics", () => ({
   analyticsReport: mocks.report,
   deleteStoredQuery: mocks.remove,
   hongKongDay: () => "2026-09-28",
-  privateQueryKey: (value: string) =>
-    value === "流動維修" ? value : null,
+  privateQueryKey: (value: string) => (value === "流動維修" ? value : null),
 }));
 vi.mock("@/server/catalog/service", () => ({
   CatalogSearchService: { search: mocks.search },

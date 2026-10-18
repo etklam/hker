@@ -116,7 +116,9 @@ test.describe("Phase 8 content workflow", () => {
     for (const width of [390, 768, 1440]) {
       await page.setViewportSize({ width, height: 900 });
       await page.goto("/admin/imports");
-      await expect(page.getByRole("textbox", { name: "或貼上 CSV／JSON", exact: true })).toBeVisible();
+      await expect(
+        page.getByRole("textbox", { name: "或貼上 CSV／JSON", exact: true }),
+      ).toBeVisible();
       await page.screenshot({
         path: `.impeccable/review/phase8/import-${width}.png`,
         fullPage: true,

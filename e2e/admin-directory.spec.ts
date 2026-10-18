@@ -26,7 +26,8 @@ async function deleteListingByName(
   const deletion = await request.delete("/api/admin/catalog", {
     headers: { origin },
     data: {
-      kind: "listings", requestKey: crypto.randomUUID(),
+      kind: "listings",
+      requestKey: crypto.randomUUID(),
       id: current.id,
       revision: current.revision,
     },
@@ -64,7 +65,9 @@ test.describe("directory admin acceptance", () => {
       .fill("https://example.com/Branch#Contact");
     await dialog.getByRole("button", { name: "儲存", exact: true }).click();
     await expect(dialog).not.toBeVisible();
-    await page.getByRole("textbox", { name: "搜尋收錄", exact: true }).fill(name);
+    await page
+      .getByRole("textbox", { name: "搜尋收錄", exact: true })
+      .fill(name);
     await page.getByRole("button", { name: "搜尋", exact: true }).click();
     const row = page.getByRole("row").filter({ hasText: name });
     await expect(row).toHaveCount(1);
@@ -95,10 +98,14 @@ test.describe("directory admin acceptance", () => {
         page.getByRole("link", { name: "官方網站" }),
       ).toHaveAttribute("href", `/out/${first.links[0].id}?source=web`);
       await page.goto("/admin/listings");
-      await page.getByRole("textbox", { name: "搜尋收錄", exact: true }).fill(name);
+      await page
+        .getByRole("textbox", { name: "搜尋收錄", exact: true })
+        .fill(name);
       await page.getByRole("button", { name: "搜尋", exact: true }).click();
       await row.getByRole("button", { name: "取消發佈", exact: true }).click();
-      await expect(row.getByRole("button", { name: "發佈", exact: true })).toBeVisible();
+      await expect(
+        row.getByRole("button", { name: "發佈", exact: true }),
+      ).toBeVisible();
       const unpublished = await request.get(`/listing/${updated.slug}`);
       expect(await unpublished.text()).not.toContain(name);
     } finally {
@@ -163,7 +170,8 @@ test.describe("directory admin acceptance", () => {
     const createdResponse = await request.post("/api/admin/catalog", {
       headers: { origin },
       data: {
-        kind: "listings", requestKey: crypto.randomUUID(),
+        kind: "listings",
+        requestKey: crypto.randomUUID(),
         data: { name, slug: `two-tab-${suffix}` },
       },
     });
@@ -185,15 +193,23 @@ test.describe("directory admin acceptance", () => {
         openEditor(page),
         openEditor(second),
       ]);
-      await firstDialog.getByLabel("簡介", { exact: true }).fill("第一分頁已儲存");
-      await secondDialog.getByRole("textbox", { name: "簡介", exact: true }).fill("第二分頁舊草稿");
-      await firstDialog.getByRole("button", { name: "儲存", exact: true }).click();
+      await firstDialog
+        .getByLabel("簡介", { exact: true })
+        .fill("第一分頁已儲存");
+      await secondDialog
+        .getByRole("textbox", { name: "簡介", exact: true })
+        .fill("第二分頁舊草稿");
+      await firstDialog
+        .getByRole("button", { name: "儲存", exact: true })
+        .click();
       await expect(firstDialog).not.toBeVisible();
-      await secondDialog.getByRole("button", { name: "儲存", exact: true }).click();
+      await secondDialog
+        .getByRole("button", { name: "儲存", exact: true })
+        .click();
       await expect(secondDialog.getByRole("alert")).toContainText("草稿已保留");
-      await expect(secondDialog.getByRole("textbox", { name: "簡介", exact: true })).toHaveValue(
-        "第二分頁舊草稿",
-      );
+      await expect(
+        secondDialog.getByRole("textbox", { name: "簡介", exact: true }),
+      ).toHaveValue("第二分頁舊草稿");
       const latest = (
         await (
           await request.get(`/api/admin/catalog?q=${encodeURIComponent(name)}`)
@@ -282,7 +298,8 @@ test.describe("directory admin acceptance", () => {
       const response = await request.post("/api/admin/catalog", {
         headers: { origin },
         data: {
-          kind: "listings", requestKey: crypto.randomUUID(),
+          kind: "listings",
+          requestKey: crypto.randomUUID(),
           data: {
             name,
             slug: `reorder-${suffix}-${index}`,
@@ -295,7 +312,9 @@ test.describe("directory admin acceptance", () => {
     }
     try {
       await page.goto("/admin/listings");
-      await page.getByRole("textbox", { name: "搜尋收錄", exact: true }).fill(`重排 ${suffix}`);
+      await page
+        .getByRole("textbox", { name: "搜尋收錄", exact: true })
+        .fill(`重排 ${suffix}`);
       await page.getByRole("button", { name: "搜尋", exact: true }).click();
       await page
         .getByRole("button", { name: `上移重排 ${suffix} B`, exact: true })
@@ -322,27 +341,50 @@ test.describe("directory admin acceptance", () => {
     }
   });
 
-  test("returns to the previous page after deleting its final item without clearing filters", async ({ page, request }) => {
-    const origin = new URL(process.env.E2E_BASE_URL ?? "http://localhost:3000").origin;
+  test("returns to the previous page after deleting its final item without clearing filters", async ({
+    page,
+    request,
+  }) => {
+    const origin = new URL(process.env.E2E_BASE_URL ?? "http://localhost:3000")
+      .origin;
     const prefix = `pagination-${Date.now()}`;
     const names: string[] = [];
     try {
       for (let index = 0; index < 21; index++) {
-        const response = await request.post("/api/admin/catalog", { headers: { origin }, data: { kind: "listings", requestKey: crypto.randomUUID(), data: { name: `${prefix} ${index}`, slug: `${prefix}-${index}` } } });
+        const response = await request.post("/api/admin/catalog", {
+          headers: { origin },
+          data: {
+            kind: "listings",
+            requestKey: crypto.randomUUID(),
+            data: { name: `${prefix} ${index}`, slug: `${prefix}-${index}` },
+          },
+        });
         expect(response.ok()).toBe(true);
         names.push(`${prefix} ${index}`);
       }
       await page.goto("/admin/listings");
-      await page.getByRole("textbox", { name: "搜尋收錄", exact: true }).fill(prefix);
+      await page
+        .getByRole("textbox", { name: "搜尋收錄", exact: true })
+        .fill(prefix);
       await page.getByRole("button", { name: "搜尋", exact: true }).click();
-      await expect(page.getByRole("button", { name: "刪除", exact: true })).toHaveCount(20);
+      await expect(
+        page.getByRole("button", { name: "刪除", exact: true }),
+      ).toHaveCount(20);
       await page.getByRole("button", { name: "下一頁", exact: true }).click();
-      await expect(page.getByRole("button", { name: "刪除", exact: true })).toHaveCount(1);
-      page.once("dialog", prompt => prompt.accept());
+      await expect(
+        page.getByRole("button", { name: "刪除", exact: true }),
+      ).toHaveCount(1);
+      page.once("dialog", (prompt) => prompt.accept());
       await page.getByRole("button", { name: "刪除", exact: true }).click();
-      await expect(page.getByRole("button", { name: "刪除", exact: true })).toHaveCount(20);
-      await expect(page.getByRole("textbox", { name: "搜尋收錄", exact: true })).toHaveValue(prefix);
-      await expect(page.getByRole("button", { name: "上一頁", exact: true })).toBeDisabled();
+      await expect(
+        page.getByRole("button", { name: "刪除", exact: true }),
+      ).toHaveCount(20);
+      await expect(
+        page.getByRole("textbox", { name: "搜尋收錄", exact: true }),
+      ).toHaveValue(prefix);
+      await expect(
+        page.getByRole("button", { name: "上一頁", exact: true }),
+      ).toBeDisabled();
     } finally {
       for (const name of names)
         await deleteListingByName(request, origin, name);
@@ -380,7 +422,9 @@ test.describe("directory admin acceptance", () => {
     await page.goto("/admin/imports");
     await page.getByLabel("或貼上 CSV").fill(csv);
     await page.getByRole("button", { name: "解析及預覽" }).click();
-    await expect(page.getByRole("cell").filter({ hasText: name })).toBeVisible();
+    await expect(
+      page.getByRole("cell").filter({ hasText: name }),
+    ).toBeVisible();
     await page.getByRole("button", { name: "確認匯入 1 項" }).click();
     await expect(page.getByRole("status")).toContainText("新增 1");
     const row = (

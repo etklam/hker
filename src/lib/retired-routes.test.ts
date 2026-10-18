@@ -12,13 +12,26 @@ describe("retired server entry points", () => {
       expect(isRetiredPath(`${path}/child/deep`)).toBe(true);
       expect(isRetiredPath(`${path}-new`)).toBe(false);
     }
-    for (const path of ["/api/admin/catalog", "/api/auth/login", "/api/catalog", "/api/telegram/webhook"])
+    for (const path of [
+      "/api/admin/catalog",
+      "/api/auth/login",
+      "/api/catalog",
+      "/api/telegram/webhook",
+    ])
       expect(isRetiredPath(path)).toBe(false);
   });
   it("all methods deny directly without database access", () => {
     const previous = vi.mocked(db.select).mock.calls.length;
     for (const route of [registration, bills, featured]) {
-      for (const method of ["GET", "HEAD", "OPTIONS", "POST", "PUT", "PATCH", "DELETE"] as const) {
+      for (const method of [
+        "GET",
+        "HEAD",
+        "OPTIONS",
+        "POST",
+        "PUT",
+        "PATCH",
+        "DELETE",
+      ] as const) {
         const response = route[method]();
         expect(response.status).toBe(410);
         expect(response.headers.get("cache-control")).toBe("no-store");

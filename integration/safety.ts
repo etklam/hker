@@ -5,5 +5,7 @@ if (
   url.pathname !== "/hker_directory_test" ||
   process.env.ALLOW_DIRECTORY_TEST_RESET !== "1"
 ) {
-  throw new Error("Integration tests require a disposable loopback hker_directory_test database and ALLOW_DIRECTORY_TEST_RESET=1");
+  throw new Error(
+    "Integration tests require a disposable loopback hker_directory_test database and ALLOW_DIRECTORY_TEST_RESET=1",
+  );
 }

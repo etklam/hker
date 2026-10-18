@@ -1,3 +1,25 @@
-import {test,expect} from '@playwright/test'
-test('homepage offers search and directory navigation',async({page})=>{await page.goto('/');await expect(page).toHaveTitle(/HKER/);await expect(page.getByRole('heading',{level:1})).toContainText('值得用');await expect(page.getByRole('heading',{name:'精選推薦'})).toBeVisible();await page.getByRole('textbox',{name:'搜尋目錄'}).fill('咖啡');await page.getByRole('button',{name:'搜尋',exact:true}).click();await expect(page).toHaveURL(/\/search\?q=/);await expect(page.getByRole('textbox',{name:'搜尋關鍵字'})).toHaveValue('咖啡')})
-test('mobile homepage keeps search immediately available',async({page})=>{await page.setViewportSize({width:375,height:667});await page.goto('/');await expect(page.getByRole('textbox',{name:'搜尋目錄'})).toBeInViewport();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)})
+import { test, expect } from "@playwright/test";
+test("homepage offers search and directory navigation", async ({ page }) => {
+  await page.goto("/");
+  await expect(page).toHaveTitle(/HKER/);
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("值得用");
+  await expect(page.getByRole("heading", { name: "精選推薦" })).toBeVisible();
+  await page.getByRole("textbox", { name: "搜尋目錄" }).fill("咖啡");
+  await page.getByRole("button", { name: "搜尋", exact: true }).click();
+  await expect(page).toHaveURL(/\/search\?q=/);
+  await expect(page.getByRole("textbox", { name: "搜尋關鍵字" })).toHaveValue(
+    "咖啡",
+  );
+});
+test("mobile homepage keeps search immediately available", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 667 });
+  await page.goto("/");
+  await expect(
+    page.getByRole("textbox", { name: "搜尋目錄" }),
+  ).toBeInViewport();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+});

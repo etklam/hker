@@ -1,17 +1,18 @@
-import type { NextRequest } from 'next/server'
-import { cookies } from 'next/headers'
-import type { AuthUser } from '@/lib/types'
-import { validateSession } from '@/server/services/session-service'
+import type { NextRequest } from "next/server";
+import { cookies } from "next/headers";
+import type { AuthUser } from "@/lib/types";
+import { validateSession } from "@/server/services/session-service";
 
-export const SESSION_COOKIE_NAME = process.env.AUTH_SESSION_COOKIE_NAME ?? '__Host-hker_session'
+export const SESSION_COOKIE_NAME =
+  process.env.AUTH_SESSION_COOKIE_NAME ?? "__Host-hker_session";
 
 export async function getServerUser(): Promise<AuthUser | null> {
-  const cookieStore = await cookies()
-  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value
-  if (!token) return null
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+  if (!token) return null;
 
-  const result = await validateSession(token)
-  if (!result) return null
+  const result = await validateSession(token);
+  if (!result) return null;
 
   return {
     id: result.user.id,
@@ -19,21 +20,23 @@ export async function getServerUser(): Promise<AuthUser | null> {
     displayName: result.user.displayName,
     avatarUrl: result.user.avatarUrl,
     role: result.user.role,
-  }
+  };
 }
 
 function isSecure(): boolean {
-  const baseUrl = process.env.APP_BASE_URL ?? ''
-  if (baseUrl) return baseUrl.startsWith('https')
-  return process.env.NODE_ENV === 'production'
+  const baseUrl = process.env.APP_BASE_URL ?? "";
+  if (baseUrl) return baseUrl.startsWith("https");
+  return process.env.NODE_ENV === "production";
 }
 
-export async function resolveSession(req: NextRequest): Promise<AuthUser | null> {
-  const token = req.cookies.get(SESSION_COOKIE_NAME)?.value
-  if (!token) return null
+export async function resolveSession(
+  req: NextRequest,
+): Promise<AuthUser | null> {
+  const token = req.cookies.get(SESSION_COOKIE_NAME)?.value;
+  if (!token) return null;
 
-  const result = await validateSession(token)
-  if (!result) return null
+  const result = await validateSession(token);
+  if (!result) return null;
 
   return {
     id: result.user.id,
@@ -41,7 +44,7 @@ export async function resolveSession(req: NextRequest): Promise<AuthUser | null>
     displayName: result.user.displayName,
     avatarUrl: result.user.avatarUrl,
     role: result.user.role,
-  }
+  };
 }
 
 export function setSessionCookie(token: string, expiresAt: Date): string {
@@ -51,11 +54,11 @@ export function setSessionCookie(token: string, expiresAt: Date): string {
     `HttpOnly`,
     `SameSite=Lax`,
     `Expires=${expiresAt.toUTCString()}`,
-  ]
+  ];
   if (isSecure()) {
-    parts.push('Secure')
+    parts.push("Secure");
   }
-  return parts.join('; ')
+  return parts.join("; ");
 }
 
 export function clearSessionCookie(): string {
@@ -66,9 +69,9 @@ export function clearSessionCookie(): string {
     `SameSite=Lax`,
     `Expires=Thu, 01 Jan 1970 00:00:00 GMT`,
     `Max-Age=0`,
-  ]
+  ];
   if (isSecure()) {
-    parts.push('Secure')
+    parts.push("Secure");
   }
-  return parts.join('; ')
+  return parts.join("; ");
 }

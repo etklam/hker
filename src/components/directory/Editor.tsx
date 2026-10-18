@@ -57,7 +57,9 @@ export function Editor({
   const [value, setValue] = useState<EditorValue>(initial);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const attempt = useRef<{ data: string; key: string; at: number } | null>(null);
+  const attempt = useRef<{ data: string; key: string; at: number } | null>(
+    null,
+  );
   const [unknownOutcome, setUnknownOutcome] = useState(false);
   const dirty = JSON.stringify(value) !== JSON.stringify(initial);
   const set = (key: keyof EditorValue, v: unknown) =>
@@ -196,18 +198,45 @@ export function Editor({
               delete data.aliasesText;
             }
             const serialized = JSON.stringify(data);
-            if (!attempt.current || (!unknownOutcome && attempt.current.data !== serialized)) attempt.current = { data: serialized, key: crypto.randomUUID(), at: Date.now() };
-            if (unknownOutcome && (!listing || Date.now() - attempt.current.at > 23 * 3600000)) throw new Error("上次儲存結果未確認，請先在另一分頁核對資料再關閉編輯器。");
-            if (unknownOutcome && attempt.current.data !== serialized) throw new Error("上次儲存結果未確認。請先在另一分頁核對資料；保留原草稿重試才可確認該次操作。");
+            if (
+              !attempt.current ||
+              (!unknownOutcome && attempt.current.data !== serialized)
+            )
+              attempt.current = {
+                data: serialized,
+                key: crypto.randomUUID(),
+                at: Date.now(),
+              };
+            if (
+              unknownOutcome &&
+              (!listing || Date.now() - attempt.current.at > 23 * 3600000)
+            )
+              throw new Error(
+                "上次儲存結果未確認，請先在另一分頁核對資料再關閉編輯器。",
+              );
+            if (unknownOutcome && attempt.current.data !== serialized)
+              throw new Error(
+                "上次儲存結果未確認。請先在另一分頁核對資料；保留原草稿重試才可確認該次操作。",
+              );
             setUnknownOutcome(true);
             const response = await fetch("/api/admin/catalog", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ kind, id: initial.id, data, requestKey: listing ? attempt.current.key : undefined }),
+              body: JSON.stringify({
+                kind,
+                id: initial.id,
+                data,
+                requestKey: listing ? attempt.current.key : undefined,
+              }),
             });
             const result = await response.json();
-            if (response.status >= 500 || (response.ok && listing && !Number.isInteger(result?.id)))
-              throw new Error("儲存結果未確認。草稿已保留；請核對資料或以相同內容重試。");
+            if (
+              response.status >= 500 ||
+              (response.ok && listing && !Number.isInteger(result?.id))
+            )
+              throw new Error(
+                "儲存結果未確認。草稿已保留；請核對資料或以相同內容重試。",
+              );
             setUnknownOutcome(false);
             if (!response.ok)
               throw new Error(
@@ -215,11 +244,17 @@ export function Editor({
                   ? `${result.message ?? "此項目已被其他管理員更新"}。你的草稿已保留，請複製變更後重新開啟最新版本。`
                   : response.status === 401
                     ? "登入已逾時。你的草稿仍保留在此編輯器，請在另一個分頁重新登入後再儲存。"
-                  : (result.message ?? "儲存失敗"),
+                    : (result.message ?? "儲存失敗"),
               );
             onSaved();
           } catch (e) {
-            setError(e instanceof TypeError || e instanceof SyntaxError ? "連線中斷，儲存結果未確認。草稿已保留；請核對資料或以相同內容重試。" : e instanceof Error ? e.message : "儲存結果未確認，草稿已保留。");
+            setError(
+              e instanceof TypeError || e instanceof SyntaxError
+                ? "連線中斷，儲存結果未確認。草稿已保留；請核對資料或以相同內容重試。"
+                : e instanceof Error
+                  ? e.message
+                  : "儲存結果未確認，草稿已保留。",
+            );
           } finally {
             setBusy(false);
           }

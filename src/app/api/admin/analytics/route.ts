@@ -34,8 +34,7 @@ export const GET = withAdmin(async (req) =>
     const from =
         req.nextUrl.searchParams.get("from") ??
         hongKongDay(new Date(today.getTime() - 30 * 86400000)),
-      to =
-        req.nextUrl.searchParams.get("to") ?? hongKongDay(today),
+      to = req.nextUrl.searchParams.get("to") ?? hongKongDay(today),
       source = req.nextUrl.searchParams.get("source") ?? "all";
     const range = z
       .object({

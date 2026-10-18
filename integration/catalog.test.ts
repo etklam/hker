@@ -128,22 +128,40 @@ describe("PostgreSQL directory domain", () => {
     expect((await catalog.search({ query: "%" })).total).toBe(0);
   });
   it.each([
-    ["測試", ["repair-shop"]], ["維修店", ["repair-shop"]], ["測試維修店", ["repair-shop"]],
-    ["維修", ["repair-shop"]], ["Repair Hub", ["repair-shop"]], ["Ｒｅｐａｉｒ　Ｈｕｂ", ["repair-shop"]],
-    [" repair   hub ", ["repair-shop"]], ["REPAIR HUB", ["repair-shop"]], ["repair", ["repair-shop"]],
-    ["修理專家", ["repair-shop"]], ["修理", ["repair-shop"]], ["手提電話", ["online", "repair-shop"]],
-    ["手機", ["online", "repair-shop"]], ["網上", ["online"]], ["社群", ["online"]], ["網上社群", ["online"]],
-    ["不存在", []], ["%", []], ["_", []], ["alliance", []],
+    ["測試", ["repair-shop"]],
+    ["維修店", ["repair-shop"]],
+    ["測試維修店", ["repair-shop"]],
+    ["維修", ["repair-shop"]],
+    ["Repair Hub", ["repair-shop"]],
+    ["Ｒｅｐａｉｒ　Ｈｕｂ", ["repair-shop"]],
+    [" repair   hub ", ["repair-shop"]],
+    ["REPAIR HUB", ["repair-shop"]],
+    ["repair", ["repair-shop"]],
+    ["修理專家", ["repair-shop"]],
+    ["修理", ["repair-shop"]],
+    ["手提電話", ["online", "repair-shop"]],
+    ["手機", ["online", "repair-shop"]],
+    ["網上", ["online"]],
+    ["社群", ["online"]],
+    ["網上社群", ["online"]],
+    ["不存在", []],
+    ["%", []],
+    ["_", []],
+    ["alliance", []],
   ])("fictional search corpus: %s", async (query, expected) => {
     const found = await catalog.search({ query: query as string });
-    expect(found.items.map(row => row.slug).sort()).toEqual(expected);
+    expect(found.items.map((row) => row.slug).sort()).toEqual(expected);
   });
   it.each([
     ["parent area", () => ({ areaId: area }), ["repair-shop"]],
     ["child area", () => ({ areaId: child }), ["repair-shop"]],
     ["category", () => ({ categoryId: category }), ["repair-shop"]],
     ["AND", () => ({ tagIds: [tag, tag2] }), ["repair-shop"]],
-    ["OR", () => ({ tagIds: [tag, tag2], tagMatchMode: "or" as const }), ["online", "repair-shop"]],
+    [
+      "OR",
+      () => ({ tagIds: [tag, tag2], tagMatchMode: "or" as const }),
+      ["online", "repair-shop"],
+    ],
     ["zero minimum", () => ({ priceMin: 0 }), ["online", "repair-shop"]],
     ["bounded price", () => ({ priceMax: 500 }), ["repair-shop"]],
     ["open price", () => ({ priceMin: 600 }), ["online"]],
@@ -152,20 +170,26 @@ describe("PostgreSQL directory domain", () => {
     ["manual", () => ({ sort: "manual" as const }), ["online", "repair-shop"]],
     ["newest", () => ({ sort: "newest" as const }), ["online", "repair-shop"]],
   ] as const)("fictional filter corpus: %s", async (_name, input, expected) => {
-    expect((await catalog.search(input())).items.map(row => row.slug).sort()).toEqual(expected);
+    expect(
+      (await catalog.search(input())).items.map((row) => row.slug).sort(),
+    ).toEqual(expected);
   });
   it("uses AND by default and supports explicit OR", async () => {
     expect((await catalog.search({ tagIds: [tag, tag2] })).total).toBe(1);
     expect(
       (await catalog.search({ tagIds: [tag, tag2], tagMatchMode: "or" })).total,
     ).toBe(2);
-    await expect(catalog.search({ tagIds: [hidden] })).rejects.toMatchObject({code: "INVALID_REQUEST"});
+    await expect(catalog.search({ tagIds: [hidden] })).rejects.toMatchObject({
+      code: "INVALID_REQUEST",
+    });
   });
   it("filters category and area descendants", async () => {
     expect(
       (await catalog.search({ categoryId: category, areaId: area })).total,
     ).toBe(1);
-    await expect(catalog.search({ areaId: 99999 })).rejects.toMatchObject({code: "INVALID_REQUEST"});
+    await expect(catalog.search({ areaId: 99999 })).rejects.toMatchObject({
+      code: "INVALID_REQUEST",
+    });
   });
   it("uses price overlap, open bounds and deterministic pagination", async () => {
     expect((await catalog.search({ priceMin: 500, priceMax: 600 })).total).toBe(
@@ -185,16 +209,33 @@ describe("PostgreSQL directory domain", () => {
       links: [{ type: "website", label: "a", url: "https://a.example" }],
     });
     await expect(
-      saveListing({ name: "Bad", slug: "temporary", tagIds: [999999], revision: row.revision }, row.id),
+      saveListing(
+        {
+          name: "Bad",
+          slug: "temporary",
+          tagIds: [999999],
+          revision: row.revision,
+        },
+        row.id,
+      ),
     ).rejects.toThrow();
     expect((await catalog.detail("temporary"))?.name).toBe("Temporary");
     await saveListing(
-      { name: "Updated", slug: "temporary", tagIds: [tag2], enabled: false, revision: row.revision },
+      {
+        name: "Updated",
+        slug: "temporary",
+        tagIds: [tag2],
+        enabled: false,
+        revision: row.revision,
+      },
       row.id,
     );
     expect(await catalog.detail("temporary")).toBeNull();
     expect((await catalog.detail("temporary", "admin"))?.tags[0].id).toBe(tag2);
-    await deleteListing(row.id, (await catalog.detail(row.slug, "admin"))!.revision);
+    await deleteListing(
+      row.id,
+      (await catalog.detail(row.slug, "admin"))!.revision,
+    );
     expect(await catalog.detail("temporary", "admin")).toBeNull();
   });
   it("prevents area cycles and supports taxonomy CRUD", async () => {
@@ -224,11 +265,19 @@ describe("PostgreSQL directory domain", () => {
     const preview = await previewImport(csv);
     expect(preview.valid).toBe(true);
     const options = { actorId: 1, requestKey: "catalog-import" };
-    await expect(confirmImport(csv + "x", preview.digest, options)).rejects.toThrow();
-    expect(await confirmImport(csv, preview.digest, options)).toMatchObject({ imported: 1, replayed: false });
+    await expect(
+      confirmImport(csv + "x", preview.digest, options),
+    ).rejects.toThrow();
+    expect(await confirmImport(csv, preview.digest, options)).toMatchObject({
+      imported: 1,
+      replayed: false,
+    });
     expect(await catalog.detail("imported")).toBeNull();
     expect((await previewImport(csv)).valid).toBe(false);
-    expect(await confirmImport(csv, preview.digest, options)).toMatchObject({ imported: 1, replayed: true });
+    expect(await confirmImport(csv, preview.digest, options)).toMatchObject({
+      imported: 1,
+      replayed: true,
+    });
     const imported = (await catalog.detail("imported", "admin"))!;
     await deleteListing(imported.id, imported.revision);
   });
@@ -238,7 +287,10 @@ describe("PostgreSQL directory domain", () => {
       .values({ name: "Direct", slug: "direct" })
       .returning();
     expect(row.enabled).toBe(false);
-    await deleteListing(row.id, (await catalog.detail(row.slug, "admin"))!.revision);
+    await deleteListing(
+      row.id,
+      (await catalog.detail(row.slug, "admin"))!.revision,
+    );
   });
   it("rejects non-admin writes and permits admin create/delete", async () => {
     vi.stubEnv("APP_BASE_URL", "http://localhost");
@@ -262,7 +314,8 @@ describe("PostgreSQL directory domain", () => {
       (
         await adminPost(
           req("POST", {
-            kind: "listings", requestKey: crypto.randomUUID(),
+            kind: "listings",
+            requestKey: crypto.randomUUID(),
             data: { name: "Forbidden", slug: "forbidden" },
           }),
         )
@@ -271,15 +324,24 @@ describe("PostgreSQL directory domain", () => {
     await db.update(users).set({ role: "admin" }).where(eq(users.id, user.id));
     const res = await adminPost(
       req("POST", {
-        kind: "listings", requestKey: crypto.randomUUID(),
+        kind: "listings",
+        requestKey: crypto.randomUUID(),
         data: { name: "Allowed", slug: "allowed" },
       }),
     );
     expect(res.status).toBe(200);
     const row = await res.json();
     expect(
-      (await adminDelete(req("DELETE", { kind: "listings", requestKey: crypto.randomUUID(), id: row.id, revision: row.revision })))
-        .status,
+      (
+        await adminDelete(
+          req("DELETE", {
+            kind: "listings",
+            requestKey: crypto.randomUUID(),
+            id: row.id,
+            revision: row.revision,
+          }),
+        )
+      ).status,
     ).toBe(200);
     vi.unstubAllEnvs();
   });
@@ -347,42 +409,98 @@ describe("PostgreSQL directory domain", () => {
     expect(job.nextOperation).toBe(job.operations.length);
     vi.unstubAllEnvs();
   });
-  it('resumes a failed bot delivery without repeating acknowledged messages', async () => {
-    const sender = vi.spyOn(botTransport, 'telegram').mockRejectedValueOnce(new botTransport.TelegramDeliveryError('network', true)).mockResolvedValue({message_id: 8});
-    const update = {update_id:200,message:{chat:{id:8},from:{id:8},text:'手提電話'}};
+  it("resumes a failed bot delivery without repeating acknowledged messages", async () => {
+    const sender = vi
+      .spyOn(botTransport, "telegram")
+      .mockRejectedValueOnce(
+        new botTransport.TelegramDeliveryError("network", true),
+      )
+      .mockResolvedValue({ message_id: 8 });
+    const update = {
+      update_id: 200,
+      message: { chat: { id: 8 }, from: { id: 8 }, text: "手提電話" },
+    };
     await handleCatalogUpdate(update);
-    const [job] = await db.select().from(botUpdates).where(eq(botUpdates.id,200));
-    expect(job.status).toBe('retry');
+    const [job] = await db
+      .select()
+      .from(botUpdates)
+      .where(eq(botUpdates.id, 200));
+    expect(job.status).toBe("retry");
     expect(job.nextOperation).toBe(0);
-    await db.update(botUpdates).set({nextAttemptAt:new Date(0)}).where(eq(botUpdates.id,200));
+    await db
+      .update(botUpdates)
+      .set({ nextAttemptAt: new Date(0) })
+      .where(eq(botUpdates.id, 200));
     await runBotDelivery();
     await handleCatalogUpdate(update);
     expect(sender).toHaveBeenCalledTimes(2);
     sender.mockRestore();
   });
-  it('generates result pagination and rejects expired callback navigation', async () => {
-    vi.stubEnv('TELEGRAM_BOT_TOKEN', 'test-token');
-    vi.stubEnv('TELEGRAM_DELIVERY_MODE', 'live'); vi.stubEnv('TELEGRAM_TEST_CHAT_ID', '9');
-    const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => Response.json({ok:true}));
-    await db.insert(botSessions).values({key:'9:9',state:{version:1,nonce:'abcdef12',search:{pageSize:1}}});
-    await handleCatalogUpdate({update_id:201,callback_query:{id:'page',from:{id:9},message:{chat:{id:9}},data:'d:abcdef12:results:0'}});
-    expect(JSON.stringify(fetcher.mock.calls)).toContain('下一頁');
-    await handleCatalogUpdate({update_id:202,callback_query:{id:'next',from:{id:9},message:{chat:{id:9}},data:'d:abcdef12:page:2'}});
-    expect(JSON.stringify(fetcher.mock.calls)).toContain('網上社群');
-    await handleCatalogUpdate({update_id:203,callback_query:{id:'expired',from:{id:9},message:{chat:{id:9}},data:'d:00000000:tag:1'}});
-    expect(JSON.stringify(fetcher.mock.calls)).toContain('選單已過期');
+  it("generates result pagination and rejects expired callback navigation", async () => {
+    vi.stubEnv("TELEGRAM_BOT_TOKEN", "test-token");
+    vi.stubEnv("TELEGRAM_DELIVERY_MODE", "live");
+    vi.stubEnv("TELEGRAM_TEST_CHAT_ID", "9");
+    const fetcher = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async () => Response.json({ ok: true }));
+    await db.insert(botSessions).values({
+      key: "9:9",
+      state: { version: 1, nonce: "abcdef12", search: { pageSize: 1 } },
+    });
+    await handleCatalogUpdate({
+      update_id: 201,
+      callback_query: {
+        id: "page",
+        from: { id: 9 },
+        message: { chat: { id: 9 } },
+        data: "d:abcdef12:results:0",
+      },
+    });
+    expect(JSON.stringify(fetcher.mock.calls)).toContain("下一頁");
+    await handleCatalogUpdate({
+      update_id: 202,
+      callback_query: {
+        id: "next",
+        from: { id: 9 },
+        message: { chat: { id: 9 } },
+        data: "d:abcdef12:page:2",
+      },
+    });
+    expect(JSON.stringify(fetcher.mock.calls)).toContain("網上社群");
+    await handleCatalogUpdate({
+      update_id: 203,
+      callback_query: {
+        id: "expired",
+        from: { id: 9 },
+        message: { chat: { id: 9 } },
+        data: "d:00000000:tag:1",
+      },
+    });
+    expect(JSON.stringify(fetcher.mock.calls)).toContain("選單已過期");
     vi.unstubAllEnvs();
   });
 
-  it('stores attributes and bot journals as native JSON objects and arrays', async () => {
-    const row = await saveListing({name:'JSON fixture',slug:'json-fixture',attrs:{hours:'10-18'}});
-    const types = await db.execute(sql`select jsonb_typeof(attrs) as kind, attrs->>'hours' as hours from directory_listings where id=${row.id}`);
-    expect(types[0]).toMatchObject({kind:'object',hours:'10-18'});
-    const journals = await db.execute(sql`select jsonb_typeof(operations) as kind from directory_bot_updates limit 1`);
-    expect(journals[0].kind).toBe('array');
-    const sessions = await db.execute(sql`select jsonb_typeof(state) as kind from directory_bot_sessions limit 1`);
-    expect(sessions[0].kind).toBe('object');
-    await deleteListing(row.id, (await catalog.detail(row.slug, "admin"))!.revision);
+  it("stores attributes and bot journals as native JSON objects and arrays", async () => {
+    const row = await saveListing({
+      name: "JSON fixture",
+      slug: "json-fixture",
+      attrs: { hours: "10-18" },
+    });
+    const types = await db.execute(
+      sql`select jsonb_typeof(attrs) as kind, attrs->>'hours' as hours from directory_listings where id=${row.id}`,
+    );
+    expect(types[0]).toMatchObject({ kind: "object", hours: "10-18" });
+    const journals = await db.execute(
+      sql`select jsonb_typeof(operations) as kind from directory_bot_updates limit 1`,
+    );
+    expect(journals[0].kind).toBe("array");
+    const sessions = await db.execute(
+      sql`select jsonb_typeof(state) as kind from directory_bot_sessions limit 1`,
+    );
+    expect(sessions[0].kind).toBe("object");
+    await deleteListing(
+      row.id,
+      (await catalog.detail(row.slug, "admin"))!.revision,
+    );
   });
-
 });

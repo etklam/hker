@@ -114,13 +114,23 @@ export function ImportMappingPanel({
           來源值（精確比對）
           <input value={value} onChange={(e) => setValue(e.target.value)} />
         </label>
-        <label>搜尋現有分類項目<input value={lookup} onChange={e => setLookup(e.target.value)} /></label>
+        <label>
+          搜尋現有分類項目
+          <input value={lookup} onChange={(e) => setLookup(e.target.value)} />
+        </label>
         <label>
           現有項目
           <select value={id} onChange={(e) => setId(e.target.value)}>
             <option value="">請選擇</option>
             {choices
-              .filter((item) => item.enabled && (item.id === Number(id) || `${item.name} ${item.slug}`.toLocaleLowerCase().includes(lookup.trim().toLocaleLowerCase())))
+              .filter(
+                (item) =>
+                  item.enabled &&
+                  (item.id === Number(id) ||
+                    `${item.name} ${item.slug}`
+                      .toLocaleLowerCase()
+                      .includes(lookup.trim().toLocaleLowerCase())),
+              )
               .map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.name} · {item.slug}

@@ -9,7 +9,10 @@ import {
 } from "@/server/catalog/bot";
 export async function POST(req: Request) {
   if (process.env.TELEGRAM_DELIVERY_MODE === "disabled")
-    return Response.json({ error: "Telegram bot is disabled" }, { status: 503 });
+    return Response.json(
+      { error: "Telegram bot is disabled" },
+      { status: 503 },
+    );
   if (!verifyWebhookSecret(req.headers.get("x-telegram-bot-api-secret-token")))
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   let body: unknown;
@@ -23,7 +26,10 @@ export async function POST(req: Request) {
     return Response.json({ error: "Invalid update" }, { status: 400 });
   // Start the short callback acknowledgement before planning, without delaying HTTP acceptance.
   const acknowledgement = acknowledgeCatalogCallback(parsed.data);
-  await handleCatalogUpdate(parsed.data, undefined, { delivery: "deferred", acknowledge: false });
+  await handleCatalogUpdate(parsed.data, undefined, {
+    delivery: "deferred",
+    acknowledge: false,
+  });
   after(async () => {
     await acknowledgement;
     await deliverCatalogUpdate(parsed.data.update_id);

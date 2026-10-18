@@ -30,9 +30,16 @@ export const catalogEventDays = pgTable(
     count: integer("count").notNull().default(0),
     zeroCount: integer("zero_count").notNull().default(0),
   },
-  (t) => ({ pk: primaryKey({ columns: [t.day, t.source, t.kind, t.key] }),
-    counters: check("directory_event_counter_valid", sql`${t.count} >= 0 and ${t.zeroCount} >= 0 and ${t.zeroCount} <= ${t.count}`),
-    dimensions: check("directory_event_dimensions_valid", sql`${t.source} in ('web','bot') and ${t.kind} in ('search','filter','preset','tag','outbound') and length(${t.key}) between 1 and 80`),
+  (t) => ({
+    pk: primaryKey({ columns: [t.day, t.source, t.kind, t.key] }),
+    counters: check(
+      "directory_event_counter_valid",
+      sql`${t.count} >= 0 and ${t.zeroCount} >= 0 and ${t.zeroCount} <= ${t.count}`,
+    ),
+    dimensions: check(
+      "directory_event_dimensions_valid",
+      sql`${t.source} in ('web','bot') and ${t.kind} in ('search','filter','preset','tag','outbound') and length(${t.key}) between 1 and 80`,
+    ),
   }),
 );
 export const catalogEventReceipts = pgTable(
@@ -108,15 +115,28 @@ export const catalogHistory = pgTable(
   }),
 );
 
-export const maintenanceRuns = pgTable("directory_maintenance_runs", {
-  id: text("id").primaryKey(),
-  kind: text("kind").notNull(),
-  status: text("status").notNull(),
-  startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
-  finishedAt: timestamp("finished_at", { withTimezone: true }),
-  counts: jsonb("counts").$type<Record<string, number | null>>().notNull().default({}),
-  errorClass: text("error_class"),
-}, (t) => ({
-  valid: check("directory_maintenance_run_valid", sql`${t.kind} = 'retention' and ${t.status} in ('succeeded', 'failed')`),
-  recent: index("directory_maintenance_run_recent_idx").on(t.kind, t.startedAt),
-}));
+export const maintenanceRuns = pgTable(
+  "directory_maintenance_runs",
+  {
+    id: text("id").primaryKey(),
+    kind: text("kind").notNull(),
+    status: text("status").notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    counts: jsonb("counts")
+      .$type<Record<string, number | null>>()
+      .notNull()
+      .default({}),
+    errorClass: text("error_class"),
+  },
+  (t) => ({
+    valid: check(
+      "directory_maintenance_run_valid",
+      sql`${t.kind} = 'retention' and ${t.status} in ('succeeded', 'failed')`,
+    ),
+    recent: index("directory_maintenance_run_recent_idx").on(
+      t.kind,
+      t.startedAt,
+    ),
+  }),
+);

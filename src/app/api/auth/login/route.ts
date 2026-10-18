@@ -1,51 +1,54 @@
-import { readJsonBody } from '@/server/catalog/http'
-import { NextRequest } from 'next/server'
-import { apiError, AppError } from '@/lib/errors'
+import { readJsonBody } from "@/server/catalog/http";
+import { NextRequest } from "next/server";
+import { apiError, AppError } from "@/lib/errors";
 import {
   applyRateLimit,
   validateOrigin,
   isAccountLocked,
   trackLoginFailure,
   clearLoginFailures,
-} from '@/server/api-helpers'
-import * as authService from '@/server/services/auth-service'
-import * as sessionService from '@/server/services/session-service'
-import { setSessionCookie } from '@/server/auth'
-import type { SessionResponse } from '@/lib/types'
-import { parseBody } from '@/schemas/parse-body'
-import { loginSchema } from '@/schemas/auth'
+} from "@/server/api-helpers";
+import * as authService from "@/server/services/auth-service";
+import * as sessionService from "@/server/services/session-service";
+import { setSessionCookie } from "@/server/auth";
+import type { SessionResponse } from "@/lib/types";
+import { parseBody } from "@/schemas/parse-body";
+import { loginSchema } from "@/schemas/auth";
 
 export async function POST(req: NextRequest) {
-  if (!validateOrigin(req)) return apiError('FORBIDDEN', 'Invalid origin')
-  const rateLimitResponse = await applyRateLimit(req)
-  if (rateLimitResponse) return rateLimitResponse
+  if (!validateOrigin(req)) return apiError("FORBIDDEN", "Invalid origin");
+  const rateLimitResponse = await applyRateLimit(req);
+  if (rateLimitResponse) return rateLimitResponse;
 
-  let body: unknown
+  let body: unknown;
   try {
-    body = await readJsonBody(req, 12_000)
+    body = await readJsonBody(req, 12_000);
   } catch {
-    return apiError('INVALID_REQUEST', 'Invalid JSON body')
+    return apiError("INVALID_REQUEST", "Invalid JSON body");
   }
 
-  let email = ''
+  let email = "";
   try {
-    const parsed = parseBody(body, loginSchema)
-    email = parsed.email
+    const parsed = parseBody(body, loginSchema);
+    email = parsed.email;
 
     if (await isAccountLocked(parsed.email)) {
-      return apiError('FORBIDDEN', 'Account temporarily locked due to too many failed attempts')
+      return apiError(
+        "FORBIDDEN",
+        "Account temporarily locked due to too many failed attempts",
+      );
     }
 
-    const user = await authService.login(parsed.email, parsed.password)
+    const user = await authService.login(parsed.email, parsed.password);
 
-    await clearLoginFailures(parsed.email)
+    await clearLoginFailures(parsed.email);
 
-    const token = await sessionService.createSession(user.id)
+    const token = await sessionService.createSession(user.id);
 
-    const expiresAt = new Date()
-    expiresAt.setDate(expiresAt.getDate() + sessionService.SESSION_TTL_DAYS)
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + sessionService.SESSION_TTL_DAYS);
 
-    const cookie = setSessionCookie(token, expiresAt)
+    const cookie = setSessionCookie(token, expiresAt);
 
     const responseBody: SessionResponse = {
       authenticated: true,
@@ -56,18 +59,18 @@ export async function POST(req: NextRequest) {
         avatarUrl: user.avatarUrl,
         role: user.role,
       },
-    }
+    };
 
-    const response = Response.json(responseBody)
-    response.headers.append('Set-Cookie', cookie)
-    return response
+    const response = Response.json(responseBody);
+    response.headers.append("Set-Cookie", cookie);
+    return response;
   } catch (err) {
     if (err instanceof AppError) {
-      if (err.code === 'INVALID_CREDENTIALS') {
-        await trackLoginFailure(email)
+      if (err.code === "INVALID_CREDENTIALS") {
+        await trackLoginFailure(email);
       }
-      return apiError(err.code, err.message)
+      return apiError(err.code, err.message);
     }
-    throw err
+    throw err;
   }
 }

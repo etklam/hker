@@ -25,12 +25,16 @@ const report = {
 
 describe("analytics operator view", () => {
   it("filters by source and distinguishes an enabled empty range", async () => {
-    const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => report });
+    const fetch = vi
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => report });
     vi.stubGlobal("fetch", fetch);
     render(<AnalyticsPanel />);
     expect(await screen.findByText(/尚未收集事件/)).toBeInTheDocument();
     expect(screen.getByText(/尚未有獲准的探索操作/)).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("來源"), { target: { value: "web" } });
+    fireEvent.change(screen.getByLabelText("來源"), {
+      target: { value: "web" },
+    });
     await waitFor(() =>
       expect(fetch.mock.calls.at(-1)?.[0]).toContain("source=web"),
     );

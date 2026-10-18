@@ -16,10 +16,14 @@ describe("CSV import", () => {
   it("bounds UTF-8 bytes per field and the number of columns", () => {
     expect(() => parseCsv(`name\n${"界".repeat(8001)}`)).toThrow();
     const headers = ["name", ...Array.from({ length: 24 }, (_, i) => `x${i}`)];
-    expect(() => parseCsv(`${headers.join(",")}\n${headers.map(() => "x").join(",")}`)).toThrow();
+    expect(() =>
+      parseCsv(`${headers.join(",")}\n${headers.map(() => "x").join(",")}`),
+    ).toThrow();
   });
   it("normalizes names while preserving meaningful URL fragments", () => {
     expect(normalizeName(" Ａ B ")).toBe("ab");
-    expect(normalizeUrl("https://EXAMPLE.com/#x")).toBe("https://example.com/#x");
+    expect(normalizeUrl("https://EXAMPLE.com/#x")).toBe(
+      "https://example.com/#x",
+    );
   });
 });

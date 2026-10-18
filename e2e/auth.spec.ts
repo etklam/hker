@@ -1,4 +1,30 @@
-import {test,expect} from '@playwright/test'
-test('administrator login is accessible and has no registration link',async({page})=>{await page.goto('/login');await expect(page.getByRole('heading',{name:'管理員登入'})).toBeVisible();await expect(page.getByLabel('電郵')).toBeVisible();await expect(page.getByLabel('密碼')).toBeVisible();await page.getByRole('button',{name:'登入',exact:true}).click();await expect(page).toHaveURL(/\/login$/);await expect(page.getByRole('link',{name:/註冊|register/i})).toHaveCount(0)})
-test('legacy registration and marketplace are retired',async({request})=>{expect((await request.get('/register')).status()).toBe(410);expect((await request.get('/marketplace')).status()).toBe(410)})
-test('unauthenticated visitors cannot mutate catalog data',async({request})=>{const result=await request.post('/api/admin/catalog',{headers:{origin:process.env.E2E_BASE_URL??'http://localhost:3000'},data:{kind:'listings',data:{name:'Unauthorized',slug:'unauthorized'}}});expect([401,403]).toContain(result.status())})
+import { test, expect } from "@playwright/test";
+test("administrator login is accessible and has no registration link", async ({
+  page,
+}) => {
+  await page.goto("/login");
+  await expect(page.getByRole("heading", { name: "管理員登入" })).toBeVisible();
+  await expect(page.getByLabel("電郵")).toBeVisible();
+  await expect(page.getByLabel("密碼")).toBeVisible();
+  await page.getByRole("button", { name: "登入", exact: true }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole("link", { name: /註冊|register/i })).toHaveCount(
+    0,
+  );
+});
+test("legacy registration and marketplace are retired", async ({ request }) => {
+  expect((await request.get("/register")).status()).toBe(410);
+  expect((await request.get("/marketplace")).status()).toBe(410);
+});
+test("unauthenticated visitors cannot mutate catalog data", async ({
+  request,
+}) => {
+  const result = await request.post("/api/admin/catalog", {
+    headers: { origin: process.env.E2E_BASE_URL ?? "http://localhost:3000" },
+    data: {
+      kind: "listings",
+      data: { name: "Unauthorized", slug: "unauthorized" },
+    },
+  });
+  expect([401, 403]).toContain(result.status());
+});

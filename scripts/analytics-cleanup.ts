@@ -17,11 +17,20 @@ const safeCode = (error: unknown) => {
     : "operation_failed";
 };
 
-async function run(name: string, operation: () => Promise<Record<string, number>>) {
+async function run(
+  name: string,
+  operation: () => Promise<Record<string, number>>,
+) {
   try {
-    Object.assign(counts, Object.fromEntries(
-      Object.entries(await operation()).map(([key, value]) => [`${name}.${key}`, value]),
-    ));
+    Object.assign(
+      counts,
+      Object.fromEntries(
+        Object.entries(await operation()).map(([key, value]) => [
+          `${name}.${key}`,
+          value,
+        ]),
+      ),
+    );
   } catch (error) {
     errors.push(`${name}:${safeCode(error)}`);
     counts[`${name}.failed`] = null;
@@ -35,7 +44,9 @@ async function main() {
   await run("analytics", () => cleanupAnalytics());
   await run("maintenance", async () => {
     const cutoff = new Date(Date.now() - 90 * 86400000);
-    const removed = await db.execute(sql`delete from directory_maintenance_runs where id in (select id from directory_maintenance_runs where finished_at < ${cutoff} order by finished_at limit 1000 for update skip locked) returning id`);
+    const removed = await db.execute(
+      sql`delete from directory_maintenance_runs where id in (select id from directory_maintenance_runs where finished_at < ${cutoff} order by finished_at limit 1000 for update skip locked) returning id`,
+    );
     return { runs: removed.length };
   });
   const status = errors.length ? "failed" : "succeeded";
@@ -48,13 +59,26 @@ async function main() {
     counts,
     errorClass: errors.length ? errors.join(",").slice(0, 160) : null,
   });
-  console.log(JSON.stringify({ status, startedAt, finishedAt: new Date(), deleted: counts, errors }));
+  console.log(
+    JSON.stringify({
+      status,
+      startedAt,
+      finishedAt: new Date(),
+      deleted: counts,
+      errors,
+    }),
+  );
   if (errors.length) process.exitCode = 1;
 }
 
 main()
   .catch(() => {
-    console.error(JSON.stringify({ status: "failed", errorClass: "cleanup_evidence_write_failed" }));
+    console.error(
+      JSON.stringify({
+        status: "failed",
+        errorClass: "cleanup_evidence_write_failed",
+      }),
+    );
     process.exitCode = 1;
   })
   .finally(closeDatabase);

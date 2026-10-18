@@ -1,4 +1,10 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AdminCatalog } from "./AdminCatalog";
 
@@ -39,15 +45,17 @@ describe("admin catalog loading", () => {
     ["categories", ["/api/admin/catalog?taxonomy=1"]],
     ["settings", ["/api/admin/catalog?settings=1"]],
   ] as const)("does not fetch listings for %s", async (section, expected) => {
-    const fetch = vi.fn().mockResolvedValue(Response.json(
-      section === "settings"
-        ? {
-            publicUrlConfigured: false,
-            telegramConfigured: false,
-            webhookProtected: false,
-          }
-        : taxonomy,
-    ));
+    const fetch = vi.fn().mockResolvedValue(
+      Response.json(
+        section === "settings"
+          ? {
+              publicUrlConfigured: false,
+              telegramConfigured: false,
+              webhookProtected: false,
+            }
+          : taxonomy,
+      ),
+    );
     vi.stubGlobal("fetch", fetch);
     render(<AdminCatalog section={section} />);
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(expected.length));

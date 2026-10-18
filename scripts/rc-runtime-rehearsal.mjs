@@ -1,5 +1,12 @@
 import { createHash, randomBytes } from "node:crypto";
-import { chmod, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  mkdtemp,
+  mkdir,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { createServer } from "node:net";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -17,8 +24,14 @@ if (process.argv.some((arg) => arg.startsWith("--database-url")))
 const image =
   process.argv.find((arg) => arg.startsWith("--image="))?.slice(8) ??
   "hker:rc-local";
-const predecessorImage = process.argv.find((arg) => arg.startsWith("--predecessor-image="))?.slice("--predecessor-image=".length) ?? null;
-const evidenceDirectory = process.argv.find((arg) => arg.startsWith("--evidence-dir="))?.slice("--evidence-dir=".length) ?? "artifacts/release-candidate";
+const predecessorImage =
+  process.argv
+    .find((arg) => arg.startsWith("--predecessor-image="))
+    ?.slice("--predecessor-image=".length) ?? null;
+const evidenceDirectory =
+  process.argv
+    .find((arg) => arg.startsWith("--evidence-dir="))
+    ?.slice("--evidence-dir=".length) ?? "artifacts/release-candidate";
 const postgresImage = "postgres:16-alpine";
 const suffix = `${Date.now()}-${process.pid}-${randomBytes(3).toString("hex")}`;
 const prefix = `hker-rc-${suffix}`;
@@ -230,7 +243,14 @@ async function psql(container, database, statement) {
   return result.stdout.trim();
 }
 
-async function runImage(container, database, baseUrl, command, extra = {}, runtimeImage = image) {
+async function runImage(
+  container,
+  database,
+  baseUrl,
+  command,
+  extra = {},
+  runtimeImage = image,
+) {
   const runName = trackDisposable("app-job");
   return docker(
     [
@@ -248,7 +268,13 @@ async function runImage(container, database, baseUrl, command, extra = {}, runti
   );
 }
 
-async function startWebsite(name, container, database, port, runtimeImage = image) {
+async function startWebsite(
+  name,
+  container,
+  database,
+  port,
+  runtimeImage = image,
+) {
   const baseUrl = `http://127.0.0.1:${port}`;
   await docker(
     [
@@ -314,7 +340,11 @@ async function adminCreate(baseUrl, cookie, kind, data) {
       origin: baseUrl,
       cookie,
     },
-    body: JSON.stringify({ kind, data, requestKey: kind === "listings" ? crypto.randomUUID() : undefined }),
+    body: JSON.stringify({
+      kind,
+      data,
+      requestKey: kind === "listings" ? crypto.randomUUID() : undefined,
+    }),
   });
   const body = await response.json();
   if (!response.ok)
@@ -380,10 +410,13 @@ async function seedThroughRuntime(baseUrl, cookie, dbContainer, database) {
     slug: "rc-runtime-draft",
     enabled: false,
   });
-  const operations = Array.from({ length: workerOperationCount }, (_, index) => ({
-    method: "sendMessage",
-    body: { chat_id: -100900001, text: `RC mock ${index + 1}` },
-  }));
+  const operations = Array.from(
+    { length: workerOperationCount },
+    (_, index) => ({
+      method: "sendMessage",
+      body: { chat_id: -100900001, text: `RC mock ${index + 1}` },
+    }),
+  );
   await psql(
     dbContainer,
     database,
@@ -467,7 +500,9 @@ async function runWorkerRehearsal(baseUrl) {
     scheduledJob.next !== 0 ||
     scheduledJob.attempts !== 0
   )
-    throw new Error("Predecessor compatibility test consumed the scheduled recovery job");
+    throw new Error(
+      "Predecessor compatibility test consumed the scheduled recovery job",
+    );
   await docker(
     [
       "run",
@@ -502,7 +537,9 @@ async function runWorkerRehearsal(baseUrl) {
           `select jsonb_build_object('status', status, 'next', next_operation, 'leased', lease_owner is not null) from directory_bot_updates where id=900001;`,
         );
         const state = JSON.parse(value);
-        return state.status === "delivering" && state.leased ? state.next : false;
+        return state.status === "delivering" && state.leased
+          ? state.next
+          : false;
       },
       "worker claim",
       20_000,
@@ -510,11 +547,28 @@ async function runWorkerRehearsal(baseUrl) {
     );
   } catch (error) {
     const [stateText, workerLogs, workerState] = await Promise.all([
-      psql(names.restoreDb, restoreDatabase, `select jsonb_build_object('status', status, 'next', next_operation, 'attempts', attempts, 'errorClass', error_class)::text from directory_bot_updates where id=900001;`),
-      docker(["logs", names.worker], { allowFailure: true, label: "capture interrupted worker logs" }),
-      docker(["inspect", "--format", "{{.State.Status}}|{{.State.ExitCode}}", names.worker], { allowFailure: true, label: "capture interrupted worker state" }),
+      psql(
+        names.restoreDb,
+        restoreDatabase,
+        `select jsonb_build_object('status', status, 'next', next_operation, 'attempts', attempts, 'errorClass', error_class)::text from directory_bot_updates where id=900001;`,
+      ),
+      docker(["logs", names.worker], {
+        allowFailure: true,
+        label: "capture interrupted worker logs",
+      }),
+      docker(
+        [
+          "inspect",
+          "--format",
+          "{{.State.Status}}|{{.State.ExitCode}}",
+          names.worker,
+        ],
+        { allowFailure: true, label: "capture interrupted worker state" },
+      ),
     ]);
-    throw new Error(`${sanitize(error instanceof Error ? error.message : error)}; observedJob=${sanitize(stateText)}; worker=${sanitize(workerState.stdout.trim())}; workerLogs=${sanitize(workerLogs.stdout || workerLogs.stderr)}`);
+    throw new Error(
+      `${sanitize(error instanceof Error ? error.message : error)}; observedJob=${sanitize(stateText)}; worker=${sanitize(workerState.stdout.trim())}; workerLogs=${sanitize(workerLogs.stdout || workerLogs.stderr)}`,
+    );
   }
   await docker(["stop", "-t", "10", names.worker], {
     timeout: 15_000,
@@ -722,7 +776,9 @@ try {
       label: "copy private backup",
     });
     await chmod(backupPath, 0o600);
-    const checksum = createHash("sha256").update(await readFile(backupPath)).digest("hex");
+    const checksum = createHash("sha256")
+      .update(await readFile(backupPath))
+      .digest("hex");
     const sizeBytes = (await readFile(backupPath)).byteLength;
     const inspectContainer = trackDisposable("backup-inspect");
     await docker(
@@ -790,9 +846,14 @@ try {
   let predecessorCompatibility = { status: "not tested" };
   let predecessorImageId = null;
   if (predecessorImage) {
-    predecessorImageId = (await docker(["image", "inspect", predecessorImage, "--format", "{{.Id}}"], {
-      label: "inspect committed predecessor image",
-    })).stdout.trim();
+    predecessorImageId = (
+      await docker(
+        ["image", "inspect", predecessorImage, "--format", "{{.Id}}"],
+        {
+          label: "inspect committed predecessor image",
+        },
+      )
+    ).stdout.trim();
     const predecessorPort = await reservePort();
     const predecessorBaseUrl = await startWebsite(
       names.predecessorWeb,
@@ -803,18 +864,34 @@ try {
     );
     await login(predecessorBaseUrl);
     await verifyPublic(predecessorBaseUrl);
-    await psql(names.restoreDb, restoreDatabase, `
+    await psql(
+      names.restoreDb,
+      restoreDatabase,
+      `
       insert into directory_bot_sessions (key, state) values ('900002:900002', '{"nonce":"rollback-fixture"}'::jsonb);
       insert into directory_bot_updates (id, conversation_key, chat_key, status, operations)
       values (900002, '900002:900002', '900002', 'pending', '[{"method":"sendMessage","body":{"text":"Fictional predecessor compatibility"}}]'::jsonb);
-    `);
-    await runImage(names.restoreDb, restoreDatabase, predecessorBaseUrl, [
-      "node", "ops/bot-runner.cjs", "--limit", "10",
-    ], {}, predecessorImage);
-    const predecessorJob = JSON.parse(await psql(names.restoreDb, restoreDatabase,
-      "select jsonb_build_object('status', status, 'next', next_operation) from directory_bot_updates where id=900002;"));
+    `,
+    );
+    await runImage(
+      names.restoreDb,
+      restoreDatabase,
+      predecessorBaseUrl,
+      ["node", "ops/bot-runner.cjs", "--limit", "10"],
+      {},
+      predecessorImage,
+    );
+    const predecessorJob = JSON.parse(
+      await psql(
+        names.restoreDb,
+        restoreDatabase,
+        "select jsonb_build_object('status', status, 'next', next_operation) from directory_bot_updates where id=900002;",
+      ),
+    );
     if (predecessorJob.status !== "complete" || predecessorJob.next !== 1)
-      throw new Error("Committed predecessor worker did not process a synthetic job against the forward schema");
+      throw new Error(
+        "Committed predecessor worker did not process a synthetic job against the forward schema",
+      );
     await docker(["stop", "-t", "10", names.predecessorWeb], {
       timeout: 15_000,
       label: "stop predecessor compatibility Web",
@@ -846,12 +923,16 @@ try {
     restoreDatabase,
     "show server_version;",
   );
-  const pgDumpVersion = (await docker(["exec", names.sourceDb, "pg_dump", "--version"], {
-    label: "record pg_dump version",
-  })).stdout.trim();
-  const pgRestoreVersion = (await docker(["exec", names.restoreDb, "pg_restore", "--version"], {
-    label: "record pg_restore version",
-  })).stdout.trim();
+  const pgDumpVersion = (
+    await docker(["exec", names.sourceDb, "pg_dump", "--version"], {
+      label: "record pg_dump version",
+    })
+  ).stdout.trim();
+  const pgRestoreVersion = (
+    await docker(["exec", names.restoreDb, "pg_restore", "--version"], {
+      label: "record pg_restore version",
+    })
+  ).stdout.trim();
   const backupBytes = await readFile(join(backupDirectory, "hker-rc.dump"));
   summary = {
     status: "passed",

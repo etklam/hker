@@ -1,135 +1,168 @@
 import { MAX_RATE_WINDOW_MS } from "@/server/auth-cleanup";
-import { isIP } from 'node:net'
-import { isRetiredPath, retiredResponse } from '@/lib/retired-routes'
-import { NextRequest } from 'next/server'
-import { resolveSession } from '@/server/auth'
-import { apiError, AppError } from '@/lib/errors'
-import type { AuthUser } from '@/lib/types'
-import { db } from '@/server/db'
-import { rateLimitEntries, loginFailures } from '@/db/schema/rateLimit'
-import { eq, sql, and, gte } from 'drizzle-orm'
-import { isAdmin } from '@/server/roles'
+import { isIP } from "node:net";
+import { isRetiredPath, retiredResponse } from "@/lib/retired-routes";
+import { NextRequest } from "next/server";
+import { resolveSession } from "@/server/auth";
+import { apiError, AppError } from "@/lib/errors";
+import type { AuthUser } from "@/lib/types";
+import { db } from "@/server/db";
+import { rateLimitEntries, loginFailures } from "@/db/schema/rateLimit";
+import { eq, sql, and, gte } from "drizzle-orm";
+import { isAdmin } from "@/server/roles";
 
 // --- Rate limiting (DB-backed sliding window) ---
 
-export function rateLimit(key: string, limit: number, windowMs: number): Promise<{ allowed: boolean; retryAfterMs: number }> {
-  if (!Number.isSafeInteger(windowMs) || windowMs < 1 || windowMs > MAX_RATE_WINDOW_MS) throw new Error("Unsupported rate limit window")
-  return rateLimitCheck(key, limit, windowMs)
+export function rateLimit(
+  key: string,
+  limit: number,
+  windowMs: number,
+): Promise<{ allowed: boolean; retryAfterMs: number }> {
+  if (
+    !Number.isSafeInteger(windowMs) ||
+    windowMs < 1 ||
+    windowMs > MAX_RATE_WINDOW_MS
+  )
+    throw new Error("Unsupported rate limit window");
+  return rateLimitCheck(key, limit, windowMs);
 }
 
-async function rateLimitCheck(key: string, limit: number, windowMs: number): Promise<{ allowed: boolean; retryAfterMs: number }> {
-  const windowStart = new Date(Date.now() - windowMs)
+async function rateLimitCheck(
+  key: string,
+  limit: number,
+  windowMs: number,
+): Promise<{ allowed: boolean; retryAfterMs: number }> {
+  const windowStart = new Date(Date.now() - windowMs);
 
   return db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'rate-limit:' + key}, 0))`)
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtextextended(${"rate-limit:" + key}, 0))`,
+    );
     const [{ hitCount }] = await tx
       .select({ hitCount: sql<number>`count(*)::int` })
       .from(rateLimitEntries)
-      .where(and(
-        eq(rateLimitEntries.key, key),
-        gte(rateLimitEntries.hitAt, windowStart),
-      ))
+      .where(
+        and(
+          eq(rateLimitEntries.key, key),
+          gte(rateLimitEntries.hitAt, windowStart),
+        ),
+      );
 
     if (hitCount >= limit) {
       const [oldest] = await tx
         .select({ hitAt: rateLimitEntries.hitAt })
         .from(rateLimitEntries)
-        .where(and(
-          eq(rateLimitEntries.key, key),
-          gte(rateLimitEntries.hitAt, windowStart),
-        ))
+        .where(
+          and(
+            eq(rateLimitEntries.key, key),
+            gte(rateLimitEntries.hitAt, windowStart),
+          ),
+        )
         .orderBy(rateLimitEntries.hitAt)
-        .limit(1)
+        .limit(1);
 
       const retryAfterMs = oldest
         ? windowMs - (Date.now() - oldest.hitAt.getTime())
-        : windowMs
-      return { allowed: false, retryAfterMs: Math.max(retryAfterMs, 0) }
+        : windowMs;
+      return { allowed: false, retryAfterMs: Math.max(retryAfterMs, 0) };
     }
 
-    await tx.insert(rateLimitEntries).values({ key })
-    return { allowed: true, retryAfterMs: 0 }
-  })
+    await tx.insert(rateLimitEntries).values({ key });
+    return { allowed: true, retryAfterMs: 0 };
+  });
 }
 
 // --- Rate limit config per endpoint ---
 
 interface RateLimitConfig {
-  limit: number
-  windowMs: number
+  limit: number;
+  windowMs: number;
 }
 
 const RATE_LIMIT_CONFIGS: Record<string, RateLimitConfig> = {
-  'POST:/api/auth/login': { limit: 20, windowMs: 60_000 },
-  'POST:/api/auth/register': { limit: 10, windowMs: 60_000 },
-  'GET:/api/catalog': { limit: 60, windowMs: 60_000 },
-  'GET:/api/marketplace/search': { limit: 60, windowMs: 60_000 },
-  'GET:/api/marketplace': { limit: 90, windowMs: 60_000 },
+  "POST:/api/auth/login": { limit: 20, windowMs: 60_000 },
+  "POST:/api/auth/register": { limit: 10, windowMs: 60_000 },
+  "GET:/api/catalog": { limit: 60, windowMs: 60_000 },
+  "GET:/api/marketplace/search": { limit: 60, windowMs: 60_000 },
+  "GET:/api/marketplace": { limit: 90, windowMs: 60_000 },
+};
+
+const DEFAULT_RATE_LIMIT: RateLimitConfig = { limit: 120, windowMs: 60_000 };
+
+export function getRateLimitConfig(
+  method: string,
+  pathname: string,
+): RateLimitConfig {
+  return RATE_LIMIT_CONFIGS[`${method}:${pathname}`] ?? DEFAULT_RATE_LIMIT;
 }
 
-const DEFAULT_RATE_LIMIT: RateLimitConfig = { limit: 120, windowMs: 60_000 }
+export async function applyRateLimit(
+  req: NextRequest,
+): Promise<Response | null> {
+  const ip = getClientIp(req);
+  const pathname = new URL(req.url).pathname;
+  const config = getRateLimitConfig(req.method, pathname);
+  const key = `rl:${ip}:${req.method}:${pathname}`;
 
-export function getRateLimitConfig(method: string, pathname: string): RateLimitConfig {
-  return RATE_LIMIT_CONFIGS[`${method}:${pathname}`] ?? DEFAULT_RATE_LIMIT
-}
-
-export async function applyRateLimit(req: NextRequest): Promise<Response | null> {
-  const ip = getClientIp(req)
-  const pathname = new URL(req.url).pathname
-  const config = getRateLimitConfig(req.method, pathname)
-  const key = `rl:${ip}:${req.method}:${pathname}`
-
-  const { allowed, retryAfterMs } = await rateLimit(key, config.limit, config.windowMs)
+  const { allowed, retryAfterMs } = await rateLimit(
+    key,
+    config.limit,
+    config.windowMs,
+  );
   if (!allowed) {
-    const retryAfterSeconds = Math.ceil(retryAfterMs / 1000)
+    const retryAfterSeconds = Math.ceil(retryAfterMs / 1000);
     return new Response(
-      JSON.stringify({ code: 'RATE_LIMITED', message: 'Too many requests' }),
+      JSON.stringify({ code: "RATE_LIMITED", message: "Too many requests" }),
       {
         status: 429,
         headers: {
-          'Content-Type': 'application/json',
-          'Retry-After': String(retryAfterSeconds),
+          "Content-Type": "application/json",
+          "Retry-After": String(retryAfterSeconds),
         },
       },
-    )
+    );
   }
-  return null
+  return null;
 }
 
 // --- Login failure tracking (DB-backed) ---
 
-const MAX_LOGIN_FAILURES = 5
-const LOCKOUT_DURATION_MS = 15 * 60_000
+const MAX_LOGIN_FAILURES = 5;
+const LOCKOUT_DURATION_MS = 15 * 60_000;
 
 export async function isAccountLocked(email: string): Promise<boolean> {
-  const key = email.toLowerCase()
+  const key = email.toLowerCase();
   return db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'login-failure:' + key}, 0))`)
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtextextended(${"login-failure:" + key}, 0))`,
+    );
     const [entry] = await tx
       .select()
       .from(loginFailures)
       .where(eq(loginFailures.email, key))
-      .limit(1)
+      .limit(1);
 
-    if (!entry || !entry.lockedUntil) return false
+    if (!entry || !entry.lockedUntil) return false;
     if (new Date() >= entry.lockedUntil) {
-      await tx.delete(loginFailures).where(eq(loginFailures.email, key))
-      return false
+      await tx.delete(loginFailures).where(eq(loginFailures.email, key));
+      return false;
     }
-    return true
-  })
+    return true;
+  });
 }
 
 export async function trackLoginFailure(email: string): Promise<void> {
-  const key = email.toLowerCase()
-  const now = new Date()
+  const key = email.toLowerCase();
+  const now = new Date();
   await db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'login-failure:' + key}, 0))`)
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtextextended(${"login-failure:" + key}, 0))`,
+    );
     const [existing] = await tx
       .select()
       .from(loginFailures)
       .where(eq(loginFailures.email, key))
-      .limit(1).for("update")
+      .limit(1)
+      .for("update");
 
     if (!existing) {
       await tx.insert(loginFailures).values({
@@ -137,81 +170,104 @@ export async function trackLoginFailure(email: string): Promise<void> {
         failCount: 1,
         firstFailure: now,
         lockedUntil: null,
-      })
-      return
+      });
+      return;
     }
 
-    const expiredWindow = existing.firstFailure.getTime() < now.getTime() - LOCKOUT_DURATION_MS && (!existing.lockedUntil || existing.lockedUntil <= now)
-    const newCount = expiredWindow ? 1 : existing.failCount + 1
-    const lockedUntil = newCount >= MAX_LOGIN_FAILURES
-      ? new Date(now.getTime() + LOCKOUT_DURATION_MS)
-      : null
+    const expiredWindow =
+      existing.firstFailure.getTime() < now.getTime() - LOCKOUT_DURATION_MS &&
+      (!existing.lockedUntil || existing.lockedUntil <= now);
+    const newCount = expiredWindow ? 1 : existing.failCount + 1;
+    const lockedUntil =
+      newCount >= MAX_LOGIN_FAILURES
+        ? new Date(now.getTime() + LOCKOUT_DURATION_MS)
+        : null;
 
     await tx
       .update(loginFailures)
-      .set({ failCount: newCount, lockedUntil, firstFailure: expiredWindow ? now : existing.firstFailure })
-      .where(eq(loginFailures.email, key))
-  })
+      .set({
+        failCount: newCount,
+        lockedUntil,
+        firstFailure: expiredWindow ? now : existing.firstFailure,
+      })
+      .where(eq(loginFailures.email, key));
+  });
 }
 
 export async function clearLoginFailures(email: string): Promise<void> {
-  const key = email.toLowerCase()
+  const key = email.toLowerCase();
   await db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'login-failure:' + key}, 0))`)
-    await tx.delete(loginFailures).where(eq(loginFailures.email, key))
-  })
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtextextended(${"login-failure:" + key}, 0))`,
+    );
+    await tx.delete(loginFailures).where(eq(loginFailures.email, key));
+  });
 }
 
 // --- Trusted proxy / IP parsing ---
 
-export function getClientIp(req: Pick<NextRequest, 'headers'>): string {
+export function getClientIp(req: Pick<NextRequest, "headers">): string {
   // The ingress must overwrite this header and prevent direct access before opting in.
-  if (process.env.TRUST_PROXY_HEADERS !== 'true') return 'untrusted-shared'
-  const value = req.headers.get('x-real-ip')?.trim()
-  return value && isIP(value) ? value : 'untrusted-shared'
+  if (process.env.TRUST_PROXY_HEADERS !== "true") return "untrusted-shared";
+  const value = req.headers.get("x-real-ip")?.trim();
+  return value && isIP(value) ? value : "untrusted-shared";
 }
 
 // --- Origin / Referer CSRF validation ---
 
 export function validateOrigin(req: NextRequest): boolean {
-  const method = req.method.toUpperCase()
-  if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') {
-    return true
+  const method = req.method.toUpperCase();
+  if (method === "GET" || method === "HEAD" || method === "OPTIONS") {
+    return true;
   }
 
-  const origin = req.headers.get('origin')
-  const referer = req.headers.get('referer')
-  const baseUrl = process.env.APP_BASE_URL
+  const origin = req.headers.get("origin");
+  const referer = req.headers.get("referer");
+  const baseUrl = process.env.APP_BASE_URL;
 
   if (!baseUrl) {
-    if (process.env.NODE_ENV === 'production') return false
-    return true
+    if (process.env.NODE_ENV === "production") return false;
+    return true;
   }
 
-  let allowedOrigin: string
+  let allowedOrigin: string;
   try {
-    const configured = new URL(baseUrl)
-    if (!['http:', 'https:'].includes(configured.protocol) || configured.username || configured.password) return false
-    allowedOrigin = configured.origin
-  } catch { return false }
+    const configured = new URL(baseUrl);
+    if (
+      !["http:", "https:"].includes(configured.protocol) ||
+      configured.username ||
+      configured.password
+    )
+      return false;
+    allowedOrigin = configured.origin;
+  } catch {
+    return false;
+  }
 
   if (origin) {
     try {
-      return new URL(origin).origin === allowedOrigin && new URL(origin).pathname === '/' && !new URL(origin).username && !new URL(origin).password && !new URL(origin).search && !new URL(origin).hash
+      return (
+        new URL(origin).origin === allowedOrigin &&
+        new URL(origin).pathname === "/" &&
+        !new URL(origin).username &&
+        !new URL(origin).password &&
+        !new URL(origin).search &&
+        !new URL(origin).hash
+      );
     } catch {
-      return false
+      return false;
     }
   }
 
   if (referer) {
     try {
-      return new URL(referer).origin === allowedOrigin
+      return new URL(referer).origin === allowedOrigin;
     } catch {
-      return false
+      return false;
     }
   }
 
-  return false
+  return false;
 }
 
 // --- Auth wrappers ---
@@ -219,72 +275,72 @@ export function validateOrigin(req: NextRequest): boolean {
 type AuthenticatedHandler = (
   req: NextRequest,
   context: { user: AuthUser },
-) => Promise<Response>
+) => Promise<Response>;
 
 type OptionalAuthHandler = (
   req: NextRequest,
   context: { user: AuthUser | null },
-) => Promise<Response>
+) => Promise<Response>;
 
 export function withAuth(handler: AuthenticatedHandler) {
   return async (req: NextRequest) => {
-    if (isRetiredPath(new URL(req.url).pathname)) return retiredResponse()
+    if (isRetiredPath(new URL(req.url).pathname)) return retiredResponse();
     if (!validateOrigin(req)) {
-      return apiError('FORBIDDEN', 'Invalid origin')
+      return apiError("FORBIDDEN", "Invalid origin");
     }
 
-    const rateLimitResponse = await applyRateLimit(req)
-    if (rateLimitResponse) return rateLimitResponse
+    const rateLimitResponse = await applyRateLimit(req);
+    if (rateLimitResponse) return rateLimitResponse;
 
-    const user = await resolveSession(req)
+    const user = await resolveSession(req);
     if (!user) {
-      return apiError('UNAUTHORIZED', 'Authentication required')
+      return apiError("UNAUTHORIZED", "Authentication required");
     }
 
     try {
-      return await handler(req, { user })
+      return await handler(req, { user });
     } catch (e) {
-      if (e instanceof AppError) return apiError(e.code, e.message)
-      throw e
+      if (e instanceof AppError) return apiError(e.code, e.message);
+      throw e;
     }
-  }
+  };
 }
 
 export function withOptionalAuth(handler: OptionalAuthHandler) {
   return async (req: NextRequest) => {
-    if (isRetiredPath(new URL(req.url).pathname)) return retiredResponse()
+    if (isRetiredPath(new URL(req.url).pathname)) return retiredResponse();
     if (!validateOrigin(req)) {
-      return apiError('FORBIDDEN', 'Invalid origin')
+      return apiError("FORBIDDEN", "Invalid origin");
     }
 
-    const rateLimitResponse = await applyRateLimit(req)
-    if (rateLimitResponse) return rateLimitResponse
+    const rateLimitResponse = await applyRateLimit(req);
+    if (rateLimitResponse) return rateLimitResponse;
 
-    const user = await resolveSession(req)
+    const user = await resolveSession(req);
 
     try {
-      return await handler(req, { user })
+      return await handler(req, { user });
     } catch (e) {
-      if (e instanceof AppError) return apiError(e.code, e.message)
-      throw e
+      if (e instanceof AppError) return apiError(e.code, e.message);
+      throw e;
     }
-  }
+  };
 }
 
 export function withAdmin(handler: AuthenticatedHandler) {
   return withAuth(async (req, ctx) => {
     if (!isAdmin(ctx.user.role)) {
-      return apiError('FORBIDDEN', 'Admin access required')
+      return apiError("FORBIDDEN", "Admin access required");
     }
-    return handler(req, ctx)
-  })
+    return handler(req, ctx);
+  });
 }
 
 export function withSuperAdmin(handler: AuthenticatedHandler) {
   return withAuth(async (req, ctx) => {
-    if (ctx.user.role !== 'superadmin') {
-      return apiError('FORBIDDEN', 'Superadmin access required')
+    if (ctx.user.role !== "superadmin") {
+      return apiError("FORBIDDEN", "Superadmin access required");
     }
-    return handler(req, ctx)
-  })
+    return handler(req, ctx);
+  });
 }

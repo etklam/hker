@@ -30,16 +30,39 @@ describe("K3s offline release renderer", () => {
     const runtime = readFileSync(report.manifests.runtime, "utf8");
     const preflightJob = JSON.parse(preflight.split(/^---\s*$/m).at(-1)!);
     const migrationJob = JSON.parse(migration.trim());
-    const documents = runtime.split(/^---\s*$/m).map((value) => JSON.parse(value));
+    const documents = runtime
+      .split(/^---\s*$/m)
+      .map((value) => JSON.parse(value));
     expect(migration).not.toContain("postgresql://");
     expect(preflight).not.toContain("postgresql://");
     expect(runtime).not.toContain("postgresql://");
-    expect(preflightJob.spec.template.spec.containers[0].command).toEqual(["node", "ops/migrate.cjs"]);
-    expect(migrationJob.spec.template.spec.containers[0].command).toEqual(["node", "ops/migrate.cjs", "--apply"]);
-    expect(documents.find((value) => value.kind === "Deployment" && value.metadata.name === "web").spec.replicas).toBe(1);
-    expect(documents.find((value) => value.kind === "Deployment" && value.metadata.name === "worker").spec.replicas).toBe(0);
-    expect(documents.find((value) => value.kind === "CronJob").spec.concurrencyPolicy).toBe("Forbid");
-    expect(documents.find((value) => value.kind === "CronJob").spec.timeZone).toBe("Asia/Hong_Kong");
+    expect(preflightJob.spec.template.spec.containers[0].command).toEqual([
+      "node",
+      "ops/migrate.cjs",
+    ]);
+    expect(migrationJob.spec.template.spec.containers[0].command).toEqual([
+      "node",
+      "ops/migrate.cjs",
+      "--apply",
+    ]);
+    expect(
+      documents.find(
+        (value) => value.kind === "Deployment" && value.metadata.name === "web",
+      ).spec.replicas,
+    ).toBe(1);
+    expect(
+      documents.find(
+        (value) =>
+          value.kind === "Deployment" && value.metadata.name === "worker",
+      ).spec.replicas,
+    ).toBe(0);
+    expect(
+      documents.find((value) => value.kind === "CronJob").spec
+        .concurrencyPolicy,
+    ).toBe("Forbid");
+    expect(
+      documents.find((value) => value.kind === "CronJob").spec.timeZone,
+    ).toBe("Asia/Hong_Kong");
   });
 
   it("refuses --apply before reading cluster state unless exact operator acknowledgements are supplied", () => {

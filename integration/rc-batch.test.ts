@@ -112,8 +112,9 @@ describe("RC-05 bounded batch reads", () => {
         expect(exported.listings[0].links).toHaveLength(2);
       }
       console.log("RC05_STATEMENTS", JSON.stringify(observations));
-      const evidenceDirectory = process.env.HKER_ACCEPTANCE_EVIDENCE_DIR
-        ?? `artifacts/release-candidate/rc05-statements/${run}`;
+      const evidenceDirectory =
+        process.env.HKER_ACCEPTANCE_EVIDENCE_DIR ??
+        `artifacts/release-candidate/rc05-statements/${run}`;
       mkdirSync(evidenceDirectory, { recursive: true });
       writeFileSync(
         join(evidenceDirectory, "rc05-statements.json"),

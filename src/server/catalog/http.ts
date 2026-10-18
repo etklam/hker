@@ -25,7 +25,13 @@ export async function catalogResponse(work: () => Promise<unknown>) {
     if (code === "55P03" || code === "40P01")
       return apiError("CONFLICT", "資料正被其他操作更新，請稍後重試。");
     if (code === "57014")
-      return Response.json({ code: "SERVICE_UNAVAILABLE", message: "操作逾時，請縮小條件或稍後重試。" }, { status: 503 });
+      return Response.json(
+        {
+          code: "SERVICE_UNAVAILABLE",
+          message: "操作逾時，請縮小條件或稍後重試。",
+        },
+        { status: 503 },
+      );
     if (code === "23505")
       return apiError("CONFLICT", "This slug already exists");
     if (code === "23503")
@@ -61,8 +67,13 @@ export async function readJsonBody(
       chunks.push(value);
     }
     let decoded: string;
-    try { decoded = new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks)); }
-    catch { throw new AppError("INVALID_REQUEST", "Request must use UTF-8"); }
+    try {
+      decoded = new TextDecoder("utf-8", { fatal: true }).decode(
+        Buffer.concat(chunks),
+      );
+    } catch {
+      throw new AppError("INVALID_REQUEST", "Request must use UTF-8");
+    }
     return JSON.parse(decoded);
   } finally {
     reader.releaseLock();

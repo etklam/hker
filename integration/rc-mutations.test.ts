@@ -56,6 +56,8 @@ describe("release candidate destructive mutation boundary", () => {
       afterRevision: null,
     });
     expect(history[0].changes).toHaveProperty("links");
-    expect(history[0].changes).toHaveProperty("slugAliases.before", [created.slug]);
+    expect(history[0].changes).toHaveProperty("slugAliases.before", [
+      created.slug,
+    ]);
   });
 });

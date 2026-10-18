@@ -1,0 +1,23 @@
+# Applied migrations are immutable — never reformat them.
+drizzle/
+
+# Build output and generated artifacts
+.next/
+.ops/
+coverage/
+test-results/
+playwright-report/
+artifacts/
+next-env.d.ts
+*.tsbuildinfo
+
+# Dependencies and lockfiles
+node_modules/
+package-lock.json
+pnpm-lock.yaml
+
+# Fixtures that are compared byte-for-byte
+public/*.csv
+
+# Prose is reviewed, not formatted; PRODUCT.md and AGENTS.md are authoritative.
+*.md

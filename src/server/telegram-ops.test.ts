@@ -26,10 +26,14 @@ describe("Telegram operations helper", () => {
   });
 
   it("refuses a webhook change before network access without a protected token", () => {
-    const result = spawnSync(process.execPath, [script, "set-webhook", "--apply"], {
-      encoding: "utf8",
-      env: safeEnvironment,
-    });
+    const result = spawnSync(
+      process.execPath,
+      [script, "set-webhook", "--apply"],
+      {
+        encoding: "utf8",
+        env: safeEnvironment,
+      },
+    );
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("TELEGRAM_BOT_TOKEN is required");
     expect(result.stderr).not.toContain("https://staging.example.test");

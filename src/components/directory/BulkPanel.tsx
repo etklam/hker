@@ -170,7 +170,11 @@ export function BulkPanel({
           預覽批次變更
         </button>
       </div>
-      {message && <p role="alert" className="error-message">{message}</p>}
+      {message && (
+        <p role="alert" className="error-message">
+          {message}
+        </p>
+      )}
       {plan && (
         <>
           <ContentPlanReview plan={plan} />

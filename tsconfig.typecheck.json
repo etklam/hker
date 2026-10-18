@@ -1,9 +1,4 @@
 {
   "extends": "./tsconfig.json",
-  "include": [
-    "**/*.mts",
-    "**/*.ts",
-    "**/*.tsx",
-    "next-env.d.ts"
-  ]
+  "include": ["**/*.mts", "**/*.ts", "**/*.tsx", "next-env.d.ts"]
 }

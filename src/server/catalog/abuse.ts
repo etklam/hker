@@ -26,7 +26,10 @@ export async function allowCatalogRequest(
   try {
     return (await rateLimit(abuseKey(header, bucket), limit, 60_000)).allowed;
   } catch {
-    throw new AppError("SERVICE_UNAVAILABLE", "搜尋服務暫時無法使用，請稍後重試。");
+    throw new AppError(
+      "SERVICE_UNAVAILABLE",
+      "搜尋服務暫時無法使用，請稍後重試。",
+    );
   }
 }
 export async function guardPublicSearch() {

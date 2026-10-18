@@ -46,12 +46,22 @@ describe("concurrent authentication boundaries", () => {
   });
   it("preserves current failures while cleaning an expired accounting window", async () => {
     await db.delete(loginFailures).where(eq(loginFailures.email, email));
-    await db.insert(loginFailures).values({ email, failCount: 2, firstFailure: new Date(Date.now() - 2 * 86400000), lockedUntil: null });
-    await Promise.all([cleanupAuthentication(), ...Array.from({ length: 10 }, () => trackLoginFailure(email))]);
-    const [row] = await db.select().from(loginFailures).where(eq(loginFailures.email, email));
+    await db.insert(loginFailures).values({
+      email,
+      failCount: 2,
+      firstFailure: new Date(Date.now() - 2 * 86400000),
+      lockedUntil: null,
+    });
+    await Promise.all([
+      cleanupAuthentication(),
+      ...Array.from({ length: 10 }, () => trackLoginFailure(email)),
+    ]);
+    const [row] = await db
+      .select()
+      .from(loginFailures)
+      .where(eq(loginFailures.email, email));
     expect(row.failCount).toBe(10);
     expect(row.firstFailure.getTime()).toBeGreaterThan(Date.now() - 60000);
     expect(await isAccountLocked(email)).toBe(true);
   });
-
 });

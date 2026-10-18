@@ -15,7 +15,12 @@ import {
 } from "../src/server/catalog/service";
 import { searchSchema, type SearchInput } from "../src/schemas/directory";
 
-const LISTING_COUNT = boundedInteger("HKER_BENCHMARK_LISTINGS", 3_000, 1_000, 10_000);
+const LISTING_COUNT = boundedInteger(
+  "HKER_BENCHMARK_LISTINGS",
+  3_000,
+  1_000,
+  10_000,
+);
 const SAMPLE_COUNT = boundedInteger("HKER_BENCHMARK_SAMPLES", 30, 20, 200);
 const CONCURRENCY = boundedInteger("HKER_BENCHMARK_CONCURRENCY", 8, 2, 20);
 const CONCURRENT_OPERATIONS = boundedInteger(
@@ -26,7 +31,12 @@ const CONCURRENT_OPERATIONS = boundedInteger(
 );
 const RUN = `perfbench-${Date.now().toString(36)}-${randomBytes(3).toString("hex")}`;
 
-function boundedInteger(name: string, fallback: number, minimum: number, maximum: number) {
+function boundedInteger(
+  name: string,
+  fallback: number,
+  minimum: number,
+  maximum: number,
+) {
   const value = Number(process.env[name] ?? fallback);
   if (!Number.isInteger(value) || value < minimum || value > maximum)
     throw new Error(`${name} must be an integer from ${minimum} to ${maximum}`);
@@ -37,7 +47,9 @@ function benchmarkUrl() {
   if (Number(process.versions.node.split(".")[0]) !== 24)
     throw new Error("Catalog benchmark requires Node.js 24");
   if (process.env.HKER_BENCHMARK_ALLOW_WRITE !== "1")
-    throw new Error("Set HKER_BENCHMARK_ALLOW_WRITE=1 to permit synthetic writes");
+    throw new Error(
+      "Set HKER_BENCHMARK_ALLOW_WRITE=1 to permit synthetic writes",
+    );
   const value = new URL(process.env.DATABASE_URL ?? "http://invalid");
   if (
     !["postgres:", "postgresql:"].includes(value.protocol) ||
@@ -157,8 +169,10 @@ async function seed() {
       description: `合成效能資料 ${RUN} ${index}，只供隔離測量。`,
       categoryId: categories[index % categories.length].id,
       areaId: areas[index % areas.length].id,
-      priceMin: price === 0 || price === 3 ? null : price === 1 ? "100.00" : "600.00",
-      priceMax: price === 0 || price === 2 ? null : price === 1 ? "500.00" : "300.00",
+      priceMin:
+        price === 0 || price === 3 ? null : price === 1 ? "100.00" : "600.00",
+      priceMax:
+        price === 0 || price === 2 ? null : price === 1 ? "500.00" : "300.00",
       priceCurrency: index % 17 === 0 ? "USD" : "HKD",
       attrs: { hours: "10:00-18:00", syntheticRun: RUN },
       featured: index % 10 === 0,
@@ -169,10 +183,10 @@ async function seed() {
   const listingRows: { id: number; slug: string }[] = [];
   await insertBatches(listingValues, 250, async (batch) => {
     listingRows.push(
-      ...(await benchmarkDb
-        .insert(directory.listings)
-        .values(batch)
-        .returning({ id: directory.listings.id, slug: directory.listings.slug })),
+      ...(await benchmarkDb.insert(directory.listings).values(batch).returning({
+        id: directory.listings.id,
+        slug: directory.listings.slug,
+      })),
     );
   });
   await insertBatches(
@@ -198,8 +212,15 @@ async function seed() {
   );
   await insertBatches(
     listingRows.flatMap((listing, index) => {
-      const chosen = [tags[index % 200].id, tags[(index * 7 + 1) % 200].id, tags[5].id];
-      return [...new Set(chosen)].map((tagId) => ({ listingId: listing.id, tagId }));
+      const chosen = [
+        tags[index % 200].id,
+        tags[(index * 7 + 1) % 200].id,
+        tags[5].id,
+      ];
+      return [...new Set(chosen)].map((tagId) => ({
+        listingId: listing.id,
+        tagId,
+      }));
     }),
     1_000,
     (batch) => benchmarkDb.insert(directory.listingTags).values(batch),
@@ -250,15 +271,24 @@ async function observe(run: () => Promise<unknown>): Promise<Observation> {
 }
 
 function distribution(samples: Observation[]) {
-  const values = samples.map((sample) => sample.milliseconds).sort((a, b) => a - b);
-  const percentile = (ratio: number) => values[Math.min(values.length - 1, Math.ceil(values.length * ratio) - 1)];
+  const values = samples
+    .map((sample) => sample.milliseconds)
+    .sort((a, b) => a - b);
+  const percentile = (ratio: number) =>
+    values[Math.min(values.length - 1, Math.ceil(values.length * ratio) - 1)];
   const queries = samples.map((sample) => sample.queries);
   return {
     samples: samples.length,
-    errors: samples.filter((sample) => sample.error).map((sample) => sample.error),
+    errors: samples
+      .filter((sample) => sample.error)
+      .map((sample) => sample.error),
     latencyMs: {
       min: Number(values[0].toFixed(2)),
-      mean: Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(2)),
+      mean: Number(
+        (values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(
+          2,
+        ),
+      ),
       p50: Number(percentile(0.5).toFixed(2)),
       p95: Number(percentile(0.95).toFixed(2)),
       p99: Number(percentile(0.99).toFixed(2)),
@@ -267,13 +297,21 @@ function distribution(samples: Observation[]) {
     queryCount: {
       min: Math.min(...queries),
       max: Math.max(...queries),
-      mean: Number((queries.reduce((sum, value) => sum + value, 0) / queries.length).toFixed(2)),
+      mean: Number(
+        (
+          queries.reduce((sum, value) => sum + value, 0) / queries.length
+        ).toFixed(2),
+      ),
     },
   };
 }
 
 function planSummary(value: unknown) {
-  const result = value as { "Planning Time"?: number; "Execution Time"?: number; Plan?: Record<string, unknown> }[];
+  const result = value as {
+    "Planning Time"?: number;
+    "Execution Time"?: number;
+    Plan?: Record<string, unknown>;
+  }[];
   const root = result[0] ?? {};
   const nodes: Record<string, unknown>[] = [];
   const visit = (node: Record<string, unknown> | undefined) => {
@@ -291,7 +329,9 @@ function planSummary(value: unknown) {
       sortMethod: node["Sort Method"] ?? null,
       sortSpaceKb: node["Sort Space Used"] ?? null,
     });
-    for (const child of (node.Plans as Record<string, unknown>[] | undefined) ?? []) visit(child);
+    for (const child of (node.Plans as Record<string, unknown>[] | undefined) ??
+      [])
+      visit(child);
   };
   visit(root.Plan);
   return {
@@ -301,11 +341,17 @@ function planSummary(value: unknown) {
   };
 }
 
-async function explain(name: string, raw: SearchInput, audience: "public" | "admin") {
+async function explain(
+  name: string,
+  raw: SearchInput,
+  audience: "public" | "admin",
+) {
   const input = searchSchema.parse(raw);
   const where = and(
     buildSearchWhere(input, audience),
-    input.sort.startsWith("price-") ? eq(directory.listings.priceCurrency, "HKD") : undefined,
+    input.sort.startsWith("price-")
+      ? eq(directory.listings.priceCurrency, "HKD")
+      : undefined,
   )!;
   const result = await benchmarkDb.execute(sql`
     explain (analyze, buffers, format json)
@@ -341,32 +387,127 @@ async function main() {
       );
       return result.items.map((item) => ({
         slug: item.slug,
-        text: [item.name, item.area?.name, item.category?.name, item.shortDescription]
+        text: [
+          item.name,
+          item.area?.name,
+          item.category?.name,
+          item.shortDescription,
+        ]
           .filter(Boolean)
           .join("\n"),
         links: item.links.slice(0, 2).map((link) => link.url),
       }));
     };
     const scenarios: Scenario[] = [
-      { name: "homepage-featured", run: () => CatalogSearchService.search({ featured: true, pageSize: 12 }, "public", catalogExecutor) },
-      { name: "empty-browse", run: () => CatalogSearchService.search({ pageSize: 12 }, "public", catalogExecutor) },
-      { name: "chinese-name-search", run: () => CatalogSearchService.search({ query: "港式維修", pageSize: 12 }, "public", catalogExecutor) },
-      { name: "tag-alias-search", run: () => CatalogSearchService.search({ query: "週末維修", pageSize: 12 }, "public", catalogExecutor) },
-      { name: "multi-tag-and", run: () => CatalogSearchService.search({ tagIds: [fixture.tags[1].id, fixture.tags[5].id], tagMatchMode: "and", pageSize: 12 }, "public", catalogExecutor) },
-      { name: "multi-tag-or", run: () => CatalogSearchService.search({ tagIds: [fixture.tags[1].id, fixture.tags[5].id], tagMatchMode: "or", pageSize: 12 }, "public", catalogExecutor) },
-      { name: "parent-area", run: () => CatalogSearchService.search({ areaId: fixture.areas[0].rootId, pageSize: 12 }, "public", catalogExecutor) },
-      { name: "bounded-price", run: () => CatalogSearchService.search({ priceMin: 200, priceMax: 700, pageSize: 12 }, "public", catalogExecutor) },
-      { name: "detail", run: () => CatalogSearchService.detail(fixture.listings[Math.floor(LISTING_COUNT / 2)].slug, "public", catalogExecutor) },
-      { name: "admin-filtered-list", run: () => CatalogSearchService.search({ status: "disabled", query: RUN, pageSize: 50 }, "admin", catalogExecutor) },
+      {
+        name: "homepage-featured",
+        run: () =>
+          CatalogSearchService.search(
+            { featured: true, pageSize: 12 },
+            "public",
+            catalogExecutor,
+          ),
+      },
+      {
+        name: "empty-browse",
+        run: () =>
+          CatalogSearchService.search(
+            { pageSize: 12 },
+            "public",
+            catalogExecutor,
+          ),
+      },
+      {
+        name: "chinese-name-search",
+        run: () =>
+          CatalogSearchService.search(
+            { query: "港式維修", pageSize: 12 },
+            "public",
+            catalogExecutor,
+          ),
+      },
+      {
+        name: "tag-alias-search",
+        run: () =>
+          CatalogSearchService.search(
+            { query: "週末維修", pageSize: 12 },
+            "public",
+            catalogExecutor,
+          ),
+      },
+      {
+        name: "multi-tag-and",
+        run: () =>
+          CatalogSearchService.search(
+            {
+              tagIds: [fixture.tags[1].id, fixture.tags[5].id],
+              tagMatchMode: "and",
+              pageSize: 12,
+            },
+            "public",
+            catalogExecutor,
+          ),
+      },
+      {
+        name: "multi-tag-or",
+        run: () =>
+          CatalogSearchService.search(
+            {
+              tagIds: [fixture.tags[1].id, fixture.tags[5].id],
+              tagMatchMode: "or",
+              pageSize: 12,
+            },
+            "public",
+            catalogExecutor,
+          ),
+      },
+      {
+        name: "parent-area",
+        run: () =>
+          CatalogSearchService.search(
+            { areaId: fixture.areas[0].rootId, pageSize: 12 },
+            "public",
+            catalogExecutor,
+          ),
+      },
+      {
+        name: "bounded-price",
+        run: () =>
+          CatalogSearchService.search(
+            { priceMin: 200, priceMax: 700, pageSize: 12 },
+            "public",
+            catalogExecutor,
+          ),
+      },
+      {
+        name: "detail",
+        run: () =>
+          CatalogSearchService.detail(
+            fixture.listings[Math.floor(LISTING_COUNT / 2)].slug,
+            "public",
+            catalogExecutor,
+          ),
+      },
+      {
+        name: "admin-filtered-list",
+        run: () =>
+          CatalogSearchService.search(
+            { status: "disabled", query: RUN, pageSize: 50 },
+            "admin",
+            catalogExecutor,
+          ),
+      },
       { name: "bot-result-planning", run: botPlan },
     ];
 
     const cold: Record<string, Observation> = {};
-    for (const scenario of scenarios) cold[scenario.name] = await observe(scenario.run);
+    for (const scenario of scenarios)
+      cold[scenario.name] = await observe(scenario.run);
     const warm: Record<string, ReturnType<typeof distribution>> = {};
     for (const scenario of scenarios) {
       const samples: Observation[] = [];
-      for (let index = 0; index < SAMPLE_COUNT; index++) samples.push(await observe(scenario.run));
+      for (let index = 0; index < SAMPLE_COUNT; index++)
+        samples.push(await observe(scenario.run));
       warm[scenario.name] = distribution(samples);
     }
 
@@ -383,7 +524,10 @@ async function main() {
           const started = performance.now();
           try {
             await scenario.run();
-            concurrentSamples.push({ milliseconds: performance.now() - started, queries: 0 });
+            concurrentSamples.push({
+              milliseconds: performance.now() - started,
+              queries: 0,
+            });
           } catch (error) {
             concurrentSamples.push({
               milliseconds: performance.now() - started,
@@ -398,12 +542,40 @@ async function main() {
 
     const explains = await Promise.all([
       explain("empty-browse", { pageSize: 12 }, "public"),
-      explain("chinese-name-search", { query: "港式維修", pageSize: 12 }, "public"),
-      explain("tag-alias-search", { query: "週末維修", pageSize: 12 }, "public"),
-      explain("multi-tag-and", { tagIds: [fixture.tags[1].id, fixture.tags[5].id], tagMatchMode: "and", pageSize: 12 }, "public"),
-      explain("parent-area", { areaId: fixture.areas[0].rootId, pageSize: 12 }, "public"),
-      explain("bounded-price", { priceMin: 200, priceMax: 700, pageSize: 12 }, "public"),
-      explain("admin-filtered-list", { status: "disabled", query: RUN, pageSize: 50 }, "admin"),
+      explain(
+        "chinese-name-search",
+        { query: "港式維修", pageSize: 12 },
+        "public",
+      ),
+      explain(
+        "tag-alias-search",
+        { query: "週末維修", pageSize: 12 },
+        "public",
+      ),
+      explain(
+        "multi-tag-and",
+        {
+          tagIds: [fixture.tags[1].id, fixture.tags[5].id],
+          tagMatchMode: "and",
+          pageSize: 12,
+        },
+        "public",
+      ),
+      explain(
+        "parent-area",
+        { areaId: fixture.areas[0].rootId, pageSize: 12 },
+        "public",
+      ),
+      explain(
+        "bounded-price",
+        { priceMin: 200, priceMax: 700, pageSize: 12 },
+        "public",
+      ),
+      explain(
+        "admin-filtered-list",
+        { status: "disabled", query: RUN, pageSize: 50 },
+        "admin",
+      ),
     ]);
 
     failed =
@@ -413,7 +585,8 @@ async function main() {
     console.log(
       JSON.stringify(
         {
-          label: "exploratory isolated benchmark; not a production-capacity claim",
+          label:
+            "exploratory isolated benchmark; not a production-capacity claim",
           run: RUN,
           recordedAt: new Date().toISOString(),
           runtime: {
@@ -436,13 +609,19 @@ async function main() {
             aliases: fixture.tags.length,
             links: LISTING_COUNT * 2,
             listingTagRelations: "up to three per listing",
-            includes: ["disabled listings", "hidden taxonomy", "missing and bounded prices", "non-HKD prices"],
+            includes: [
+              "disabled listings",
+              "hidden taxonomy",
+              "missing and bounded prices",
+              "non-HKD prices",
+            ],
           },
           conditions: {
             cold: "first call in this process; operating-system and PostgreSQL caches were not flushed",
             warm: `${SAMPLE_COUNT} serial samples per path after the first call`,
             concurrent: `${CONCURRENCY} concurrent clients, ${CONCURRENT_OPERATIONS} mixed operations`,
-            queryCount: "Drizzle statements issued by the measured service path",
+            queryCount:
+              "Drizzle statements issued by the measured service path",
             bot: "Bot-audience result query/hydration and in-memory result planning; excludes taxonomy, session and delivery-journal work",
           },
           cold,
@@ -450,9 +629,13 @@ async function main() {
           concurrent: {
             ...distribution(concurrentSamples),
             workers: CONCURRENCY,
-            wallClockMs: Number((performance.now() - concurrentStarted).toFixed(2)),
+            wallClockMs: Number(
+              (performance.now() - concurrentStarted).toFixed(2),
+            ),
             totalQueries: concurrentQueries,
-            queriesPerOperation: Number((concurrentQueries / concurrentSamples.length).toFixed(2)),
+            queriesPerOperation: Number(
+              (concurrentQueries / concurrentSamples.length).toFixed(2),
+            ),
           },
           explains,
         },

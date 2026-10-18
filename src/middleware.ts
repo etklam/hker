@@ -1,51 +1,60 @@
-import { isRetiredPath } from '@/lib/retired-routes'
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+import { isRetiredPath } from "@/lib/retired-routes";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
 export function middleware(request: NextRequest) {
-  const deployment = process.env.HKER_ENVIRONMENT ?? (process.env.NODE_ENV === 'production' ? 'production' : 'local')
+  const deployment =
+    process.env.HKER_ENVIRONMENT ??
+    (process.env.NODE_ENV === "production" ? "production" : "local");
   if (isRetiredPath(request.nextUrl.pathname)) {
-    const retired = new NextResponse('This legacy feature is no longer available.', { status: 410, headers: { 'Cache-Control': 'no-store' } })
-    if (deployment === 'staging') retired.headers.set('X-Robots-Tag', 'noindex, nofollow')
-    return retired
+    const retired = new NextResponse(
+      "This legacy feature is no longer available.",
+      { status: 410, headers: { "Cache-Control": "no-store" } },
+    );
+    if (deployment === "staging")
+      retired.headers.set("X-Robots-Tag", "noindex, nofollow");
+    return retired;
   }
-  const requestHeaders = new Headers(request.headers)
-  requestHeaders.set('x-hker-deployment-environment', deployment)
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-hker-deployment-environment", deployment);
   const nonce = btoa(crypto.randomUUID());
   const productionPolicy = `default-src 'self'; script-src 'self' 'nonce-${nonce}' 'strict-dynamic'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: https:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`;
-  if (process.env.NODE_ENV === 'production') requestHeaders.set('Content-Security-Policy', productionPolicy);
-  const response = NextResponse.next({ request: { headers: requestHeaders } })
-  
-  response.headers.set('X-Content-Type-Options', 'nosniff')
-  response.headers.set('X-Frame-Options', 'DENY')
-  response.headers.set('Referrer-Policy', 'no-referrer')
-  response.headers.set('X-DNS-Prefetch-Control', 'on')
-  if (deployment === 'staging') response.headers.set('X-Robots-Tag', 'noindex, nofollow')
+  if (process.env.NODE_ENV === "production")
+    requestHeaders.set("Content-Security-Policy", productionPolicy);
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
 
-  if (process.env.NODE_ENV === 'production') {
-    response.headers.set('Strict-Transport-Security', 'max-age=31536000')
-    response.headers.set(
-      'Content-Security-Policy',
-      productionPolicy,
-    )
+  response.headers.set("X-Content-Type-Options", "nosniff");
+  response.headers.set("X-Frame-Options", "DENY");
+  response.headers.set("Referrer-Policy", "no-referrer");
+  response.headers.set("X-DNS-Prefetch-Control", "on");
+  if (deployment === "staging")
+    response.headers.set("X-Robots-Tag", "noindex, nofollow");
+
+  if (process.env.NODE_ENV === "production") {
+    response.headers.set("Strict-Transport-Security", "max-age=31536000");
+    response.headers.set("Content-Security-Policy", productionPolicy);
   } else {
     response.headers.set(
-      'Content-Security-Policy-Report-Only',
+      "Content-Security-Policy-Report-Only",
       "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'",
-    )
+    );
   }
 
   // Protect admin API routes at the edge (admin page-level is handled client-side + API withAdmin)
-  const pathname = request.nextUrl.pathname
-  if (pathname.startsWith('/api/admin') || pathname === '/login' || pathname.startsWith('/admin')) {
-    response.headers.set('X-Robots-Tag', 'noindex, nofollow')
+  const pathname = request.nextUrl.pathname;
+  if (
+    pathname.startsWith("/api/admin") ||
+    pathname === "/login" ||
+    pathname.startsWith("/admin")
+  ) {
+    response.headers.set("X-Robots-Tag", "noindex, nofollow");
     // The actual auth check is done in withAdmin handler, but we add extra headers
-    response.headers.set('Cache-Control', 'no-store')
+    response.headers.set("Cache-Control", "no-store");
   }
 
-  return response
+  return response;
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
-}
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+};

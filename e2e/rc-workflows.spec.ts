@@ -24,7 +24,9 @@ async function resetAdminCatalogReadLimit() {
     database.pathname !== "/hker_directory_test" ||
     !["localhost", "127.0.0.1", "[::1]"].includes(database.hostname)
   )
-    throw new Error("RC rate-limit isolation requires the disposable test database");
+    throw new Error(
+      "RC rate-limit isolation requires the disposable test database",
+    );
   const sql = postgres(database.toString(), { max: 1 });
   try {
     await sql`delete from rate_limit_entries where key = ${"rl:untrusted-shared:GET:/api/admin/catalog"}`;
@@ -59,7 +61,11 @@ test.describe("Phase 9 release-candidate browser workflows", () => {
     const create = async (name: string, slug: string, links: unknown[]) => {
       const response = await request.post("/api/admin/catalog", {
         headers,
-        data: { kind: "listings", requestKey: crypto.randomUUID(), data: { name, slug, links } },
+        data: {
+          kind: "listings",
+          requestKey: crypto.randomUUID(),
+          data: { name, slug, links },
+        },
       });
       expect(response.ok()).toBe(true);
       return response.json();
@@ -311,7 +317,8 @@ test.describe("Phase 9 release-candidate browser workflows", () => {
           await request.delete("/api/admin/catalog", {
             headers,
             data: {
-              kind: "listings", requestKey: crypto.randomUUID(),
+              kind: "listings",
+              requestKey: crypto.randomUUID(),
               id: current.id,
               revision: current.revision,
             },
