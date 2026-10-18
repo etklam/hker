@@ -2,6 +2,9 @@ FROM node:24-alpine AS builder
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NPM_CONFIG_UPDATE_NOTIFIER=false
+# db.ts top-level guard checks NEXT_PHASE; this Next release sets it only after
+# page-data collection, so pin it for the whole build to keep module import safe.
+ENV NEXT_PHASE=phase-production-build
 COPY package*.json ./
 RUN npm ci --no-audit --no-fund
 COPY . .
