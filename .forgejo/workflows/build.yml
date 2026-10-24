@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Login to Forgejo Registry
-        run: echo "${{ secrets.FORGEJO_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+        run: echo "${{ secrets.REGISTRY_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
 
       - name: Pull previous image for cache
         run: docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest || true
